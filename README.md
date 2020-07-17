@@ -6,8 +6,8 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
 
 ## Roadmap
 
-[ ] Finalize cli semantics
-[ ] Support Language/frameworks/usage templates:
+- [ ] Finalize cli semantics
+- [ ] Support Language/frameworks/usage templates:
  - [ ] Python
  - [ ] Qt
  - [ ] Stdenv
@@ -15,8 +15,8 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
  - [ ] Haskell
  - [ ] mkShell
  - [ ] and many more...
-[ ] Add option (--comments?) to embed noob-friendly comments and explanations about common usage patterns
-[ ] Allow contributor information to be set locally (similar to git settings)
+- [ ] Add option (--comments?) to embed noob-friendly comments and explanations about common usage patterns
+- [ ] Allow contributor information to be set locally (similar to git settings)
 
 ## End Goal
 
