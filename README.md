@@ -8,19 +8,19 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
 
 - [ ] Finalize cli semantics
 - [ ] Support Language/frameworks/usage templates:
- - [ ] Python
- - [ ] Qt
- - [ ] Stdenv
- - [ ] Go
- - [ ] Haskell
- - [ ] mkShell
- - [ ] and many more...
+  - [ ] Python
+  - [ ] Qt
+  - [ ] Stdenv
+  - [ ] Go
+  - [ ] Haskell
+  - [ ] mkShell
+  - [ ] and many more...
 - [ ] Add option (--comments?) to embed noob-friendly comments and explanations about common usage patterns
 - [ ] Allow contributor information to be set locally (similar to git settings)
 
 ## End Goal
 
-```nix
+```bash
 $ nix-template python -pname requests -f pypi pkgs/development/python-modules/
 Generating python expression at pkgs/development/python-modules/requests/default.nix
 For an addition to nixpkgs as a python package, please add the following to pkgs/top-level/python-packages.nix:
@@ -30,8 +30,9 @@ For an addition to nixpkgs as a python package, please add the following to pkgs
 For an addition to nixpkgs as a python application, please add the following to pkgs/top-level/all-packages.nix:
 
   requests = python3Packages.callPackage <PATH_FROM_CLI> { };
-
-$ cat pkgs/development/python-modules/requests/default.nix
+```
+```nix
+# pkgs/development/python-modules/requests/default.nix
 { lib, buildPythonPackage, fetchPypi }:
 
 buildPythonPackage rec {
