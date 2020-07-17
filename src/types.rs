@@ -1,6 +1,7 @@
-use clap::{arg_enum};
+use clap::arg_enum;
 
 arg_enum! {
+    #[allow(non_camel_case_types)]
     #[derive(Debug)]
     pub enum Template {
         stdenv,
@@ -12,6 +13,7 @@ arg_enum! {
 }
 
 arg_enum! {
+    #[allow(non_camel_case_types)]
     #[derive(Debug)]
     pub enum Fetcher {
         github,
