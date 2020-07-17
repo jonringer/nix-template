@@ -1,0 +1,14 @@
+[package]
+name        = "nix-template"
+version     = "0.1.0"
+description = "Utility to generate common nix expressions"
+license     = "CC0-1.0"
+homepage    = "https://github.com/jonringer/nix-template"
+repository  = "https://github.com/jonringer/nix-template"
+authors     = ["Jonathan Ringer <jonringer117@gmail.com>"]
+edition     = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = "2.0"
