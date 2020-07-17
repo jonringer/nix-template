@@ -1,9 +1,16 @@
-use clap::{Arg, App, SubCommand};
+use clap::{Arg, App, SubCommand, AppSettings};
 
 pub fn build_cli() -> App<'static, 'static> {
     App::new("nix-template")
         .version("0.1")
         .about("Create common nix expressions")
+        .setting(AppSettings::ColoredHelp)
+        // make completions and other subcommands distinct from
+        // default template usage
+        .setting(AppSettings::SubcommandsNegateReqs)
+        // make it so that completions subcommand doesn't
+        // inherit global options
+        .setting(AppSettings::ArgsNegateSubcommands)
         .after_help(
 "EXAMPLES:
 
@@ -19,7 +26,12 @@ $ nix-template python -pname requests -f pypi pkgs/development/python-modules/
         .arg(Arg::from_usage("-f,--fetcher [fetcher] 'Fetcher to use'")
              .possible_values(&["github", "gitlab", "git","url","zip","pypi"])
              .default_value("github"))
-}
+        .subcommand(SubCommand::with_name("completions")
+             .about("Generate shell completion scripts")
+             .arg(Arg::from_usage("<SHELL>")
+                  .possible_values(&clap::Shell::variants())))
+
+                    }
 
 #[cfg(test)]
 mod tests {
