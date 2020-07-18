@@ -17,6 +17,7 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
   - [ ] and many more...
 - [ ] Add option (--comments?) to embed noob-friendly comments and explanations about common usage patterns
 - [ ] Allow contributor information to be set locally (similar to git settings)
+- [X] Implement shell completion (nix-template completions <SHELL>)
 
 ## End Goal
 
