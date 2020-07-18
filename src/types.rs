@@ -23,4 +23,3 @@ arg_enum! {
         pypi,
     }
 }
-

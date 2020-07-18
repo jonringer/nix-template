@@ -5,5 +5,6 @@ mkShell {
     cargo
     openssl
     pkg-config
+    rustfmt
   ];
 }

@@ -1,6 +1,6 @@
-use clap::{Arg, App, SubCommand, AppSettings};
+use clap::{App, AppSettings, Arg, SubCommand};
 
-use crate::types::{Template, Fetcher};
+use crate::types::{Fetcher, Template};
 
 pub fn build_cli() -> App<'static, 'static> {
     App::new("nix-template")
@@ -14,29 +14,42 @@ pub fn build_cli() -> App<'static, 'static> {
         // inherit global options
         .setting(AppSettings::ArgsNegateSubcommands)
         .after_help(
-"EXAMPLES:
+            "EXAMPLES:
 
 $ nix-template python -pname requests -f pypi pkgs/development/python-modules/
 
-")
-        .arg(Arg::from_usage("<TEMPLATE> 'Language or framework template target'")
-             .possible_values(&Template::variants())
-             .case_insensitive(true)
-             .default_value("stdenv"))
-        .arg(Arg::from_usage("[PATH] 'location for file to be written'").default_value("default.nix")
-             .default_value_if("TEMPLATE",Some("mkshell"),"shell.nix"))
-        .arg(Arg::from_usage("-p,--pname [pname] 'Package name to be used in expresion'"))
-        .arg(Arg::from_usage("-f,--fetcher [fetcher] 'Fetcher to use'")
-             .possible_values(&Fetcher::variants())
-             .case_insensitive(true)
-             .default_value("github"))
-        .subcommand(SubCommand::with_name("completions")
-             .about("Generate shell completion scripts")
-             .arg(Arg::from_usage("<SHELL>")
-                  .case_insensitive(true)
-                  .possible_values(&clap::Shell::variants())))
-
-                    }
+",
+        )
+        .arg(
+            Arg::from_usage("<TEMPLATE> 'Language or framework template target'")
+                .possible_values(&Template::variants())
+                .case_insensitive(true)
+                .default_value("stdenv"),
+        )
+        .arg(
+            Arg::from_usage("[PATH] 'location for file to be written'")
+                .default_value("default.nix")
+                .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix"),
+        )
+        .arg(Arg::from_usage(
+            "-p,--pname [pname] 'Package name to be used in expresion'",
+        ))
+        .arg(
+            Arg::from_usage("-f,--fetcher [fetcher] 'Fetcher to use'")
+                .possible_values(&Fetcher::variants())
+                .case_insensitive(true)
+                .default_value("github"),
+        )
+        .subcommand(
+            SubCommand::with_name("completions")
+                .about("Generate shell completion scripts")
+                .arg(
+                    Arg::from_usage("<SHELL>")
+                        .case_insensitive(true)
+                        .possible_values(&clap::Shell::variants()),
+                ),
+        )
+}
 
 #[cfg(test)]
 mod tests {
@@ -44,21 +57,21 @@ mod tests {
 
     #[test]
     fn test_python() {
-        let m = build_cli().get_matches_from(vec!["nix-template","python","-p","requests"]);
+        let m = build_cli().get_matches_from(vec!["nix-template", "python", "-p", "requests"]);
         assert_eq!(m.value_of("pname"), Some("requests"));
         assert_eq!(m.value_of("TEMPLATE"), Some("python"));
     }
 
     #[test]
     fn test_mkshell() {
-        let m = build_cli().get_matches_from(vec!["nix-template","mkshell"]);
+        let m = build_cli().get_matches_from(vec!["nix-template", "mkshell"]);
         assert_eq!(m.value_of("TEMPLATE"), Some("mkshell"));
         assert_eq!(m.value_of("PATH"), Some("shell.nix"));
     }
 
     #[test]
     fn test_fetcher() {
-        let m = build_cli().get_matches_from(vec!["nix-template","-f","gitlab"]);
+        let m = build_cli().get_matches_from(vec!["nix-template", "-f", "gitlab"]);
         assert_eq!(m.value_of("fetcher"), Some("gitlab"));
     }
 }
