@@ -16,7 +16,7 @@ pub fn build_cli() -> App<'static, 'static> {
         .after_help(
             "EXAMPLES:
 
-$ nix-template python -pname requests -f pypi pkgs/development/python-modules/
+$ nix-template python --pname requests -f pypi pkgs/development/python-modules/
 
 ",
         )
