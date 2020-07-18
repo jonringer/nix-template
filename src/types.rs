@@ -6,6 +6,7 @@ arg_enum! {
     pub enum Template {
         stdenv,
         python,
+        mkshell,
         //Go,
         //Rust,
         //Qt,
