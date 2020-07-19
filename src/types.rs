@@ -2,7 +2,7 @@ use clap::arg_enum;
 
 arg_enum! {
     #[allow(non_camel_case_types)]
-    #[derive(Debug)]
+    #[derive(Debug,PartialEq)]
     pub enum Template {
         stdenv,
         python,

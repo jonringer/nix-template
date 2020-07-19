@@ -33,7 +33,7 @@ $ nix-template python --pname requests -f pypi pkgs/development/python-modules/
         )
         .arg(Arg::from_usage(
             "-p,--pname [pname] 'Package name to be used in expresion'",
-        ))
+            ).default_value("CHANGE"))
         .arg(Arg::from_usage(
             "-n,--nixpkgs 'Intended be used within nixpkgs, will append pname to file path, and print addition statement'",
         ).takes_value(false))
@@ -61,7 +61,8 @@ mod tests {
 
     #[test]
     fn test_python() {
-        let m = build_cli().get_matches_from(vec!["nix-template", "python", "-n", "-p", "requests"]);
+        let m =
+            build_cli().get_matches_from(vec!["nix-template", "python", "-n", "-p", "requests"]);
         println!("{:?}", m);
         assert_eq!(m.value_of("pname"), Some("requests"));
         assert_eq!(m.value_of("TEMPLATE"), Some("python"));
