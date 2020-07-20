@@ -7,6 +7,7 @@ pub fn build_cli() -> App<'static, 'static> {
         .version("0.1")
         .author("Jon Ringer <jonringer117@gmail.com>")
         .about("Create common nix expressions")
+        .version_short("V")
         .setting(AppSettings::ColoredHelp)
         // make completions and other subcommands distinct from
         // default template usage
@@ -33,8 +34,15 @@ $ nix-template mkshell
         )
         .arg(
             Arg::from_usage("[PATH] 'location for file to be written'")
+                .default_value("default.nix")
                 .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix"),
         )
+        .arg(Arg::from_usage(
+            "-s,--stdout 'Write expression to stdout, instead of PATH'",
+            ))
+        .arg(Arg::from_usage(
+            "-v <version> 'Set version of package'",
+            ).default_value("0.0.1"))
         .arg(Arg::from_usage(
             "-p,--pname [pname] 'Package name to be used in expresion'",
             ).default_value("CHANGE"))
@@ -76,12 +84,15 @@ mod tests {
         assert_eq!(m.value_of("pname"), Some("requests"));
         assert_eq!(m.value_of("TEMPLATE"), Some("python"));
         assert_eq!(m.value_of("fetcher"), Some("pypi"));
+        assert_eq!(m.value_of("v"), Some("0.0.1"));
+        assert_eq!(m.is_present("stdout"), false);
         assert!(m.occurrences_of("nixpkgs") >= 1);
     }
 
     #[test]
     fn test_mkshell() {
-        let m = build_cli().get_matches_from(vec!["nix-template", "mkshell"]);
+        let m = build_cli().get_matches_from(vec!["nix-template", "-s", "mkshell"]);
+        assert_eq!(m.is_present("stdout"), true);
         assert_eq!(m.value_of("TEMPLATE"), Some("mkshell"));
         assert_eq!(m.value_of("PATH"), Some("shell.nix"));
     }
