@@ -69,7 +69,7 @@ fn meta(template: &Template, fetcher: &Fetcher) -> &'static str {
   }"
 }
 
-pub fn generate_expression(template: &Template, fetcher: &Fetcher, pname: &str) -> String {
+pub fn generate_expression(template: &Template, fetcher: &Fetcher, pname: &str, version: &str) -> String {
     match template {
         Template::mkshell => "with import <nixpkgs> { };
 
@@ -110,7 +110,7 @@ mkShell rec {
                 header = header,
                 dh_helper = dh_block,
                 pname = pname,
-                version = "CHANGE",
+                version = version,
                 f_block = f_block,
                 build_inputs = build_inputs(&template),
                 meta = meta(&template, &fetcher)
