@@ -60,14 +60,14 @@ fn build_inputs(template: &Template) -> &'static str {
     }
 }
 
-fn meta(template: &Template, fetcher: &Fetcher, license: &str, maintainer: &str) -> String {
+fn meta(template: &Template, fetcher: &Fetcher, pname: &str, license: &str, maintainer: &str) -> String {
     format!(
 "  meta = with lib; {{
     description = \"CHANGE\";
-    homepage = \"CHANGE\";
+    homepage = \"https://github.com/{owner}/{pname}/\";
     license = license.{license};
     maintainer = with maintainers; [ {maintainer} ];
-  }}", license=license, maintainer=maintainer)
+  }}", license=license, maintainer=maintainer, owner="CHANGE", pname=pname)
 }
 
 pub fn generate_expression(template: &Template, fetcher: &Fetcher, pname: &str, version: &str, license: &str, maintainer: &str) -> String {
@@ -114,7 +114,7 @@ mkShell rec {
                 version = version,
                 f_block = f_block,
                 build_inputs = build_inputs(&template),
-                meta = meta(&template, &fetcher, &license, &maintainer)
+                meta = meta(&template, &fetcher, &pname, &license, &maintainer)
             )
         }
     }
