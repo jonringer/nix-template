@@ -9,12 +9,13 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
 - [ ] Finalize cli semantics
 - [ ] Ease usage with nixpkgs repo
 - [ ] Support Language/frameworks/usage templates:
-  - [ ] Python
+  - [X] Stdenv
+  - [X] Python
+  - [X] mkShell
   - [ ] Qt
-  - [ ] Stdenv
   - [ ] Go
+  - [ ] Rust
   - [ ] Haskell
-  - [ ] mkShell
   - [ ] and many more...
 - [ ] Add option (--comments?) to embed noob-friendly comments and explanations about common usage patterns
 - [ ] Allow contributor information to be set locally (similar to git settings)
