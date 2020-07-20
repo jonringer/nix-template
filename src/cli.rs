@@ -38,6 +38,9 @@ $ nix-template mkshell
                 .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix"),
         )
         .arg(Arg::from_usage(
+            "-m,--maintainer <maintainer> 'Set maintainer'",
+            ).default_value("CHANGE"))
+        .arg(Arg::from_usage(
             "-s,--stdout 'Write expression to stdout, instead of PATH'",
             ))
         .arg(Arg::from_usage(

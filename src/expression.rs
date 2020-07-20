@@ -60,16 +60,17 @@ fn build_inputs(template: &Template) -> &'static str {
     }
 }
 
-fn meta(template: &Template, fetcher: &Fetcher) -> &'static str {
-    "  meta = with lib; {
+fn meta(template: &Template, fetcher: &Fetcher, maintainer: &str) -> String {
+    format!(
+"  meta = with lib; {{
     description = \"CHANGE\";
     homepage = \"CHANGE\";
     license = license.CHANGE;
-    maintainer = with maintainers; [ CHANGE ];
-  }"
+    maintainer = with maintainers; [ {maintainer} ];
+  }}", maintainer=maintainer)
 }
 
-pub fn generate_expression(template: &Template, fetcher: &Fetcher, pname: &str, version: &str) -> String {
+pub fn generate_expression(template: &Template, fetcher: &Fetcher, pname: &str, version: &str, maintainer: &str) -> String {
     match template {
         Template::mkshell => "with import <nixpkgs> { };
 
@@ -113,7 +114,7 @@ mkShell rec {
                 version = version,
                 f_block = f_block,
                 build_inputs = build_inputs(&template),
-                meta = meta(&template, &fetcher)
+                meta = meta(&template, &fetcher, &maintainer)
             )
         }
     }
