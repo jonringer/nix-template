@@ -5,6 +5,7 @@ use crate::types::{Fetcher, Template};
 pub fn build_cli() -> App<'static, 'static> {
     App::new("nix-template")
         .version("0.1")
+        .author("Jon Ringer <jonringer117@gmail.com>")
         .about("Create common nix expressions")
         .setting(AppSettings::ColoredHelp)
         // make completions and other subcommands distinct from
@@ -16,7 +17,11 @@ pub fn build_cli() -> App<'static, 'static> {
         .after_help(
             "EXAMPLES:
 
-$ nix-template python --pname requests -f pypi pkgs/development/python-modules/
+# generate a python package expressison at pkgs/development/python-modules/requests/default.nix
+$ nix-template python --nixpkgs --pname requests
+
+# generate a shell.nix in $PWD
+$ nix-template mkshell
 
 ",
         )
@@ -28,12 +33,14 @@ $ nix-template python --pname requests -f pypi pkgs/development/python-modules/
         )
         .arg(
             Arg::from_usage("[PATH] 'location for file to be written'")
-                .default_value("default.nix")
                 .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix"),
         )
         .arg(Arg::from_usage(
             "-p,--pname [pname] 'Package name to be used in expresion'",
             ).default_value("CHANGE"))
+        .arg(Arg::from_usage(
+            "-r,--nixpkgs-root [path] 'Set root of the nixpkgs directory'",
+            ).env("NIXPKGS_ROOT"))
         .arg(Arg::from_usage(
             "-n,--nixpkgs 'Intended be used within nixpkgs, will append pname to file path, and print addition statement'",
         ).takes_value(false))
@@ -58,6 +65,8 @@ $ nix-template python --pname requests -f pypi pkgs/development/python-modules/
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::{assert_eq};
+    use serial_test::serial;
 
     #[test]
     fn test_python() {
@@ -67,7 +76,7 @@ mod tests {
         assert_eq!(m.value_of("pname"), Some("requests"));
         assert_eq!(m.value_of("TEMPLATE"), Some("python"));
         assert_eq!(m.value_of("fetcher"), Some("pypi"));
-        assert_eq!(m.occurrences_of("nixpkgs"), 1);
+        assert!(m.occurrences_of("nixpkgs") >= 1);
     }
 
     #[test]
@@ -81,5 +90,14 @@ mod tests {
     fn test_fetcher() {
         let m = build_cli().get_matches_from(vec!["nix-template", "-f", "gitlab"]);
         assert_eq!(m.value_of("fetcher"), Some("gitlab"));
+    }
+
+    #[test]
+    #[serial] // touching global env, ensure serial runs
+    fn test_nixpkgs() {
+        use std::env::set_var;
+        set_var("NIXPKGS_ROOT", "/testdir/");
+        let m = build_cli().get_matches_from(vec!["nix-template", "-n"]);
+        assert_eq!(m.value_of("nixpkgs-root"), Some("/testdir/"));
     }
 }

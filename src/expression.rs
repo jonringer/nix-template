@@ -94,8 +94,7 @@ mkShell rec {
             let header = format!("{{ {input_list} }}:", input_list = inputs.join(", "));
 
             format!(
-                "
-{header}
+"{header}
 
 {dh_helper} rec {{
   pname = \"{pname}\";

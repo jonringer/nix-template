@@ -7,6 +7,7 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
 ## Roadmap
 
 - [ ] Finalize cli semantics
+- [ ] Ease usage with nixpkgs repo
 - [ ] Support Language/frameworks/usage templates:
   - [ ] Python
   - [ ] Qt
