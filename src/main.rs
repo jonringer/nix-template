@@ -29,11 +29,12 @@ fn main() {
             let fetcher: types::Fetcher = arg_to_type(m.value_of("fetcher"));
             let pname: String = arg_to_type(m.value_of("pname"));
             let version: String = arg_to_type(m.value_of("v"));
+            let license: String = arg_to_type(m.value_of("license"));
             let maintainer: String = arg_to_type(m.value_of("maintainer"));
             let path_str: String = arg_to_type(m.value_of("PATH"));
             let path = std::path::PathBuf::from(&path_str);
 
-            let expr = expression::generate_expression(&template, &fetcher, &pname, &version, &maintainer);
+            let expr = expression::generate_expression(&template, &fetcher, &pname, &version, &license, &maintainer);
 
             if path.exists() {
                 eprintln!("Cannot write to file '{}', already exists", path.display());

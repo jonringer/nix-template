@@ -38,6 +38,9 @@ $ nix-template mkshell
                 .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix"),
         )
         .arg(Arg::from_usage(
+            "-l,--license <license> 'Set license'",
+            ).default_value("CHANGE"))
+        .arg(Arg::from_usage(
             "-m,--maintainer <maintainer> 'Set maintainer'",
             ).default_value("CHANGE"))
         .arg(Arg::from_usage(
@@ -88,6 +91,7 @@ mod tests {
         assert_eq!(m.value_of("TEMPLATE"), Some("python"));
         assert_eq!(m.value_of("fetcher"), Some("pypi"));
         assert_eq!(m.value_of("v"), Some("0.0.1"));
+        assert_eq!(m.value_of("license"), Some("CHANGE"));
         assert_eq!(m.is_present("stdout"), false);
         assert!(m.occurrences_of("nixpkgs") >= 1);
     }
@@ -102,7 +106,8 @@ mod tests {
 
     #[test]
     fn test_fetcher() {
-        let m = build_cli().get_matches_from(vec!["nix-template", "-f", "gitlab"]);
+        let m = build_cli().get_matches_from(vec!["nix-template", "-f", "gitlab", "-l", "mit"]);
+        assert_eq!(m.value_of("license"), Some("mit"));
         assert_eq!(m.value_of("fetcher"), Some("gitlab"));
     }
 
