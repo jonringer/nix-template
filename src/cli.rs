@@ -48,19 +48,19 @@ $ nix-template mkshell
                 .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix"),
         )
         .arg(Arg::from_usage(
-            "-l,--license <license> 'Set license'",
+            "-l,--license [license] 'Set license'",
             ).default_value("CHANGE"))
         .arg(Arg::from_usage(
-            "-m,--maintainer <maintainer> 'Set maintainer'",
+            "-m,--maintainer [maintainer] 'Set maintainer'",
             ).default_value(""))
         .arg(Arg::from_usage(
             "--no-meta 'Don't include meta section'",
-            ))
+            ).conflicts_with("nixpkgs"))
         .arg(Arg::from_usage(
             "-s,--stdout 'Write expression to stdout, instead of PATH'",
             ))
         .arg(Arg::from_usage(
-            "-v <version> 'Set version of package'",
+            "-v [version] 'Set version of package'",
             ).default_value("0.0.1"))
         .arg(Arg::from_usage(
             "-p,--pname [pname] 'Package name to be used in expresion'",
