@@ -52,10 +52,12 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
     }
 }
 
-fn build_inputs(template: &Template) -> &'static str {
+fn build_inputs(template: &Template, pname: &str) -> String {
     match template {
-        Template::python => "  propagatedBuildInputs = [ ];",
-        _ => "  buildInputs = [ ];",
+        Template::python => format!("  propagatedBuildInputs = [ ];
+
+  pythonImportsCheck = [ \"{pname}\" ];", pname=&pname),
+        _ => "  buildInputs = [ ];".to_owned(),
     }
 }
 
@@ -117,7 +119,7 @@ mkShell rec {
                 pname = &info.pname,
                 version = &info.version,
                 f_block = f_block,
-                build_inputs = build_inputs(&info.template),
+                build_inputs = build_inputs(&info.template, &info.pname),
                 meta = meta(&info.pname, &info.license, &info.maintainer)
             )
         }
