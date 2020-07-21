@@ -52,28 +52,23 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
     }
 }
 
-fn build_inputs(template: &Template, pname: &str) -> String {
+fn build_inputs(template: &Template) -> &'static str {
     match template {
-        Template::python => format!("  propagatedBuildInputs = [ ];
+        Template::python => "  propagatedBuildInputs = [ ];
 
-  pythonImportsCheck = [ \"{pname}\" ];", pname=&pname),
-        _ => "  buildInputs = [ ];".to_owned(),
+  pythonImportsCheck = [ \"@pname@\" ];",
+        _ => "  buildInputs = [ ];",
     }
 }
 
-fn meta(pname: &str, license: &str, maintainer: &str) -> String {
-    format!(
-        "  meta = with lib; {{
+fn meta() -> &'static str {
+        "
+  meta = with lib; {
     description = \"CHANGE\";
-    homepage = \"https://github.com/{owner}/{pname}/\";
-    license = license.{license};
-    maintainer = with maintainers; [ {maintainer} ];
-  }}",
-        license = license,
-        maintainer = maintainer,
-        owner = "CHANGE",
-        pname = pname
-    )
+    homepage = \"https://github.com/CHANGE/@pname@/\";
+    license = license.@license@;
+    maintainer = with maintainers; [ @maintainer@ ];
+  }"
 }
 
 pub fn generate_expression(info: &ExpressionInfo) -> String {
@@ -100,7 +95,7 @@ mkShell rec {
 
             let header = format!("{{ {input_list} }}:", input_list = inputs.join(", "));
 
-            format!(
+            info.format(&format!(
                 "{header}
 
 {dh_helper} rec {{
@@ -110,7 +105,6 @@ mkShell rec {
 {f_block}
 
 {build_inputs}
-
 {meta}
 }}
 ",
@@ -119,9 +113,9 @@ mkShell rec {
                 pname = &info.pname,
                 version = &info.version,
                 f_block = f_block,
-                build_inputs = build_inputs(&info.template, &info.pname),
-                meta = meta(&info.pname, &info.license, &info.maintainer)
-            )
+                build_inputs = build_inputs(&info.template),
+                meta = if info.include_meta { meta() } else { "" },
+            ))
         }
     }
 }

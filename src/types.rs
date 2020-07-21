@@ -35,4 +35,14 @@ pub struct ExpressionInfo {
     pub template: Template,
     pub path_to_write: std::path::PathBuf,
     pub top_level_path: std::path::PathBuf,
+    pub include_meta: bool,
+}
+
+impl ExpressionInfo {
+    pub fn format(&self, s: &str) -> String {
+        s.to_owned().replace("@pname@", &self.pname)
+            .replace("@version@", &self.version)
+            .replace("@license@", &self.license)
+            .replace("@maintainer@", &self.maintainer)
+    }
 }

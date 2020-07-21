@@ -54,6 +54,9 @@ $ nix-template mkshell
             "-m,--maintainer <maintainer> 'Set maintainer'",
             ).default_value(""))
         .arg(Arg::from_usage(
+            "--no-meta 'Don't include meta section'",
+            ))
+        .arg(Arg::from_usage(
             "-s,--stdout 'Write expression to stdout, instead of PATH'",
             ))
         .arg(Arg::from_usage(
@@ -96,6 +99,7 @@ pub fn validate_and_serialize_matches(matches: &ArgMatches) -> ExpressionInfo {
     let nixpkgs_root: String = arg_to_type(matches.value_of("nixpkgs-root"));
     let path_str: String = arg_to_type(matches.value_of("PATH"));
     let path = std::path::PathBuf::from(&path_str);
+    let include_meta: bool = !matches.is_present("no-meta");
 
     let (path_to_write, top_level_path) =
         nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);
@@ -109,6 +113,7 @@ pub fn validate_and_serialize_matches(matches: &ArgMatches) -> ExpressionInfo {
         fetcher,
         path_to_write,
         top_level_path,
+        include_meta
     }
 }
 
