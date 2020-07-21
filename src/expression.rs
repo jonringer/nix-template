@@ -59,7 +59,7 @@ fn build_inputs(template: &Template) -> &'static str {
     }
 }
 
-fn meta(template: &Template, fetcher: &Fetcher, pname: &str, license: &str, maintainer: &str) -> String {
+fn meta(pname: &str, license: &str, maintainer: &str) -> String {
     format!(
 "  meta = with lib; {{
     description = \"CHANGE\";
@@ -113,7 +113,7 @@ mkShell rec {
                 version = &info.version,
                 f_block = f_block,
                 build_inputs = build_inputs(&info.template),
-                meta = meta(&info.template, &info.fetcher, &info.pname, &info.license, &info.maintainer)
+                meta = meta(&info.pname, &info.license, &info.maintainer)
             )
         }
     }

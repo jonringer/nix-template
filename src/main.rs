@@ -3,7 +3,6 @@ mod expression;
 mod types;
 mod file_path;
 
-use std::path::{Path,PathBuf};
 use cli::arg_to_type;
 
 fn main() {
