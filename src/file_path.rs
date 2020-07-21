@@ -7,7 +7,13 @@ use std::process::exit;
 /// returns (file_path_to_write, file_path_in_top_level)
 /// file_path_to_write: filepath to write to disk
 /// file_path_in_top_level: filepath to mention in top-level/*.nix
-pub fn nix_file_paths(matches: &clap::ArgMatches, template: &Template, path: &Path, pname: &str, nixpkgs_root: &str) -> (PathBuf, PathBuf) {
+pub fn nix_file_paths(
+    matches: &clap::ArgMatches,
+    template: &Template,
+    path: &Path,
+    pname: &str,
+    nixpkgs_root: &str,
+) -> (PathBuf, PathBuf) {
     if matches.is_present("nixpkgs") {
         if matches.occurrences_of("pname") == 0 {
             eprintln!("'-p,--pname' is required when using the -n,--nixpkgs flag");
@@ -51,12 +57,11 @@ pub fn nix_file_paths(matches: &clap::ArgMatches, template: &Template, path: &Pa
     (path.to_path_buf(), PathBuf::from(""))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::{build_cli, validate_and_serialize_matches, arg_to_type};
-    use pretty_assertions::{assert_eq};
+    use crate::cli::{arg_to_type, build_cli, validate_and_serialize_matches};
+    use pretty_assertions::assert_eq;
     use serial_test::serial;
 
     #[test]
@@ -66,9 +71,17 @@ mod tests {
             build_cli().get_matches_from(vec!["nix-template", "python", "-n", "-p", "requests"]);
         let info = validate_and_serialize_matches(&m);
         let nixpkgs_root: String = arg_to_type(m.value_of("nixpkgs-root"));
-        let expected = (PathBuf::from("pkgs/development/python-modules/requests/default.nix"), PathBuf::from("../development/python-modules/requests"));
-        let actual = nix_file_paths(&m, &info.template, &info.path_to_write, &info.pname, &nixpkgs_root);
+        let expected = (
+            PathBuf::from("pkgs/development/python-modules/requests/default.nix"),
+            PathBuf::from("../development/python-modules/requests"),
+        );
+        let actual = nix_file_paths(
+            &m,
+            &info.template,
+            &info.path_to_write,
+            &info.pname,
+            &nixpkgs_root,
+        );
         assert_eq!(expected, actual);
     }
 }
-

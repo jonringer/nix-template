@@ -1,7 +1,7 @@
 mod cli;
 mod expression;
-mod types;
 mod file_path;
+mod types;
 
 use cli::arg_to_type;
 
@@ -37,10 +37,12 @@ fn main() {
                 if let Some(p) = path.parent() {
                     if !path.exists() {
                         println!("Creating directory: {}", p.display());
-                        std::fs::create_dir_all(p).expect(&format!("Was unable to create directory {}", p.display()));
+                        std::fs::create_dir_all(p)
+                            .expect(&format!("Was unable to create directory {}", p.display()));
                     }
                 }
-                std::fs::write(path, expr).expect(&format!("Was unable to write to file: {}", &path.display()));
+                std::fs::write(path, expr)
+                    .expect(&format!("Was unable to write to file: {}", &path.display()));
             }
         }
     }

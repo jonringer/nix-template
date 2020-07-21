@@ -1,7 +1,7 @@
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
-use crate::types::{Fetcher, Template, ExpressionInfo};
 use crate::file_path::nix_file_paths;
+use crate::types::{ExpressionInfo, Fetcher, Template};
 
 // clap will validate inputs, only use on functions with possible_values defined
 pub fn arg_to_type<T>(arg: Option<&str>) -> T
@@ -97,21 +97,38 @@ pub fn validate_and_serialize_matches(matches: &ArgMatches) -> ExpressionInfo {
     let path_str: String = arg_to_type(matches.value_of("PATH"));
     let path = std::path::PathBuf::from(&path_str);
 
-    let (path_to_write, top_level_path) = nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);
+    let (path_to_write, top_level_path) =
+        nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);
 
-    ExpressionInfo { pname, version, license, maintainer, template, fetcher, path_to_write, top_level_path }
+    ExpressionInfo {
+        pname,
+        version,
+        license,
+        maintainer,
+        template,
+        fetcher,
+        path_to_write,
+        top_level_path,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::{assert_eq};
+    use pretty_assertions::assert_eq;
     use serial_test::serial;
 
     #[test]
     fn test_python() {
-        let m =
-            build_cli().get_matches_from(vec!["nix-template", "python", "-r", "/tmp", "-n", "-p", "requests"]);
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "python",
+            "-r",
+            "/tmp",
+            "-n",
+            "-p",
+            "requests",
+        ]);
         println!("{:?}", m);
         assert_eq!(m.value_of("pname"), Some("requests"));
         assert_eq!(m.value_of("TEMPLATE"), Some("python"));
@@ -134,7 +151,15 @@ mod tests {
 
     #[test]
     fn test_fetcher() {
-        let m = build_cli().get_matches_from(vec!["nix-template", "-f", "gitlab", "-l", "mit", "stdenv", "default.nix"]);
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "-f",
+            "gitlab",
+            "-l",
+            "mit",
+            "stdenv",
+            "default.nix",
+        ]);
         assert_eq!(m.value_of("license"), Some("mit"));
         assert_eq!(m.value_of("PATH"), Some("default.nix"));
         assert_eq!(m.occurrences_of("PATH"), 1);
@@ -144,7 +169,7 @@ mod tests {
     #[test]
     #[serial] // touching global env, ensure serial runs
     fn test_nixpkgs() {
-        use std::env::{set_var, remove_var};
+        use std::env::{remove_var, set_var};
         set_var("NIXPKGS_ROOT", "/testdir/");
         let m = build_cli().get_matches_from(vec!["nix-template", "-n"]);
         assert_eq!(m.value_of("nixpkgs-root"), Some("/testdir/"));

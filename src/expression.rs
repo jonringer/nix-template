@@ -1,4 +1,4 @@
-use crate::types::{Fetcher, Template, ExpressionInfo};
+use crate::types::{ExpressionInfo, Fetcher, Template};
 
 fn derivation_helper(template: &Template) -> (&'static str, &'static str) {
     match template {
@@ -61,12 +61,17 @@ fn build_inputs(template: &Template) -> &'static str {
 
 fn meta(pname: &str, license: &str, maintainer: &str) -> String {
     format!(
-"  meta = with lib; {{
+        "  meta = with lib; {{
     description = \"CHANGE\";
     homepage = \"https://github.com/{owner}/{pname}/\";
     license = license.{license};
     maintainer = with maintainers; [ {maintainer} ];
-  }}", license=license, maintainer=maintainer, owner="CHANGE", pname=pname)
+  }}",
+        license = license,
+        maintainer = maintainer,
+        owner = "CHANGE",
+        pname = pname
+    )
 }
 
 pub fn generate_expression(info: &ExpressionInfo) -> String {
@@ -94,7 +99,7 @@ mkShell rec {
             let header = format!("{{ {input_list} }}:", input_list = inputs.join(", "));
 
             format!(
-"{header}
+                "{header}
 
 {dh_helper} rec {{
   pname = \"{pname}\";
