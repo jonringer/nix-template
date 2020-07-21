@@ -24,3 +24,15 @@ arg_enum! {
         pypi,
     }
 }
+
+#[derive(Debug)]
+pub struct ExpressionInfo {
+    pub pname: String,
+    pub version: String,
+    pub license: String,
+    pub maintainer: String,
+    pub fetcher: Fetcher,
+    pub template: Template,
+    pub path_to_write: std::path::PathBuf,
+    pub top_level_path: std::path::PathBuf,
+}

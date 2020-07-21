@@ -1,6 +1,16 @@
-use clap::{App, AppSettings, Arg, SubCommand};
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
-use crate::types::{Fetcher, Template};
+use crate::types::{Fetcher, Template, ExpressionInfo};
+use crate::file_path::nix_file_paths;
+
+// clap will validate inputs, only use on functions with possible_values defined
+pub fn arg_to_type<T>(arg: Option<&str>) -> T
+where
+    T: std::str::FromStr,
+    <T as std::str::FromStr>::Err: std::fmt::Debug,
+{
+    arg.unwrap().parse::<T>().unwrap()
+}
 
 pub fn build_cli() -> App<'static, 'static> {
     App::new("nix-template")
@@ -42,7 +52,7 @@ $ nix-template mkshell
             ).default_value("CHANGE"))
         .arg(Arg::from_usage(
             "-m,--maintainer <maintainer> 'Set maintainer'",
-            ).default_value("CHANGE"))
+            ).default_value(""))
         .arg(Arg::from_usage(
             "-s,--stdout 'Write expression to stdout, instead of PATH'",
             ))
@@ -76,6 +86,21 @@ $ nix-template mkshell
         )
 }
 
+pub fn validate_and_serialize_matches(matches: &ArgMatches) -> ExpressionInfo {
+    let template: Template = arg_to_type(matches.value_of("TEMPLATE"));
+    let fetcher: Fetcher = arg_to_type(matches.value_of("fetcher"));
+    let pname: String = arg_to_type(matches.value_of("pname"));
+    let version: String = arg_to_type(matches.value_of("v"));
+    let license: String = arg_to_type(matches.value_of("license"));
+    let maintainer: String = arg_to_type(matches.value_of("maintainer"));
+    let path_str: String = arg_to_type(matches.value_of("PATH"));
+    let path = std::path::PathBuf::from(&path_str);
+
+    let (path_to_write, top_level_path) = nix_file_paths(&matches, &template, &path, &pname);
+
+    ExpressionInfo { pname, version, license, maintainer, template, fetcher, path_to_write, top_level_path }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,6 +118,7 @@ mod tests {
         assert_eq!(m.value_of("v"), Some("0.0.1"));
         assert_eq!(m.value_of("license"), Some("CHANGE"));
         assert_eq!(m.is_present("stdout"), false);
+        assert_eq!(m.occurrences_of("PATH"), 0);
         assert!(m.occurrences_of("nixpkgs") >= 1);
     }
 
@@ -106,8 +132,10 @@ mod tests {
 
     #[test]
     fn test_fetcher() {
-        let m = build_cli().get_matches_from(vec!["nix-template", "-f", "gitlab", "-l", "mit"]);
+        let m = build_cli().get_matches_from(vec!["nix-template", "-f", "gitlab", "-l", "mit", "stdenv", "default.nix"]);
         assert_eq!(m.value_of("license"), Some("mit"));
+        assert_eq!(m.value_of("PATH"), Some("default.nix"));
+        assert_eq!(m.occurrences_of("PATH"), 1);
         assert_eq!(m.value_of("fetcher"), Some("gitlab"));
     }
 

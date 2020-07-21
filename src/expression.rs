@@ -1,5 +1,4 @@
-use crate::types::Fetcher;
-use crate::types::Template;
+use crate::types::{Fetcher, Template, ExpressionInfo};
 
 fn derivation_helper(template: &Template) -> (&'static str, &'static str) {
     match template {
@@ -70,8 +69,8 @@ fn meta(template: &Template, fetcher: &Fetcher, pname: &str, license: &str, main
   }}", license=license, maintainer=maintainer, owner="CHANGE", pname=pname)
 }
 
-pub fn generate_expression(template: &Template, fetcher: &Fetcher, pname: &str, version: &str, license: &str, maintainer: &str) -> String {
-    match template {
+pub fn generate_expression(info: &ExpressionInfo) -> String {
+    match &info.template {
         Template::mkshell => "with import <nixpkgs> { };
 
 mkShell rec {
@@ -87,8 +86,8 @@ mkShell rec {
         .to_string(),
         _ => {
             // Generate nix expression
-            let (dh_input, dh_block) = derivation_helper(&template);
-            let (f_input, f_block) = fetch_block(&fetcher);
+            let (dh_input, dh_block) = derivation_helper(&info.template);
+            let (f_input, f_block) = fetch_block(&info.fetcher);
 
             let inputs = &["lib", dh_input, f_input];
 
@@ -110,11 +109,11 @@ mkShell rec {
 ",
                 header = header,
                 dh_helper = dh_block,
-                pname = pname,
-                version = version,
+                pname = &info.pname,
+                version = &info.version,
                 f_block = f_block,
-                build_inputs = build_inputs(&template),
-                meta = meta(&template, &fetcher, &pname, &license, &maintainer)
+                build_inputs = build_inputs(&info.template),
+                meta = meta(&info.template, &info.fetcher, &info.pname, &info.license, &info.maintainer)
             )
         }
     }

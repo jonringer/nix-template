@@ -1,15 +1,10 @@
 mod cli;
 mod expression;
 mod types;
+mod file_path;
 
-// clap will validate inputs, only use on functions with possible_values defined
-fn arg_to_type<T>(arg: Option<&str>) -> T
-where
-    T: std::str::FromStr,
-    <T as std::str::FromStr>::Err: std::fmt::Debug,
-{
-    arg.unwrap().parse::<T>().unwrap()
-}
+use std::path::{Path,PathBuf};
+use cli::arg_to_type;
 
 fn main() {
     let m = cli::build_cli().get_matches();
@@ -25,16 +20,11 @@ fn main() {
         }
         _ => {
             // build expression
-            let template: types::Template = arg_to_type(m.value_of("TEMPLATE"));
-            let fetcher: types::Fetcher = arg_to_type(m.value_of("fetcher"));
-            let pname: String = arg_to_type(m.value_of("pname"));
-            let version: String = arg_to_type(m.value_of("v"));
-            let license: String = arg_to_type(m.value_of("license"));
-            let maintainer: String = arg_to_type(m.value_of("maintainer"));
-            let path_str: String = arg_to_type(m.value_of("PATH"));
-            let path = std::path::PathBuf::from(&path_str);
+            let info = cli::validate_and_serialize_matches(&m);
 
-            let expr = expression::generate_expression(&template, &fetcher, &pname, &version, &license, &maintainer);
+            let expr = expression::generate_expression(&info);
+
+            let path = &info.path_to_write;
 
             if path.exists() {
                 eprintln!("Cannot write to file '{}', already exists", path.display());
@@ -47,10 +37,11 @@ fn main() {
                 // ensure directory to file exists
                 if let Some(p) = path.parent() {
                     if !path.exists() {
-                        std::fs::create_dir_all(p);
+                        println!("Creating directory: {}", p.display());
+                        std::fs::create_dir_all(p).expect(&format!("Was unable to create directory {}", p.display()));
                     }
                 }
-                std::fs::write(path, expr);
+                std::fs::write(path, expr).expect(&format!("Was unable to write to file: {}", &path.display()));
             }
         }
     }
