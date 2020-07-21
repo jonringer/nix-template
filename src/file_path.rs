@@ -1,16 +1,17 @@
 use crate::types::Template;
 use std::path::{Path, PathBuf};
+use std::process::exit;
 
 /// Determine where the file path should be written
 /// Meant to save people time in dealing with file paths
 /// returns (file_path_to_write, file_path_in_top_level)
 /// file_path_to_write: filepath to write to disk
 /// file_path_in_top_level: filepath to mention in top-level/*.nix
-pub fn nix_file_paths(matches: &clap::ArgMatches, template: &Template, path: &std::path::Path, pname: &str) -> (PathBuf, PathBuf) {
+pub fn nix_file_paths(matches: &clap::ArgMatches, template: &Template, path: &Path, pname: &str) -> (PathBuf, PathBuf) {
     if matches.is_present("nixpkgs") {
         if matches.occurrences_of("pname") == 0 {
             eprintln!("'--pname' is required when using the nixpkgs flag");
-            std::process::exit(1);
+            exit(1);
         }
 
         if matches.occurrences_of("PATH") == 0 {
@@ -26,7 +27,7 @@ pub fn nix_file_paths(matches: &clap::ArgMatches, template: &Template, path: &st
                 return (file_path.to_path_buf(), nix_path.to_path_buf());
             } else {
                 eprintln!("Template '{}' does not have a known path default for the nixpkgs repo, please provide a PATH (E.g. nix-template stdenv --pname mypackage --nixpkgs pkgs/applications/misc/", template);
-                std::process::exit(1);
+                exit(1);
             }
         } else {
             let radix = path.strip_prefix("pkgs").unwrap_or(path);
