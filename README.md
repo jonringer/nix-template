@@ -7,8 +7,10 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
 ## Roadmap
 
 - [ ] Finalize cli semantics
-- [ ] Ease usage with nixpkgs repo
-- [ ] Support Language/frameworks/usage templates:
+- Ease usage with nixpkgs repo
+  - [X] Write to correct location using path
+  - [ ] Print top-level addition statement
+- Support Language/frameworks/usage templates:
   - [X] Stdenv
   - [X] Python
   - [X] mkShell
