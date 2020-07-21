@@ -7,10 +7,10 @@ use std::process::exit;
 /// returns (file_path_to_write, file_path_in_top_level)
 /// file_path_to_write: filepath to write to disk
 /// file_path_in_top_level: filepath to mention in top-level/*.nix
-pub fn nix_file_paths(matches: &clap::ArgMatches, template: &Template, path: &Path, pname: &str) -> (PathBuf, PathBuf) {
+pub fn nix_file_paths(matches: &clap::ArgMatches, template: &Template, path: &Path, pname: &str, nixpkgs_root: &str) -> (PathBuf, PathBuf) {
     if matches.is_present("nixpkgs") {
         if matches.occurrences_of("pname") == 0 {
-            eprintln!("'--pname' is required when using the nixpkgs flag");
+            eprintln!("'-p,--pname' is required when using the -n,--nixpkgs flag");
             exit(1);
         }
 
@@ -19,7 +19,8 @@ pub fn nix_file_paths(matches: &clap::ArgMatches, template: &Template, path: &Pa
             if *template == Template::python {
                 let mut radix = PathBuf::from("development/python-modules/");
                 radix.push(&pname);
-                let mut file_path = PathBuf::from("pkgs");
+                let mut file_path = PathBuf::from(&nixpkgs_root);
+                file_path.push("pkgs");
                 file_path.push(&radix);
                 file_path.push("default.nix");
                 let mut nix_path = PathBuf::from("..");
@@ -31,16 +32,22 @@ pub fn nix_file_paths(matches: &clap::ArgMatches, template: &Template, path: &Pa
             }
         } else {
             let radix = path.strip_prefix("pkgs").unwrap_or(path);
-            let mut file_path = PathBuf::from("pkgs");
+
+            let mut file_path = PathBuf::from(&nixpkgs_root);
+            file_path.push("pkgs");
             file_path.push(&radix);
+            // may have specified a specific nix file (E.g path/package.nix)
             if file_path.extension() != Some(std::ffi::OsStr::new("nix")) {
                 file_path.push("default.nix");
             }
+
             let mut nix_path = PathBuf::from("..");
             nix_path.push(&radix);
+
             return (file_path.to_path_buf(), nix_path.to_path_buf());
         }
     }
+
     (path.to_path_buf(), PathBuf::from(""))
 }
 
@@ -48,16 +55,19 @@ pub fn nix_file_paths(matches: &clap::ArgMatches, template: &Template, path: &Pa
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::{build_cli, validate_and_serialize_matches};
+    use crate::cli::{build_cli, validate_and_serialize_matches, arg_to_type};
     use pretty_assertions::{assert_eq};
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_python() {
         let m =
             build_cli().get_matches_from(vec!["nix-template", "python", "-n", "-p", "requests"]);
         let info = validate_and_serialize_matches(&m);
+        let nixpkgs_root: String = arg_to_type(m.value_of("nixpkgs-root"));
         let expected = (PathBuf::from("pkgs/development/python-modules/requests/default.nix"), PathBuf::from("../development/python-modules/requests"));
-        let actual = nix_file_paths(&m, &info.template, &info.path_to_write, &info.pname);
+        let actual = nix_file_paths(&m, &info.template, &info.path_to_write, &info.pname, &nixpkgs_root);
         assert_eq!(expected, actual);
     }
 }

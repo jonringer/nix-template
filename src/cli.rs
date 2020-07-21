@@ -64,7 +64,7 @@ $ nix-template mkshell
             ).default_value("CHANGE"))
         .arg(Arg::from_usage(
             "-r,--nixpkgs-root [path] 'Set root of the nixpkgs directory'",
-            ).env("NIXPKGS_ROOT"))
+            ).env("NIXPKGS_ROOT").default_value(""))
         .arg(Arg::from_usage(
             "-n,--nixpkgs 'Intended be used within nixpkgs, will append pname to file path, and print addition statement'",
         ).takes_value(false))
@@ -93,10 +93,11 @@ pub fn validate_and_serialize_matches(matches: &ArgMatches) -> ExpressionInfo {
     let version: String = arg_to_type(matches.value_of("v"));
     let license: String = arg_to_type(matches.value_of("license"));
     let maintainer: String = arg_to_type(matches.value_of("maintainer"));
+    let nixpkgs_root: String = arg_to_type(matches.value_of("nixpkgs-root"));
     let path_str: String = arg_to_type(matches.value_of("PATH"));
     let path = std::path::PathBuf::from(&path_str);
 
-    let (path_to_write, top_level_path) = nix_file_paths(&matches, &template, &path, &pname);
+    let (path_to_write, top_level_path) = nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);
 
     ExpressionInfo { pname, version, license, maintainer, template, fetcher, path_to_write, top_level_path }
 }
@@ -110,13 +111,14 @@ mod tests {
     #[test]
     fn test_python() {
         let m =
-            build_cli().get_matches_from(vec!["nix-template", "python", "-n", "-p", "requests"]);
+            build_cli().get_matches_from(vec!["nix-template", "python", "-r", "/tmp", "-n", "-p", "requests"]);
         println!("{:?}", m);
         assert_eq!(m.value_of("pname"), Some("requests"));
         assert_eq!(m.value_of("TEMPLATE"), Some("python"));
         assert_eq!(m.value_of("fetcher"), Some("pypi"));
         assert_eq!(m.value_of("v"), Some("0.0.1"));
         assert_eq!(m.value_of("license"), Some("CHANGE"));
+        assert_eq!(m.value_of("nixpkgs-root"), Some("/tmp"));
         assert_eq!(m.is_present("stdout"), false);
         assert_eq!(m.occurrences_of("PATH"), 0);
         assert!(m.occurrences_of("nixpkgs") >= 1);
@@ -142,9 +144,10 @@ mod tests {
     #[test]
     #[serial] // touching global env, ensure serial runs
     fn test_nixpkgs() {
-        use std::env::set_var;
+        use std::env::{set_var, remove_var};
         set_var("NIXPKGS_ROOT", "/testdir/");
         let m = build_cli().get_matches_from(vec!["nix-template", "-n"]);
         assert_eq!(m.value_of("nixpkgs-root"), Some("/testdir/"));
+        remove_var("NIXPKGS_ROOT");
     }
 }
