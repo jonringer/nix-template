@@ -14,9 +14,9 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
   - [X] Stdenv
   - [X] Python
   - [X] mkShell
-  - [ ] Qt
+  - [x] Qt
   - [ ] Go
-  - [ ] Rust
+  - [x] Rust
   - [ ] Haskell
   - [ ] and many more...
 - [ ] Add option (--comments?) to embed noob-friendly comments and explanations about common usage patterns

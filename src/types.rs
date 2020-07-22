@@ -8,8 +8,8 @@ arg_enum! {
         python,
         mkshell,
         //Go,
-        //Rust,
-        //Qt,
+        rust,
+        qt,
     }
 }
 

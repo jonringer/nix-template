@@ -2,9 +2,11 @@ use crate::types::{ExpressionInfo, Fetcher, Template};
 
 fn derivation_helper(template: &Template) -> (&'static str, &'static str) {
     match template {
-        Template::stdenv => ("stdenv", "stdenv.mkDerivation"),
-        Template::python => ("buildPythonPackage", "buildPythonPackage"),
+        Template::stdenv  => ("stdenv", "stdenv.mkDerivation"),
+        Template::python  => ("buildPythonPackage", "buildPythonPackage"),
         Template::mkshell => ("pkgs ? import <nixpkgs> {}", "with pkgs;\n\nmkShell"),
+        Template::qt      => ("mkDerivation", "mkDerivation"),
+        Template::rust    => ("rustPlatform", "rustPlatform.buildRustPackage"),
     }
 }
 
@@ -57,6 +59,9 @@ fn build_inputs(template: &Template) -> &'static str {
         Template::python => "  propagatedBuildInputs = [ ];
 
   pythonImportsCheck = [ \"@pname@\" ];",
+        Template::rust => "  cargoSha256 = lib.fakeSha256;
+
+  buildInputs = [ ];",
         _ => "  buildInputs = [ ];",
     }
 }
