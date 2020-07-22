@@ -15,7 +15,7 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
   - [X] Python
   - [X] mkShell
   - [x] Qt
-  - [ ] Go
+  - [x] Go
   - [x] Rust
   - [ ] Haskell
   - [ ] and many more...
