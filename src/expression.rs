@@ -6,6 +6,7 @@ fn derivation_helper(template: &Template) -> (&'static str, &'static str) {
         Template::python  => ("buildPythonPackage", "buildPythonPackage"),
         Template::mkshell => ("pkgs ? import <nixpkgs> {}", "with pkgs;\n\nmkShell"),
         Template::qt      => ("mkDerivation", "mkDerivation"),
+        Template::go      => ("buildGoModule", "buildGoModule"),
         Template::rust    => ("rustPlatform", "rustPlatform.buildRustPackage"),
     }
 }
@@ -62,6 +63,9 @@ fn build_inputs(template: &Template) -> &'static str {
         Template::rust => "  cargoSha256 = lib.fakeSha256;
 
   buildInputs = [ ];",
+        Template::go => "  vendorSha256 = lib.fakeSha256;
+
+  subPackages = [ \".\" ];",
         _ => "  buildInputs = [ ];",
     }
 }

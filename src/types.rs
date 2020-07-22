@@ -7,7 +7,7 @@ arg_enum! {
         stdenv,
         python,
         mkshell,
-        //Go,
+        go,
         rust,
         qt,
     }
