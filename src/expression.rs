@@ -77,7 +77,7 @@ fn meta() -> &'static str {
     homepage = \"https://github.com/CHANGE/@pname@/\";
     license = license.@license@;
     maintainer = with maintainers; [ @maintainer@ ];
-  }"
+  };"
 }
 
 pub fn generate_expression(info: &ExpressionInfo) -> String {
