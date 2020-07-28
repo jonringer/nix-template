@@ -76,7 +76,7 @@ fn meta() -> &'static str {
     description = \"CHANGE\";
     homepage = \"https://github.com/CHANGE/@pname@/\";
     license = license.@license@;
-    maintainer = with maintainers; [ @maintainer@ ];
+    maintainers = with maintainers; [ @maintainer@ ];
   };"
 }
 
