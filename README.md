@@ -46,7 +46,7 @@ buildPythonPackage rec {
 
   src = fetchPypi {
     inherit pname version;
-    sha256 = lib.fakeSha256;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
   };
 
   pythonImportsCheck = [ "requests" ];

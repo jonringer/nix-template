@@ -19,7 +19,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
     owner = \"CHANGE\";
     repo = pname;
     rev = \"CHANGE\";
-    sha256 = lib.fakeSha256;
+    sha256 = \"0000000000000000000000000000000000000000000000000000\";
   };",
         ),
         Fetcher::gitlab => (
@@ -28,28 +28,28 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
     owner = \"CHANGE\";
     repo = pname;
     rev = \"CHANGE\";
-    sha256 = lib.fakeSha256;
+    sha256 = \"0000000000000000000000000000000000000000000000000000\";
   };",
         ),
         Fetcher::url => (
             "fetchurl",
             "  src = fetchurl {
     url = \"CHANGE\";
-    sha256 = lib.fakeSha256;
+    sha256 = \"0000000000000000000000000000000000000000000000000000\";
   };",
         ),
         Fetcher::zip => (
             "fetchzip",
             "  src = fetchzip {
     url = \"CHANAGE\";
-    sha256 = lib.fakeSha256;
+    sha256 = \"0000000000000000000000000000000000000000000000000000\";
   };",
         ),
         Fetcher::pypi => (
             "fetchPypi",
             "  src = fetchPypi {
     inherit pname version;
-    sha256 = lib.fakeSha256;
+    sha256 = \"0000000000000000000000000000000000000000000000000000\";
   };",
         ),
     }
@@ -60,10 +60,10 @@ fn build_inputs(template: &Template) -> &'static str {
         Template::python => "  propagatedBuildInputs = [ ];
 
   pythonImportsCheck = [ \"@pname@\" ];",
-        Template::rust => "  cargoSha256 = lib.fakeSha256;
+        Template::rust => "  cargoSha256 = \"0000000000000000000000000000000000000000000000000000\";
 
   buildInputs = [ ];",
-        Template::go => "  vendorSha256 = lib.fakeSha256;
+        Template::go => "  vendorSha256 = \"0000000000000000000000000000000000000000000000000000\";
 
   subPackages = [ \".\" ];",
         _ => "  buildInputs = [ ];",
