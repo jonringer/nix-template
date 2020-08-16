@@ -87,7 +87,7 @@ fn meta() -> &'static str {
   meta = with lib; {
     description = \"CHANGE\";
     homepage = \"https://github.com/CHANGE/@pname@/\";
-    license = license.@license@;
+    license = licenses.@license@;
     maintainers = with maintainers; [ @maintainer@ ];
   };"
 }
