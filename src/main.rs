@@ -15,7 +15,7 @@ use types::UserConfig;
 fn main() {
     let xdg_dirs = xdg::BaseDirectories::with_prefix("nix-template").unwrap();
 
-    let user_config: Option<UserConfig> = if let Some(file) = xdg_dirs.find_config_file("config.toml") {
+    let mut user_config: Option<UserConfig> = if let Some(file) = xdg_dirs.find_config_file("config.toml") {
         toml::from_str(&std::fs::read_to_string(file).unwrap()).ok()
     } else {
         None
@@ -33,31 +33,44 @@ fn main() {
             )
         }
         ("config", Some(m)) => {
+            let config_path = xdg_dirs.place_config_file("config.toml")
+                .expect("unable to create configuration directory");
+
             // set config
             match m.subcommand() {
                 ("name", Some(m)) => {
                     //set name
-                    let config_path = xdg_dirs.place_config_file("config.toml")
-                        .expect("unable to create configuration directory");
                     let name: Option<String> = m.value_of("name").map(|s| s.to_string());
 
                     // since we can only set 1 value currently, this is a bit of over-engineered
                     // however, we want to prevent overriding future values
-                    let user_config = if let Some(mut config) = user_config {
+                    if let Some(ref mut config) = user_config {
                         config.maintainer = name;
-                        config
                     } else {
-                        UserConfig { maintainer: name }
+                        user_config = Some(UserConfig { maintainer: name, nixpkgs_root: None })
                     };
+                }
+                ("nixpkgs-root", Some(m)) => {
+                    //set nixpkgs root
+                    let root: Option<String> = m.value_of("nixpkgs-root").map(|s| s.to_string());
 
-                    std::fs::write(&config_path, toml::to_string(&user_config).unwrap())
-                        .expect(&format!("Was unable to write to file: {}", config_path.display()));
+                    // since we can only set 1 value currently, this is a bit of over-engineered
+                    // however, we want to prevent overriding future values
+                    if let Some(ref mut config) = user_config {
+                        config.nixpkgs_root = root;
+                    } else {
+                        user_config = Some(UserConfig { maintainer: None, nixpkgs_root: root })
+                    };
                 }
                 _ => {
                     eprintln!("Unexpected command given to config subcommand.");
                     std::process::exit(1);
                 }
             }
+
+            // write config
+            std::fs::write(&config_path, toml::to_string(&user_config).unwrap())
+                .expect(&format!("Was unable to write to file: {}", &config_path.display()));
         }
         _ => {
             // build expression

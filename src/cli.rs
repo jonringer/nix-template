@@ -70,7 +70,7 @@ $ nix-template mkshell
             ).default_value("CHANGE"))
         .arg(Arg::from_usage(
             "-r,--nixpkgs-root [path] 'Set root of the nixpkgs directory'",
-            ).env("NIXPKGS_ROOT").default_value(""))
+            ).env("NIXPKGS_ROOT"))
         .arg(Arg::from_usage(
             "-n,--nixpkgs 'Intended be used within nixpkgs, will append pname to file path, and print addition statement'",
         ).takes_value(false))
@@ -101,6 +101,11 @@ $ nix-template mkshell
                     .about("Set maintainer name")
                     .arg(Arg::from_usage("<name>"))
                 )
+                .subcommand(
+                    SubCommand::with_name("nixpkgs-root")
+                    .about("Set the root directory of nixpkgs")
+                    .arg(Arg::from_usage("<nixpkgs-root>"))
+                )
         )
 
 }
@@ -111,18 +116,22 @@ pub fn validate_and_serialize_matches(matches: &ArgMatches, user_config: Option<
     let pname: String = arg_to_type(matches.value_of("pname"));
     let version: String = arg_to_type(matches.value_of("v"));
     let license: String = arg_to_type(matches.value_of("license"));
-    let nixpkgs_root: String = arg_to_type(matches.value_of("nixpkgs-root"));
     let path_str: String = arg_to_type(matches.value_of("PATH"));
     let path = std::path::PathBuf::from(&path_str);
     let include_documentation_links: bool = matches.is_present("documentation-links");
     let include_meta: bool = !matches.is_present("no-meta");
-    let maintainer: String = if let Some(config) = user_config {
-        // try to get maintainer from user config if available
-        matches.value_of("maintainer").map(|s| s.to_string()).or(config.maintainer).unwrap_or("".to_string())
-    } else {
-        matches.value_of("maintainer").unwrap_or("").to_string()
-    };
 
+    let maintainer: String;
+    let nixpkgs_root: String;
+    if let Some(ref config) = user_config {
+        maintainer = matches.value_of("maintainer")
+            .map(|s| s.to_string()).or(config.maintainer.to_owned()).unwrap_or("".to_string());
+        nixpkgs_root = matches.value_of("nixpkgs-root")
+            .map(|s| s.to_string()).or(config.nixpkgs_root.to_owned()).unwrap_or("".to_string());
+    } else {
+        maintainer = matches.value_of("maintainer").unwrap_or("").to_string();
+        nixpkgs_root = matches.value_of("nixpkgs-root").unwrap_or("").to_string();
+    };
 
     let (path_to_write, top_level_path) =
         nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);

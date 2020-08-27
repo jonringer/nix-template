@@ -84,4 +84,5 @@ impl ExpressionInfo {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UserConfig {
     pub maintainer: Option<String>,
+    pub nixpkgs_root: Option<String>,
 }
