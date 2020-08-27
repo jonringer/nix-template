@@ -12,16 +12,16 @@ fn derivation_helper(template: &Template) -> (String, String) {
 
     match documentation_key {
         Some(key) => (String::from(input),
-                      format!("@documentation:{}@\n{}", key, derivation)),
+                      format!("@doc:{}@{}", key, derivation)),
         None => (String::from(input), String::from(derivation))
     }
 }
 
-fn fetch_block(fetcher: &Fetcher) -> (String, String) {
-    let (input, block) = match fetcher {
+fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
+    match fetcher {
         Fetcher::github => (
             "fetchFromGitHub",
-            "  src = fetchFromGitHub {
+            "  @doc:fetcher@src = fetchFromGitHub {
     owner = \"CHANGE\";
     repo = pname;
     rev = \"CHANGE\";
@@ -30,7 +30,7 @@ fn fetch_block(fetcher: &Fetcher) -> (String, String) {
         ),
         Fetcher::gitlab => (
             "fetchFromGitLab",
-            "  src = fetchFromGitLab {
+            "  @doc:fetcher@src = fetchFromGitLab {
     owner = \"CHANGE\";
     repo = pname;
     rev = \"CHANGE\";
@@ -39,52 +39,46 @@ fn fetch_block(fetcher: &Fetcher) -> (String, String) {
         ),
         Fetcher::url => (
             "fetchurl",
-            "  src = fetchurl {
+            "  @doc:fetcher@src = fetchurl {
     url = \"CHANGE\";
     sha256 = \"0000000000000000000000000000000000000000000000000000\";
   };",
         ),
         Fetcher::zip => (
             "fetchzip",
-            "  src = fetchzip {
+            "  @doc:fetcher@src = fetchzip {
     url = \"CHANAGE\";
     sha256 = \"0000000000000000000000000000000000000000000000000000\";
   };",
         ),
         Fetcher::pypi => (
             "fetchPypi",
-            "  src = fetchPypi {
+            "  @doc:fetcher@src = fetchPypi {
     inherit pname version;
     sha256 = \"0000000000000000000000000000000000000000000000000000\";
   };",
         ),
-    };
-
-    (String::from(input),
-     format!("  @documentation:fetcher@\n{}", block))
+    }
 }
 
-fn build_inputs(template: &Template) -> String {
-    let build_inputs = match template {
-        Template::python => "  propagatedBuildInputs = [ ];
+fn build_inputs(template: &Template) -> &'static str {
+    match template {
+        Template::python => "  @doc:buildDependencies@propagatedBuildInputs = [ ];
 
   pythonImportsCheck = [ \"@pname@\" ];",
-        Template::rust => "  cargoSha256 = \"0000000000000000000000000000000000000000000000000000\";
+        Template::rust => "  @doc:buildDependencies@cargoSha256 = \"0000000000000000000000000000000000000000000000000000\";
 
   buildInputs = [ ];",
-        Template::go => "  vendorSha256 = \"0000000000000000000000000000000000000000000000000000\";
+        Template::go => "  @doc:buildDependencies@vendorSha256 = \"0000000000000000000000000000000000000000000000000000\";
 
   subPackages = [ \".\" ];",
         _ => "  buildInputs = [ ];",
-    };
-
-    format!("  @documentation:buildDependencies@\n{}", build_inputs)
+    }
 }
 
 fn meta() -> &'static str {
         "
-  @documentation:meta@
-  meta = with lib; {
+  @doc:meta@meta = with lib; {
     description = \"CHANGE\";
     homepage = \"https://github.com/CHANGE/@pname@/\";
     license = licenses.@license@;
@@ -112,7 +106,7 @@ mkShell rec {
             let (dh_input, dh_block) = derivation_helper(&info.template);
             let (f_input, f_block) = fetch_block(&info.fetcher);
 
-            let inputs = [String::from("lib"), dh_input, f_input];
+            let inputs = [String::from("lib"), dh_input, f_input.to_string() ];
 
             let header = format!("{{ {input_list} }}:", input_list = inputs.join(", "));
 

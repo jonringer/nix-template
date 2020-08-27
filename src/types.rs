@@ -6,10 +6,10 @@ use regex::{Captures, Regex};
 lazy_static! {
     static ref DOCUMENTATION_LINKS: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
-        m.insert("buildDependencies", "https://nixos.org/nixpkgs/manual/#ssec-stdenv-dependencies");
-        m.insert("fetcher", "https://nixos.org/nixpkgs/manual/#chap-pkgs-fetchers");
-        m.insert("meta", "https://nixos.org/nixpkgs/manual/#chap-meta");
-        m.insert("stdenvMkDerivation", "https://nixos.org/nixpkgs/manual/#sec-using-stdenv");
+        m.insert("buildDependencies", "https://nixos.org/nixpkgs/manual/#ssec-stdenv-dependencies\n  ");
+        m.insert("fetcher", "https://nixos.org/nixpkgs/manual/#chap-pkgs-fetchers\n  ");
+        m.insert("meta", "https://nixos.org/nixpkgs/manual/#chap-meta\n  ");
+        m.insert("stdenvMkDerivation", "https://nixos.org/nixpkgs/manual/#sec-using-stdenv\n  ");
         m
     };
 }
@@ -63,7 +63,7 @@ impl ExpressionInfo {
         if self.include_documentation_links {
             Self::insert_documentation_links(result)
         } else {
-            Regex::new(r"@documentation:.*@\n")
+            Regex::new(r"@doc:.*@")
                 .unwrap()
                 .replace_all(&result, "")
                 .to_string()
@@ -71,7 +71,7 @@ impl ExpressionInfo {
     }
 
     fn insert_documentation_links(s: String) -> String {
-        let re = Regex::new(r"@documentation:(\w+)@").unwrap();
+        let re = Regex::new(r"@doc:(\w+)@").unwrap();
 
         re.replace_all(&s, |caps: &Captures| {
             let key = &caps[1];
