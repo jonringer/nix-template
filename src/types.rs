@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 
 use clap::arg_enum;
 use regex::{Captures, Regex};
@@ -78,4 +79,9 @@ impl ExpressionInfo {
             format!("# See the guide for more information: {}", DOCUMENTATION_LINKS.get(key).unwrap_or(&"").to_string())
         }).to_string()
     }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UserConfig {
+    pub maintainer: Option<String>,
 }

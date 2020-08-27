@@ -1,7 +1,7 @@
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
 use crate::file_path::nix_file_paths;
-use crate::types::{ExpressionInfo, Fetcher, Template};
+use crate::types::{ExpressionInfo, Fetcher, Template, UserConfig};
 
 // clap will validate inputs, only use on functions with possible_values defined
 pub fn arg_to_type<T>(arg: Option<&str>) -> T
@@ -52,7 +52,7 @@ $ nix-template mkshell
             ).default_value("CHANGE"))
         .arg(Arg::from_usage(
             "-m,--maintainer [maintainer] 'Set maintainer'",
-            ).default_value(""))
+            ))
         .arg(Arg::from_usage(
             "--no-meta 'Don't include meta section'",
             ).conflicts_with("nixpkgs"))
@@ -90,20 +90,39 @@ $ nix-template mkshell
                         .possible_values(&clap::Shell::variants()),
                 ),
         )
+        .subcommand(
+            SubCommand::with_name("config")
+                .about("Set information about nix-template usage")
+                .arg(
+                    Arg::from_usage("-f,--file [config-file] 'Config file location. [default: $XDG_CONFIG_HOME/nix-template/config.toml]'")
+                )
+                .subcommand(
+                    SubCommand::with_name("name")
+                    .about("Set maintainer name")
+                    .arg(Arg::from_usage("<name>"))
+                )
+        )
+
 }
 
-pub fn validate_and_serialize_matches(matches: &ArgMatches) -> ExpressionInfo {
+pub fn validate_and_serialize_matches(matches: &ArgMatches, user_config: Option<UserConfig>) -> ExpressionInfo {
     let template: Template = arg_to_type(matches.value_of("TEMPLATE"));
     let fetcher: Fetcher = arg_to_type(matches.value_of("fetcher"));
     let pname: String = arg_to_type(matches.value_of("pname"));
     let version: String = arg_to_type(matches.value_of("v"));
     let license: String = arg_to_type(matches.value_of("license"));
-    let maintainer: String = arg_to_type(matches.value_of("maintainer"));
     let nixpkgs_root: String = arg_to_type(matches.value_of("nixpkgs-root"));
     let path_str: String = arg_to_type(matches.value_of("PATH"));
     let path = std::path::PathBuf::from(&path_str);
     let include_documentation_links: bool = matches.is_present("documentation-links");
     let include_meta: bool = !matches.is_present("no-meta");
+    let maintainer: String = if let Some(config) = user_config {
+        // try to get maintainer from user config if available
+        matches.value_of("maintainer").map(|s| s.to_string()).or(config.maintainer).unwrap_or("".to_string())
+    } else {
+        matches.value_of("maintainer").unwrap_or("").to_string()
+    };
+
 
     let (path_to_write, top_level_path) =
         nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);
