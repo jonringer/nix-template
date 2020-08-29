@@ -60,7 +60,7 @@ pub fn nix_file_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::{arg_to_type, build_cli, validate_and_serialize_matches};
+    use crate::cli::{build_cli, validate_and_serialize_matches};
     use pretty_assertions::assert_eq;
     use serial_test::serial;
 
@@ -69,8 +69,8 @@ mod tests {
     fn test_python() {
         let m =
             build_cli().get_matches_from(vec!["nix-template", "python", "-n", "-p", "requests"]);
-        let info = validate_and_serialize_matches(&m);
-        let nixpkgs_root: String = arg_to_type(m.value_of("nixpkgs-root"));
+        let info = validate_and_serialize_matches(&m, None);
+        let nixpkgs_root: String = "".to_owned();
         let expected = (
             PathBuf::from("pkgs/development/python-modules/requests/default.nix"),
             PathBuf::from("../development/python-modules/requests"),
