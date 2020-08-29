@@ -110,7 +110,7 @@ $ nix-template mkshell
 
 }
 
-pub fn validate_and_serialize_matches(matches: &ArgMatches, user_config: Option<UserConfig>) -> ExpressionInfo {
+pub fn validate_and_serialize_matches(matches: &ArgMatches, user_config: Option<&UserConfig>) -> ExpressionInfo {
     let template: Template = arg_to_type(matches.value_of("TEMPLATE"));
     let fetcher: Fetcher = arg_to_type(matches.value_of("fetcher"));
     let pname: String = arg_to_type(matches.value_of("pname"));
@@ -125,9 +125,9 @@ pub fn validate_and_serialize_matches(matches: &ArgMatches, user_config: Option<
     let nixpkgs_root: String;
     if let Some(ref config) = user_config {
         maintainer = matches.value_of("maintainer")
-            .map(|s| s.to_string()).or(config.maintainer.to_owned()).unwrap_or("".to_string());
+            .or_else(|| config.maintainer.as_deref()).unwrap_or("").to_owned();
         nixpkgs_root = matches.value_of("nixpkgs-root")
-            .map(|s| s.to_string()).or(config.nixpkgs_root.to_owned()).unwrap_or("".to_string());
+            .or_else(|| config.nixpkgs_root.as_deref()).unwrap_or("").to_owned();
     } else {
         maintainer = matches.value_of("maintainer").unwrap_or("").to_string();
         nixpkgs_root = matches.value_of("nixpkgs-root").unwrap_or("").to_string();

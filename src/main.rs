@@ -1,9 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
 
-use toml;
-use xdg;
-
 mod cli;
 mod expression;
 mod file_path;
@@ -34,7 +31,7 @@ fn main() {
         }
         ("config", Some(m)) => {
             let config_path = xdg_dirs.place_config_file("config.toml")
-                .expect("unable to create configuration directory");
+                .unwrap_or_else(|_| panic!("unable to create configuration directory"));
 
             // set config
             match m.subcommand() {
@@ -70,7 +67,7 @@ fn main() {
 
             // write config
             std::fs::write(&config_path, toml::to_string(&user_config).unwrap())
-                .expect(&format!("Was unable to write to file: {}", &config_path.display()));
+                .unwrap_or_else(|_| panic!("Was unable to write to file: {}", &config_path.display()));
         }
         _ => {
             // build expression
@@ -80,7 +77,7 @@ fn main() {
                 None
             };
 
-            let info = cli::validate_and_serialize_matches(&m, user_config);
+            let info = cli::validate_and_serialize_matches(&m, user_config.as_ref());
 
             let expr = expression::generate_expression(&info);
 
@@ -99,11 +96,11 @@ fn main() {
                     if !path.exists() {
                         println!("Creating directory: {}", p.display());
                         std::fs::create_dir_all(p)
-                            .expect(&format!("Was unable to create directory {}", p.display()));
+                            .unwrap_or_else(|_| panic!("Was unable to create directory {}", p.display()));
                     }
                 }
                 std::fs::write(path, expr)
-                    .expect(&format!("Was unable to write to file: {}", &path.display()));
+                    .unwrap_or_else(|_| panic!("Was unable to write to file: {}", &path.display()));
             }
         }
     }

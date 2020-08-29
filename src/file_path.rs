@@ -31,7 +31,7 @@ pub fn nix_file_paths(
                 file_path.push("default.nix");
                 let mut nix_path = PathBuf::from("..");
                 nix_path.push(&radix);
-                return (file_path.to_path_buf(), nix_path.to_path_buf());
+                return (file_path, nix_path);
             } else {
                 eprintln!("Template '{}' does not have a known path default for the nixpkgs repo, please provide a PATH (E.g. nix-template stdenv --pname mypackage --nixpkgs pkgs/applications/misc/", template);
                 exit(1);
@@ -50,7 +50,7 @@ pub fn nix_file_paths(
             let mut nix_path = PathBuf::from("..");
             nix_path.push(&radix);
 
-            return (file_path.to_path_buf(), nix_path.to_path_buf());
+            return (file_path, nix_path);
         }
     }
 
