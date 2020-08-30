@@ -101,6 +101,12 @@ fn main() {
                 }
                 std::fs::write(path, expr)
                     .unwrap_or_else(|_| panic!("Was unable to write to file: {}", &path.display()));
+                if m.is_present("nixpkgs") {
+                    println!("Please add the following line to the approriate file in top-level:");
+                    println!();
+                    println!("  {} = callPackage {} {{ }};", info.pname, info.top_level_path.display());
+                    println!();
+                }
             }
         }
     }
