@@ -9,6 +9,7 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
 - [ ] Finalize cli semantics
 - Ease usage with nixpkgs repo
   - [X] Write to correct location using path
+    - [ ] Improve logic around directories vs files
   - [ ] Print top-level addition statement
 - Support Language/frameworks/usage templates:
   - [X] Stdenv
