@@ -39,7 +39,7 @@ $ nix-template config name jonringer
 $ nix-template config nixpkgs-root /home/jon/projects/nixpkgs
 
 # add a package
-$ nix-template python -pname requests -f pypi -l asl20
+$ nix-template python --pname requests -f pypi -l asl20
 Creating directory: /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/
 Generating python expression at /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/default.nix
 Please add the following line to the approriate file in top-level:
@@ -74,9 +74,13 @@ buildPythonPackage rec {
 
 ### Installation
 
-with nix-pkgs:
+from nixpkgs (unstable, not available in 20.03):
 ```
-# from current repo
+$ nixenv -iA nix-template
+```
+
+with nix-cli (from this repository):
+```
 $ nix-env -f default.nix -iA ""
 ```
 
@@ -105,7 +109,7 @@ $ nix-template config name jonringer
 $ nix-template config nixpkgs-root /home/jon/projects/nixpkgs
 
 # add a package
-$ nix-template python -pname requests -f pypi -l asl20
+$ nix-template python --pname requests -f pypi -l asl20
 Found latest stable release to be 2.24.0 on pypi.com
 Creating directory: /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/
 Generating python expression at /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/default.nix
