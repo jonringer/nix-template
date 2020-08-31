@@ -44,7 +44,7 @@ Creating directory: /home/jon/projects/nixpkgs/pkgs/development/python-modules/r
 Generating python expression at /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/default.nix
 Please add the following line to the approriate file in top-level:
 
-  requests = python3Packages.callPackage ../development/python-modules/requests { };
+  requests = callPackage ../development/python-modules/requests { };
 ```
 ```nix
 # pkgs/development/python-modules/requests/default.nix
@@ -72,6 +72,30 @@ buildPythonPackage rec {
 }
 ```
 
+### Installation
+
+with nix-pkgs:
+```
+# from current repo
+$ nix-env -f default.nix -iA ""
+```
+
+with cargo
+```
+$ cargo install --path .
+```
+
+### Development
+
+Installing depedencies on nixpkgs:
+```
+nix-shell
+```
+
+Other platforms, you'll need the following dependencies:
+  - cargo
+  - rustc
+  - rust-clippy
 
 ## End Goal
 
