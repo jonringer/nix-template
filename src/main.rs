@@ -84,8 +84,7 @@ fn main() {
             let path = &info.path_to_write;
 
             if path.exists() {
-                eprintln!("Cannot write to file '{}', already exists", path.display());
-                std::process::exit(1);
+                panic!("Cannot write to file '{}', already exists", path.display());
             }
 
             if m.is_present("stdout") {
@@ -99,8 +98,12 @@ fn main() {
                             .unwrap_or_else(|_| panic!("Was unable to create directory {}", p.display()));
                     }
                 }
+                // write file
                 std::fs::write(path, expr)
                     .unwrap_or_else(|_| panic!("Was unable to write to file: {}", &path.display()));
+                println!("Generated a {} nix expression at {}", &info.template, &path.canonicalize().unwrap().display());
+
+                // print helpful message about line to be included in pkgs/top-level
                 if m.is_present("nixpkgs") {
                     println!("Please add the following line to the approriate file in top-level:");
                     println!();
