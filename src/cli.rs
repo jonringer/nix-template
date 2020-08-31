@@ -34,6 +34,10 @@ $ nix-template python --nixpkgs --pname requests
 # generate a shell.nix in $PWD
 $ nix-template mkshell
 
+# set maintainer name and location of nixpkgs, only needs to be set once per user
+$ nix-template config name jonringer
+$ nix-template config nixpkgs-root ~/nixpkgs
+
 ",
         )
         .arg(
@@ -43,7 +47,7 @@ $ nix-template mkshell
                 .default_value("stdenv"),
         )
         .arg(
-            Arg::from_usage("[PATH] 'directory or file to be written. In the case of a directory, a default.nix will be created. When used with --nixpkgs, it will be used from nixpkgs-root to determine path location.'")
+            Arg::from_usage("[PATH] 'directory or file to be written. In the case of a directory, a default.nix will be created. When used with --nixpkgs, it will be appended to nixpkgs-root to determine path location.'")
                 .default_value("default.nix")
                 .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix"),
         )
@@ -92,7 +96,7 @@ $ nix-template mkshell
         )
         .subcommand(
             SubCommand::with_name("config")
-                .about("Set information about nix-template usage")
+                .about("Set information about nix-template usage. Writes to $XDG_CONFIG_HOME")
                 .arg(
                     Arg::from_usage("-f,--file [config-file] 'Config file location. [default: $XDG_CONFIG_HOME/nix-template/config.toml]'")
                 )
