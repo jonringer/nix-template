@@ -43,7 +43,7 @@ $ nix-template mkshell
                 .default_value("stdenv"),
         )
         .arg(
-            Arg::from_usage("[PATH] 'location for file to be written'")
+            Arg::from_usage("[PATH] 'directory or file to be written. In the case of a directory, a default.nix will be created. When used with --nixpkgs, it will be used from nixpkgs-root to determine path location.'")
                 .default_value("default.nix")
                 .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix"),
         )
