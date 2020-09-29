@@ -81,16 +81,16 @@ fn main() {
 
             let expr = expression::generate_expression(&info);
 
-            let path = &info.path_to_write;
-
-            if path.exists() {
-                panic!("Cannot write to file '{}', already exists", path.display());
-            }
-
             if m.is_present("stdout") {
                 println!("{}", expr);
             } else {
-                // ensure directory to file exists
+                let path = &info.path_to_write;
+
+                if path.exists() {
+                    panic!("Cannot write to file '{}', already exists", path.display());
+                }
+
+               // ensure directory to file exists
                 if let Some(p) = path.parent() {
                     if !path.exists() {
                         println!("Creating directory: {}", p.display());
