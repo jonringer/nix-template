@@ -57,6 +57,7 @@ pub struct ExpressionInfo {
 impl ExpressionInfo {
     pub fn format(&self, s: &str) -> String {
         let result = s.to_owned().replace("@pname@", &self.pname)
+            .replace("@pname-import-check@", &self.pname.replace("-", "."))  // used for pythonImportsCheck, "azure-mgmt" -> "azure.mgmt"
             .replace("@version@", &self.version)
             .replace("@license@", &self.license)
             .replace("@maintainer@", &self.maintainer);

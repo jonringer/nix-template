@@ -65,7 +65,7 @@ fn build_inputs(template: &Template) -> &'static str {
     match template {
         Template::python => "  @doc:buildDependencies@propagatedBuildInputs = [ ];
 
-  pythonImportsCheck = [ \"@pname@\" ];",
+  pythonImportsCheck = [ \"@pname-import-check@\" ];",
         Template::rust => "  @doc:buildDependencies@cargoSha256 = \"0000000000000000000000000000000000000000000000000000\";
 
   buildInputs = [ ];",
