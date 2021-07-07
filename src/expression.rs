@@ -24,10 +24,10 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
         Fetcher::github => (
             "fetchFromGitHub",
             "  @doc:fetcher@src = fetchFromGitHub {
-    owner = \"CHANGE\";
+    owner = \"@owner@\";
     repo = pname;
-    rev = \"CHANGE\";
-    sha256 = \"0000000000000000000000000000000000000000000000000000\";
+    rev = \"@rev@\";
+    sha256 = \"@src_sha@\";
   };",
         ),
         Fetcher::gitlab => (
@@ -81,8 +81,8 @@ fn build_inputs(template: &Template) -> &'static str {
 fn meta() -> &'static str {
         "
   @doc:meta@meta = with lib; {
-    description = \"CHANGE\";
-    homepage = \"https://github.com/CHANGE/@pname@/\";
+    description = \"@description@\";
+    homepage = \"https://github.com/@owner@/@pname@/\";
     license = licenses.@license@;
     maintainers = with maintainers; [ @maintainer@ ];
   };"
