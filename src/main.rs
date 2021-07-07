@@ -5,11 +5,15 @@ mod cli;
 mod expression;
 mod file_path;
 mod types;
+mod url;
 
 use cli::arg_to_type;
 use types::{UserConfig, Template};
+use env_logger;
 
 fn main() {
+    env_logger::init();
+
     let xdg_dirs = xdg::BaseDirectories::with_prefix("nix-template").unwrap();
 
     let mut user_config: Option<UserConfig> = if let Some(file) = xdg_dirs.find_config_file("config.toml") {
@@ -106,7 +110,7 @@ fn main() {
 
                 // print helpful message about line to be included in pkgs/top-level
                 if m.is_present("nixpkgs") {
-                    println!("Please add the following line to the approriate file in top-level:");
+                    println!("Please add the following line to the appropriate file:");
                     println!();
                     match &info.template {
                       Template::test => println!("  {} = handleTest {} {{ }};", &info.pname, &info.top_level_path.display()),

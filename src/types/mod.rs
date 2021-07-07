@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 use clap::arg_enum;
 use regex::{Captures, Regex};
 
+pub mod gh_release_response;
+pub mod gh_repo_response;
+
+pub use gh_release_response::*;
+pub use gh_repo_response::*;
+
 lazy_static! {
     static ref DOCUMENTATION_LINKS: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
@@ -43,6 +49,12 @@ arg_enum! {
 }
 
 #[derive(Debug)]
+pub struct GithubRepo {
+    pub owner: String,
+    pub repo: String
+}
+
+#[derive(Debug)]
 pub struct ExpressionInfo {
     pub pname: String,
     pub version: String,
@@ -54,13 +66,27 @@ pub struct ExpressionInfo {
     pub top_level_path: std::path::PathBuf,
     pub include_documentation_links: bool,
     pub include_meta: bool,
+    pub tag_prefix: String,
+    pub owner: String,
+    pub src_sha: String,
+    pub description: String,
 }
 
 impl ExpressionInfo {
     pub fn format(&self, s: &str) -> String {
+        let rev: String = if self.tag_prefix == "" {
+            "version".to_owned()
+        } else {
+            format!(r"{}${{version}}", &self.tag_prefix)
+        };
+
         let result = s.to_owned().replace("@pname@", &self.pname)
             .replace("@pname-import-check@", &self.pname.replace("-", "."))  // used for pythonImportsCheck, "azure-mgmt" -> "azure.mgmt"
             .replace("@version@", &self.version)
+            .replace("@owner@", &self.owner)
+            .replace("@rev@", &rev)
+            .replace("@src_sha@", &self.src_sha)
+            .replace("@description@", &self.description)
             .replace("@license@", &self.license)
             .replace("@maintainer@", &self.maintainer);
 

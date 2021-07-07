@@ -2,6 +2,7 @@ use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
 use crate::file_path::nix_file_paths;
 use crate::types::{ExpressionInfo, Fetcher, Template, UserConfig};
+use crate::url::read_meta_from_url;
 
 // clap will validate inputs, only use on functions with possible_values defined
 pub fn arg_to_type<T>(arg: Option<&str>) -> T
@@ -28,6 +29,9 @@ pub fn build_cli() -> App<'static, 'static> {
         .after_help(
             "EXAMPLES:
 
+# generate an expression for this package
+$ nix-template rust --from-url https://github.com/jonringer/nix-template
+
 # generate a python package expressison at pkgs/development/python-modules/requests/default.nix
 $ nix-template python --nixpkgs --pname requests
 
@@ -53,6 +57,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
                 .default_value_if("TEMPLATE", Some("test"), "test.nix")
                 .default_value_if("TEMPLATE", Some("flake"), "flake.nix"),
         )
+        .arg(Arg::from_usage(
+            "-u,--from-url [url] 'Point to a github repo, and use github api to determine package values'",
+            ))
         .arg(Arg::from_usage(
             "-l,--license [license] 'Set license'",
             ).default_value("CHANGE"))
@@ -142,7 +149,7 @@ pub fn validate_and_serialize_matches(matches: &ArgMatches, user_config: Option<
     let (path_to_write, top_level_path) =
         nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);
 
-    ExpressionInfo {
+    let mut info = ExpressionInfo {
         pname,
         version,
         license,
@@ -152,8 +159,18 @@ pub fn validate_and_serialize_matches(matches: &ArgMatches, user_config: Option<
         path_to_write,
         top_level_path,
         include_documentation_links,
-        include_meta
+        include_meta,
+        tag_prefix: "".to_owned(),
+        owner: "CHANGE".to_owned(),
+        src_sha: "0000000000000000000000000000000000000000000000000000".to_owned(),
+        description: "CHANGE".to_owned(),
+    };
+
+    if let Some(url) = matches.value_of("from-url") {
+        read_meta_from_url(url, &mut info);
     }
+
+    info
 }
 
 #[cfg(test)]
