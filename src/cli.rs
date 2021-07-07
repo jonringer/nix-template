@@ -50,6 +50,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             Arg::from_usage("[PATH] 'directory or file to be written. In the case of a directory, a default.nix will be created. When used with --nixpkgs, it will be appended to nixpkgs-root to determine path location.'")
                 .default_value("default.nix")
                 .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix")
+                .default_value_if("TEMPLATE", Some("test"), "test.nix")
                 .default_value_if("TEMPLATE", Some("flake"), "flake.nix"),
         )
         .arg(Arg::from_usage(
@@ -190,6 +191,14 @@ mod tests {
         assert_eq!(m.is_present("stdout"), true);
         assert_eq!(m.value_of("TEMPLATE"), Some("mkshell"));
         assert_eq!(m.value_of("PATH"), Some("shell.nix"));
+    }
+
+    #[test]
+    fn test_test() {
+        let m = build_cli().get_matches_from(vec!["nix-template", "test", "-m", "myself"]);
+        assert_eq!(m.value_of("TEMPLATE"), Some("test"));
+        assert_eq!(m.value_of("PATH"), Some("test.nix"));
+        assert_eq!(m.value_of("maintainer"), Some("myself"));
     }
 
     #[test]

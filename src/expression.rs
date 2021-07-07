@@ -8,7 +8,8 @@ fn derivation_helper(template: &Template) -> (String, String) {
         Template::qt      => ("mkDerivation", "mkDerivation", None),
         Template::go      => ("buildGoModule", "buildGoModule", None),
         Template::rust    => ("rustPlatform", "rustPlatform.buildRustPackage", None),
-        Template::flake   => ("", "", None) // flakes aren't a normal expression
+        Template::flake   => ("", "", None), // flakes aren't a normal expression
+        Template::test    => ("", "", None), // Tests aren't a normal expression
     };
 
     match documentation_key {
@@ -113,7 +114,7 @@ pub fn generate_expression(info: &ExpressionInfo) -> String {
     in utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" ] (system: rec {
       legacyPackages = pkgsForSystem system;
       packages = utils.lib.flattenTree {
-        inherit (pkgs) devShell myPkg;
+        inherit (legacyPackages) devShell myPkg;
       };
       defaultPackage = packages.myPkg;
       apps.<mypkg> = utils.lib.mkApp { drv = packages.myPkg; };  # use as `nix run <mypkg>`
@@ -128,6 +129,28 @@ pub fn generate_expression(info: &ExpressionInfo) -> String {
     nixosConfigurations.hostname = { config, pkgs }: {};
   };
 }"#.to_string(),
+        Template::test => r#"import ./make-test-python.nix ({ pkgs, ... }:
+{
+  name = "@pname@";
+  meta = with pkgs.lib.maintainers; {
+    maintainers = [ @maintainer@ ];
+  };
+  machine = { pkgs, ... }: {
+    environment.systemPackages = [ @pname@ ];
+    services.@pname@.enable = true;
+    virtualisation.memorySize = 512;
+  };
+
+  testScript =
+    ''
+      start_all()
+
+      machine.wait_for_unit("multi-user.target")
+      machine.wait_for_unit("@pname@.service")
+      machine.wait_for_open_port(8080)
+      machine.succeed("CMD")
+    '';
+})"#.to_string(),
         Template::mkshell => "with import <nixpkgs> { };
 
 mkShell rec {

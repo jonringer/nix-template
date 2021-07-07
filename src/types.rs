@@ -26,6 +26,7 @@ arg_enum! {
         go,
         rust,
         qt,
+        test,
     }
 }
 
