@@ -49,7 +49,8 @@ $ nix-template config nixpkgs-root ~/nixpkgs
         .arg(
             Arg::from_usage("[PATH] 'directory or file to be written. In the case of a directory, a default.nix will be created. When used with --nixpkgs, it will be appended to nixpkgs-root to determine path location.'")
                 .default_value("default.nix")
-                .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix"),
+                .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix")
+                .default_value_if("TEMPLATE", Some("flake"), "flake.nix"),
         )
         .arg(Arg::from_usage(
             "-l,--license [license] 'Set license'",

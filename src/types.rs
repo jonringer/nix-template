@@ -19,6 +19,7 @@ arg_enum! {
     #[allow(non_camel_case_types)]
     #[derive(Debug,PartialEq)]
     pub enum Template {
+        flake,
         stdenv,
         python,
         mkshell,

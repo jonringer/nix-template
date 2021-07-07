@@ -92,7 +92,8 @@ fn main() {
 
                // ensure directory to file exists
                 if let Some(p) = path.parent() {
-                    if !path.exists() {
+                    // TODO: better way to determine that file will be written PWD
+                    if p.to_str() != Some("") && !p.exists()  {
                         println!("Creating directory: {}", p.display());
                         std::fs::create_dir_all(p)
                             .unwrap_or_else(|_| panic!("Was unable to create directory {}", p.display()));
