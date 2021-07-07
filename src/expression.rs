@@ -197,10 +197,3 @@ mkShell rec {
         }
     }
 }
-
-fn calling_expression (template: Template) -> &'static str {
-  match template {
-    Template::test => "  {} = handleTest {} {{ }};",
-    _ => "  {} = callPackage {} {{ }};"
-  }
-}
