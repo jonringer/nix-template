@@ -19,6 +19,7 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
   - [x] Qt
   - [x] Go
   - [x] Rust
+  - [x] Flakes
   - [ ] Haskell
   - [ ] and many more...
 - [ ] Add option (--comments?) to embed noob-friendly comments and explanations about common usage patterns
