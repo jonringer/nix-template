@@ -20,6 +20,7 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
   - [x] Go
   - [x] Rust
   - [x] Flakes
+  - [x] NixOS Test
   - [ ] Haskell
   - [ ] and many more...
 - [ ] Add option (--comments?) to embed noob-friendly comments and explanations about common usage patterns

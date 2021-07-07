@@ -7,7 +7,7 @@ mod file_path;
 mod types;
 
 use cli::arg_to_type;
-use types::UserConfig;
+use types::{UserConfig, Template};
 
 fn main() {
     let xdg_dirs = xdg::BaseDirectories::with_prefix("nix-template").unwrap();
@@ -108,7 +108,10 @@ fn main() {
                 if m.is_present("nixpkgs") {
                     println!("Please add the following line to the approriate file in top-level:");
                     println!();
-                    println!("  {} = callPackage {} {{ }};", info.pname, info.top_level_path.display());
+                    match &info.template {
+                      Template::test => println!("  {} = handleTest {} {{ }};", &info.pname, &info.top_level_path.display()),
+                      _ => println!("  {} = callPackage {} {{ }};", &info.pname, &info.top_level_path.display()),
+                    }
                     println!();
                 }
             }

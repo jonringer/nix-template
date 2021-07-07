@@ -26,6 +26,11 @@ pub fn nix_file_paths(
             if *template == Template::python {
                 eprintln!("No [PATH] provided, defaulting to \"pkgs/development/python-modules/\"");
                 radix = PathBuf::from("development/python-modules/");
+            } else if *template == Template::test {
+                eprintln!("No [PATH] provided, defaulting to \"nixos/tests/\"");
+                radix = PathBuf::from("nixos/tests/");
+                radix.push(format!("{}.nix", &pname));
+                return (radix, PathBuf::from(format!("./{}.nix", &pname)));
             } else {
                 eprintln!("No [PATH] provided, defaulting to \"pkgs/applications/misc/\"");
                 radix = PathBuf::from("applications/misc");
@@ -38,9 +43,11 @@ pub fn nix_file_paths(
             radix.push(&pname);
         }
 
+        // nix_path is the path used in pkgs/top-level/*.nix or nixos/tests/all-tests.nix
         let mut nix_path = PathBuf::from("..");
         nix_path.push(&radix);
 
+        // file path is the path to the nix expression from NIXPKGS_ROOT
         let mut file_path = PathBuf::from(&nixpkgs_root);
         file_path.push("pkgs");
         file_path.push(&radix);
@@ -69,6 +76,18 @@ mod tests {
         let actual = (info.path_to_write, info.top_level_path);
 
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[serial]
+    fn test_test() {
+        let m =
+            build_cli().get_matches_from(vec!["nix-template", "test", "-n", "-p", "newpkg"]);
+        let expected = (
+            PathBuf::from("nixos/tests/newpkg.nix"),
+            PathBuf::from("./newpkg.nix"),
+        );
+        assert_paths(m, expected);
     }
 
     #[test]
