@@ -95,7 +95,7 @@ fn main() {
             let expr = expression::generate_expression(&info);
 
             if m.is_present("stdout") {
-                println!("{}", expr);
+                println!("{}", info.format(&expr));
             } else {
                 let path = &info.path_to_write;
 
@@ -127,6 +127,7 @@ fn main() {
                     println!("Please add the following line to the appropriate file:");
                     println!();
                     match &info.template {
+                        Template::module => println!("  {}", &info.top_level_path.display()),
                         Template::test => println!(
                             "  {} = handleTest {} {{ }};",
                             &info.pname,

@@ -31,12 +31,36 @@ pub fn nix_file_paths(
                 radix = PathBuf::from("nixos/tests/");
                 radix.push(format!("{}.nix", &pname));
                 return (radix, PathBuf::from(format!("./{}.nix", &pname)));
+            } else if *template == Template::module {
+                eprintln!("A path is required when using the module template.");
+                eprintln!("For example, 'nixos/modules/services/{}.nix", &pname);
+                exit(1);
             } else {
                 eprintln!("No [PATH] provided, defaulting to \"pkgs/applications/misc/\"");
                 radix = PathBuf::from("applications/misc");
             }
         } else {
             radix = path.strip_prefix("pkgs").unwrap_or(path).to_path_buf();
+        }
+
+        // modules just need the file location
+        if *template == Template::module {
+            radix = path.strip_prefix(".").unwrap_or(path).to_path_buf();
+            radix = radix.strip_prefix("/").unwrap_or(&radix).to_path_buf();
+            radix = radix
+                .strip_prefix("nixos/modules")
+                .unwrap_or(&radix)
+                .to_path_buf();
+
+            let mut module = PathBuf::from("./");
+            module.push(&radix);
+
+            let mut file_path = PathBuf::from(&nixpkgs_root);
+            file_path.push("nixos");
+            file_path.push("modules");
+            file_path.push(&radix);
+
+            return (file_path, module);
         }
 
         if !radix.ends_with(&pname) && radix.extension() != Some(std::ffi::OsStr::new("nix")) {
@@ -76,6 +100,42 @@ mod tests {
         let actual = (info.path_to_write, info.top_level_path);
 
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[serial]
+    fn test_module() {
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "module",
+            "-n",
+            "-p",
+            "my-package",
+            "nixos/modules/services/my-package.nix",
+        ]);
+        let expected = (
+            PathBuf::from("nixos/modules/services/my-package.nix"),
+            PathBuf::from("./services/my-package.nix"),
+        );
+        assert_paths(m, expected);
+    }
+
+    #[test]
+    #[serial]
+    fn test_module_long_path() {
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "module",
+            "-n",
+            "-p",
+            "my-package",
+            "nixos/modules/services/some-pkg-set/my-package.nix",
+        ]);
+        let expected = (
+            PathBuf::from("nixos/modules/services/some-pkg-set/my-package.nix"),
+            PathBuf::from("./services/some-pkg-set/my-package.nix"),
+        );
+        assert_paths(m, expected);
     }
 
     #[test]

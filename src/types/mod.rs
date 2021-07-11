@@ -37,6 +37,7 @@ arg_enum! {
         flake,
         stdenv,
         python,
+        module,
         mkshell,
         go,
         rust,

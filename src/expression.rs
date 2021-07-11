@@ -10,6 +10,7 @@ fn derivation_helper(template: &Template) -> (String, String) {
         Template::rust => ("rustPlatform", "rustPlatform.buildRustPackage", None),
         Template::flake => ("", "", None), // flakes aren't a normal expression
         Template::test => ("", "", None),  // Tests aren't a normal expression
+        Template::module => ("", "", None), // Tests aren't a normal expression
     };
 
     match documentation_key {
@@ -89,6 +90,46 @@ fn meta() -> &'static str {
 
 pub fn generate_expression(info: &ExpressionInfo) -> String {
     match &info.template {
+        Template::module   => r#"{ pkgs, lib, config, ... }:
+
+with lib;
+
+let
+  cfg = config.services.@pname@;
+in {
+  options.services.@pname@ = {
+    enable = mkEnableOption "CHANGE";
+
+    package = mkOption {
+      type = types.package;
+      default = pkgs.@pname@;
+      defaultText = "pkgs.@pname@";
+      description = "Set version of @pname@ package to use.";
+    };
+  };
+
+  config = mkIf cfg.enable {
+    environment.systemPackages = [ cfg.package ]; # if user should have the command available as well
+    services.dbus.packages = [ cfg.package ]; # if the package has dbus related configuration
+
+    systemd.services.@pname@ = {
+      description = "@pname server daemon.";
+
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network.target" ]; # if networking is needed
+
+      restartIfChanged = true; # set to false, if restarting is problematic
+
+      serviceConfig = {
+        DynamicUser = true;
+        ExecStart = "${cfg.package}/bin/@pname@";
+        Restart = "always";
+      };
+    };
+  };
+
+  meta.maintainers = with lib.maintainers; [ @maintainer@ ];
+}"#.to_owned(),
         Template::flake   => r#"{
   description = "CHANGEME";
 
