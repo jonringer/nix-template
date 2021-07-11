@@ -2,6 +2,7 @@
 
 ## v0.1.1
 
+- Add nixos module template
 - Add nixos test template
 - Add flake template
 - Add `-u,--from-url` option
