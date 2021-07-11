@@ -1,16 +1,13 @@
 use crate::types;
-use regex::Regex;
-use lazy_static;
-use std::process::exit;
-use reqwest::blocking::{Client,Response};
-use serde::Deserialize;
-use serde_json;
-use log::{error,debug,info};
-use anyhow::{Context, Result};
 use anyhow::anyhow;
-use version_compare::VersionCompare;
+use anyhow::Result;
+use log::{debug, error};
+use regex::Regex;
+use reqwest::blocking::Client;
 use std::collections::HashMap;
+use std::process::exit;
 use std::process::Command;
+use version_compare::VersionCompare;
 
 lazy_static! {
     static ref GITHUB_URL_REGEX: Regex = {
@@ -43,10 +40,12 @@ lazy_static! {
 const LOG_TARGET: &str = "nix-template::url";
 
 // This will just crazy the program, so no need to return a value
-fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::GithubRepo>  {
+fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::GithubRepo> {
     if url.starts_with("github.com") {
         if !GITHUB_URL_REGEX.is_match(url) {
-            return Err(anyhow!("Error: please provide a github url of shape 'github.com/<owner>/<repo>'"))
+            return Err(anyhow!(
+                "Error: please provide a github url of shape 'github.com/<owner>/<repo>'"
+            ));
         }
 
         let captures = GITHUB_URL_REGEX.captures(url).unwrap();
@@ -54,9 +53,12 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Github
         return Ok(types::GithubRepo {
             owner: captures.get(1).unwrap().as_str().to_owned(),
             repo: captures.get(2).unwrap().as_str().to_owned(),
-        })
+        });
     } else {
-        Err(anyhow!("{} is not a supported url. Only github.com is supported currently", original_url))
+        Err(anyhow!(
+            "{} is not a supported url. Only github.com is supported currently",
+            original_url
+        ))
     }
 }
 
@@ -68,10 +70,13 @@ fn get_json(request: reqwest::blocking::RequestBuilder) -> Result<String, reqwes
 pub fn fetch_github_repo_info(repo: &types::GithubRepo) -> types::GhRepoResponse {
     let request_client = Client::new();
     let mut request = request_client
-        .get(format!("https://api.github.com/repos/{}/{}", repo.owner, repo.repo))
+        .get(format!(
+            "https://api.github.com/repos/{}/{}",
+            repo.owner, repo.repo
+        ))
         .header("User-Agent", "reqwest")
         .header("Accept", "application/vnd.github.v3+json");
-        
+
     if let Ok(github_token) = std::env::var("GITHUB_TOKEN") {
         debug!(target: LOG_TARGET, "Using github token for polling events");
         request = request.header("Authorization", format!("token {}", github_token));
@@ -81,7 +86,10 @@ pub fn fetch_github_repo_info(repo: &types::GithubRepo) -> types::GhRepoResponse
     match serde_json::from_str(&body) {
         Ok(s) => s,
         Err(e) => {
-            error!(target: LOG_TARGET, "Unable to parse response from github to json: {:?}", e);
+            error!(
+                target: LOG_TARGET,
+                "Unable to parse response from github to json: {:?}", e
+            );
             exit(1)
         }
     }
@@ -90,10 +98,13 @@ pub fn fetch_github_repo_info(repo: &types::GithubRepo) -> types::GhRepoResponse
 pub fn fetch_github_release_info(repo: &types::GithubRepo) -> types::GhReleaseResponse {
     let request_client = Client::new();
     let mut request = request_client
-        .get(format!("https://api.github.com/repos/{}/{}/releases", repo.owner, repo.repo))
+        .get(format!(
+            "https://api.github.com/repos/{}/{}/releases",
+            repo.owner, repo.repo
+        ))
         .header("User-Agent", "reqwest")
         .header("Accept", "application/vnd.github.v3+json");
-        
+
     if let Ok(github_token) = std::env::var("GITHUB_TOKEN") {
         debug!(target: LOG_TARGET, "Using github token for polling events");
         request = request.header("Authorization", format!("token {}", github_token));
@@ -103,40 +114,59 @@ pub fn fetch_github_release_info(repo: &types::GithubRepo) -> types::GhReleaseRe
     match serde_json::from_str(&body) {
         Ok(s) => s,
         Err(e) => {
-            error!(target: LOG_TARGET, "Unable to parse response from github to json: {:?}", e);
+            error!(
+                target: LOG_TARGET,
+                "Unable to parse response from github to json: {:?}", e
+            );
             exit(1)
         }
     }
 }
 pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo) {
-    let trimmed_url = url.trim_start_matches("http://").trim_start_matches("https://");
+    let trimmed_url = url
+        .trim_start_matches("http://")
+        .trim_start_matches("https://");
 
     match validate_and_parse_url(trimmed_url, url) {
         Ok(repo) => {
             eprintln!("Determining latest release for {}", &repo.repo);
             let mut releases = fetch_github_release_info(&repo);
-            if releases.len() > 0 {
-                releases.sort_by(|a,b| VersionCompare::compare(&b.tag_name, &a.tag_name).unwrap().ord().unwrap());
+            if !releases.is_empty() {
+                releases.sort_by(|a, b| {
+                    VersionCompare::compare(&b.tag_name, &a.tag_name)
+                        .unwrap()
+                        .ord()
+                        .unwrap()
+                });
                 releases = releases.into_iter().filter(|a| !a.prerelease).collect();
-                let parsed_version = VERSION_REGEX.captures(&releases.first().unwrap().tag_name).unwrap();
+                let parsed_version = VERSION_REGEX
+                    .captures(&releases.first().unwrap().tag_name)
+                    .unwrap();
                 info.version = parsed_version.get(2).unwrap().as_str().to_owned();
                 info.tag_prefix = parsed_version.get(1).unwrap().as_str().to_owned();
 
                 eprintln!("Determining sha256 for {}", &repo.repo);
                 let sha256_cmd = Command::new("nix-prefetch-url")
                     .args(&["--unpack", "--type", "sha256"])
-                    .arg(format!("https://github.com/{}/{}/archive/refs/tags/{}{}.tar.gz",
-                        &repo.owner, &repo.repo, &info.tag_prefix, &info.version))
+                    .arg(format!(
+                        "https://github.com/{}/{}/archive/refs/tags/{}{}.tar.gz",
+                        &repo.owner, &repo.repo, &info.tag_prefix, &info.version
+                    ))
                     .output();
-                info.src_sha = std::str::from_utf8(&sha256_cmd.unwrap().stdout).unwrap().trim().to_owned();
-
+                info.src_sha = std::str::from_utf8(&sha256_cmd.unwrap().stdout)
+                    .unwrap()
+                    .trim()
+                    .to_owned();
             } else {
                 eprintln!("No releases found for {}", &url);
             }
 
             let repo_info = fetch_github_repo_info(&repo);
             if repo_info.license.key != "other" {
-                info.license = GITHUB_TO_NIXPKGS_LICENSE.get(&*repo_info.license.key).unwrap_or(&"CHANGE").to_string();
+                info.license = GITHUB_TO_NIXPKGS_LICENSE
+                    .get(&*repo_info.license.key)
+                    .unwrap_or(&"CHANGE")
+                    .to_string();
             }
             info.description = repo_info.description;
 
@@ -146,14 +176,13 @@ pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo) {
             if info.owner == "CHANGE" {
                 info.owner = repo.owner;
             }
-        },
+        }
         Err(e) => {
             eprintln!("{}", e);
             exit(1);
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -162,7 +191,11 @@ mod tests {
 
     #[test]
     fn test_url_parse() {
-        let repo = validate_and_parse_url("github.com/jonringer/nix-template", "github.com/jonringer/nix-template").unwrap();
+        let repo = validate_and_parse_url(
+            "github.com/jonringer/nix-template",
+            "github.com/jonringer/nix-template",
+        )
+        .unwrap();
 
         assert_eq!(repo.owner, "jonringer");
         assert_eq!(repo.repo, "nix-template");

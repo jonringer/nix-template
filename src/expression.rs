@@ -2,20 +2,19 @@ use crate::types::{ExpressionInfo, Fetcher, Template};
 
 fn derivation_helper(template: &Template) -> (String, String) {
     let (input, derivation, documentation_key): (&str, &str, Option<&str>) = match template {
-        Template::stdenv  => ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation")),
-        Template::python  => ("buildPythonPackage", "buildPythonPackage", None),
+        Template::stdenv => ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation")),
+        Template::python => ("buildPythonPackage", "buildPythonPackage", None),
         Template::mkshell => ("pkgs ? import <nixpkgs> {}", "with pkgs;\n\nmkShell", None),
-        Template::qt      => ("mkDerivation", "mkDerivation", None),
-        Template::go      => ("buildGoModule", "buildGoModule", None),
-        Template::rust    => ("rustPlatform", "rustPlatform.buildRustPackage", None),
-        Template::flake   => ("", "", None), // flakes aren't a normal expression
-        Template::test    => ("", "", None), // Tests aren't a normal expression
+        Template::qt => ("mkDerivation", "mkDerivation", None),
+        Template::go => ("buildGoModule", "buildGoModule", None),
+        Template::rust => ("rustPlatform", "rustPlatform.buildRustPackage", None),
+        Template::flake => ("", "", None), // flakes aren't a normal expression
+        Template::test => ("", "", None),  // Tests aren't a normal expression
     };
 
     match documentation_key {
-        Some(key) => (String::from(input),
-                      format!("@doc:{}@{}", key, derivation)),
-        None => (String::from(input), String::from(derivation))
+        Some(key) => (String::from(input), format!("@doc:{}@{}", key, derivation)),
+        None => (String::from(input), String::from(derivation)),
     }
 }
 
@@ -79,7 +78,7 @@ fn build_inputs(template: &Template) -> &'static str {
 }
 
 fn meta() -> &'static str {
-        "
+    "
   @doc:meta@meta = with lib; {
     description = \"@description@\";
     homepage = \"https://github.com/@owner@/@pname@/\";
