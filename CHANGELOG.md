@@ -1,7 +1,6 @@
 # Changelog
 
 ## v0.1.1
-=========
 
 - Add nixos test template
 - Add flake template
@@ -9,7 +8,6 @@
   - Github supported
 
 ## v0.1.0
-=========
 
 - Add the following templates:
   - stdenv
