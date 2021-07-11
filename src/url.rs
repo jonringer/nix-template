@@ -202,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn test_version_regix() {
+    fn test_version_regex() {
         let captures = VERSION_REGEX.captures("v0.1.0").unwrap();
         assert_eq!(captures.len(), 3);
         assert_eq!(captures.get(1).unwrap().as_str(), "v");
@@ -220,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_version_regix() {
+    fn test_simple_version_regex() {
         let captures = VERSION_REGEX.captures("2.1.1").unwrap();
         assert_eq!(captures.len(), 3);
         assert_eq!(captures.get(1).unwrap().as_str(), "");
