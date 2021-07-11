@@ -34,7 +34,46 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
     - [ ] Pypi (will need a way to pass pypi pname, as it may differ from installable path)
 - [X] Implement shell completion (nix-template completions <SHELL>)
 
-## Current Usage
+## Current Usage (github only)
+
+```bash
+$ nix-template rust -n --from-url github.com/jonringer/nix-template
+Creating directory: /home/jon/projects/nixpkgs/pkgs/applications/misc/nix-template
+Generating python expression at /home/jon/projects/nixpkgs/pkgs/applications/misc/nix-template/default.nix
+Please add the following line to the approriate file in top-level:
+
+  nix-template = callPackage ../applications/misc/nix-template { };
+```
+The resulting file:
+```
+# $NIXPKGS_ROOT/pkgs/applications/misc/nix-template/default.nix
+{ lib, rustPlatform, fetchFromGitHub }:
+
+rustPlatform.buildRustPackage rec {
+  pname = "nix-template";
+  version = "0.1.0";
+
+  src = fetchFromGitHub {
+    owner = "jonringer";
+    repo = pname;
+    rev = "v${version}";
+    sha256 = "1h6xdvhzg7nb0s82b3r5bsh8bfdb1l5sm7fa24lfwd396xp9yyig";
+  };
+
+  cargoSha256 = "0000000000000000000000000000000000000000000000000000";
+
+  buildInputs = [ ];
+
+  meta = with lib; {
+    description = "Make creating nix expressions easy";
+    homepage = "https://github.com/jonringer/nix-template/";
+    license = licenses.cc0;
+    maintainers = with maintainers; [ jonringer ];
+  };
+}
+```
+
+## Current Usage (Generically)
 
 ```bash
 # only need to config once per user
