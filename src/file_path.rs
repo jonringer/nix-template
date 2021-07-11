@@ -67,9 +67,9 @@ pub fn nix_file_paths(
 mod tests {
     use super::*;
     use crate::cli::{build_cli, validate_and_serialize_matches};
+    use clap::ArgMatches;
     use pretty_assertions::assert_eq;
     use serial_test::serial;
-    use clap::ArgMatches;
 
     fn assert_paths(m: ArgMatches, expected: (PathBuf, PathBuf)) {
         let info = validate_and_serialize_matches(&m, None);
@@ -81,8 +81,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_test() {
-        let m =
-            build_cli().get_matches_from(vec!["nix-template", "test", "-n", "-p", "newpkg"]);
+        let m = build_cli().get_matches_from(vec!["nix-template", "test", "-n", "-p", "newpkg"]);
         let expected = (
             PathBuf::from("nixos/tests/newpkg.nix"),
             PathBuf::from("./newpkg.nix"),
@@ -117,13 +116,18 @@ mod tests {
     #[test]
     #[serial]
     fn test_stdenv_path() {
-        let m =
-            build_cli().get_matches_from(vec!["nix-template", "stdenv", "-n", "-p", "mypackage", "pkgs/compilers/test/"]);
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "stdenv",
+            "-n",
+            "-p",
+            "mypackage",
+            "pkgs/compilers/test/",
+        ]);
         let expected = (
             PathBuf::from("pkgs/compilers/test/mypackage/default.nix"),
             PathBuf::from("../compilers/test/mypackage"),
         );
         assert_paths(m, expected);
     }
-
 }

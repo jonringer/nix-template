@@ -12,7 +12,7 @@
 // }
 
 use serde;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub type GhReleaseResponse = Vec<GhReleaseResponseElement>;
 

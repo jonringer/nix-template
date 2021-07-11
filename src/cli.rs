@@ -120,10 +120,12 @@ $ nix-template config nixpkgs-root ~/nixpkgs
                     .arg(Arg::from_usage("<nixpkgs-root>"))
                 )
         )
-
 }
 
-pub fn validate_and_serialize_matches(matches: &ArgMatches, user_config: Option<&UserConfig>) -> ExpressionInfo {
+pub fn validate_and_serialize_matches(
+    matches: &ArgMatches,
+    user_config: Option<&UserConfig>,
+) -> ExpressionInfo {
     let template: Template = arg_to_type(matches.value_of("TEMPLATE"));
     let fetcher: Fetcher = arg_to_type(matches.value_of("fetcher"));
     let pname: String = arg_to_type(matches.value_of("pname"));
@@ -137,10 +139,16 @@ pub fn validate_and_serialize_matches(matches: &ArgMatches, user_config: Option<
     let maintainer: String;
     let nixpkgs_root: String;
     if let Some(ref config) = user_config {
-        maintainer = matches.value_of("maintainer")
-            .or_else(|| config.maintainer.as_deref()).unwrap_or("").to_owned();
-        nixpkgs_root = matches.value_of("nixpkgs-root")
-            .or_else(|| config.nixpkgs_root.as_deref()).unwrap_or("").to_owned();
+        maintainer = matches
+            .value_of("maintainer")
+            .or_else(|| config.maintainer.as_deref())
+            .unwrap_or("")
+            .to_owned();
+        nixpkgs_root = matches
+            .value_of("nixpkgs-root")
+            .or_else(|| config.nixpkgs_root.as_deref())
+            .unwrap_or("")
+            .to_owned();
     } else {
         maintainer = matches.value_of("maintainer").unwrap_or("").to_string();
         nixpkgs_root = matches.value_of("nixpkgs-root").unwrap_or("").to_string();

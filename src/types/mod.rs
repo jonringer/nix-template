@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use clap::arg_enum;
 use regex::{Captures, Regex};
@@ -13,10 +13,19 @@ pub use gh_repo_response::*;
 lazy_static! {
     static ref DOCUMENTATION_LINKS: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
-        m.insert("buildDependencies", "https://nixos.org/nixpkgs/manual/#ssec-stdenv-dependencies\n  ");
-        m.insert("fetcher", "https://nixos.org/nixpkgs/manual/#chap-pkgs-fetchers\n  ");
+        m.insert(
+            "buildDependencies",
+            "https://nixos.org/nixpkgs/manual/#ssec-stdenv-dependencies\n  ",
+        );
+        m.insert(
+            "fetcher",
+            "https://nixos.org/nixpkgs/manual/#chap-pkgs-fetchers\n  ",
+        );
         m.insert("meta", "https://nixos.org/nixpkgs/manual/#chap-meta\n  ");
-        m.insert("stdenvMkDerivation", "https://nixos.org/nixpkgs/manual/#sec-using-stdenv\n  ");
+        m.insert(
+            "stdenvMkDerivation",
+            "https://nixos.org/nixpkgs/manual/#sec-using-stdenv\n  ",
+        );
         m
     };
 }
@@ -51,7 +60,7 @@ arg_enum! {
 #[derive(Debug)]
 pub struct GithubRepo {
     pub owner: String,
-    pub repo: String
+    pub repo: String,
 }
 
 #[derive(Debug)]
@@ -74,14 +83,16 @@ pub struct ExpressionInfo {
 
 impl ExpressionInfo {
     pub fn format(&self, s: &str) -> String {
-        let rev: String = if self.tag_prefix == "" {
+        let rev: String = if self.tag_prefix.is_empty() {
             "version".to_owned()
         } else {
             format!(r"{}${{version}}", &self.tag_prefix)
         };
 
-        let result = s.to_owned().replace("@pname@", &self.pname)
-            .replace("@pname-import-check@", &self.pname.replace("-", "."))  // used for pythonImportsCheck, "azure-mgmt" -> "azure.mgmt"
+        let result = s
+            .to_owned()
+            .replace("@pname@", &self.pname)
+            .replace("@pname-import-check@", &self.pname.replace("-", ".")) // used for pythonImportsCheck, "azure-mgmt" -> "azure.mgmt"
             .replace("@version@", &self.version)
             .replace("@owner@", &self.owner)
             .replace("@rev@", &rev)
@@ -105,8 +116,12 @@ impl ExpressionInfo {
 
         re.replace_all(&s, |caps: &Captures| {
             let key = &caps[1];
-            format!("# See the guide for more information: {}", DOCUMENTATION_LINKS.get(key).unwrap_or(&"").to_string())
-        }).to_string()
+            format!(
+                "# See the guide for more information: {}",
+                DOCUMENTATION_LINKS.get(key).unwrap_or(&"").to_string()
+            )
+        })
+        .to_string()
     }
 }
 
