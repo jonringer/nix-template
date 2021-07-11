@@ -20,6 +20,7 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
   - [x] Go
   - [x] Rust
   - [x] Flakes
+  - [x] NixOS Module
   - [x] NixOS Test
   - [ ] Haskell
   - [ ] and many more...
@@ -29,7 +30,7 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
   - [X] Set nixpkgs-root path through `$XDG_CONFIG_HOME`
 - Better integration with fetchers
   - Automatically determine version and sha256
-    - [ ] Github (need a way to pass owner and repo)
+    - [X] Github (need a way to pass owner and repo)
     - [ ] Pypi (will need a way to pass pypi pname, as it may differ from installable path)
 - [X] Implement shell completion (nix-template completions <SHELL>)
 
