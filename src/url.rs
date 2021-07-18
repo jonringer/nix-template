@@ -238,9 +238,6 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
 
         let latest_version = releases.first().unwrap();
 
-        let dists = pypi_response.releases.get(latest_version).unwrap();
-
-        println!("{:?}", dists);
         let latest_release = pypi_response
             .releases
             .get(latest_version)
@@ -248,7 +245,6 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
             .iter()
             .filter(|a| a.packagetype == "sdist")
             .next();
-        println!("latest dist {:?}", latest_release);
 
         info.pname = pypi_repo.project.clone();
         info.version = latest_version.clone();
