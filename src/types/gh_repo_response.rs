@@ -176,7 +176,7 @@ pub struct GhRepoResponse {
     svn_url: String,
 
     #[serde(rename = "homepage")]
-    homepage: String,
+    homepage: Option<String>,
 
     #[serde(rename = "size")]
     size: i64,
