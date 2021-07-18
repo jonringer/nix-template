@@ -11,6 +11,8 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
   - [X] Write to correct location using path
     - [X] Improve logic around directories vs files
     - [ ] Improve template-specific items
+      - [ ] generate buildGoModule's depsSha256
+      - [ ] generate buildRustPackages's cargoSha256
   - [X] Print top-level addition statement
 - Support Language/frameworks/usage templates:
   - [X] Stdenv
