@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `-u, --from-url` support to pypi.org
+
 ## v0.1.1
 
 - Add nixos module template
