@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.1.2
 
 - Add `-u, --from-url` support to pypi.org
+- Fix crash when github's hompage url is null when used with `-u`
+- Add mention of `GITHUB_TOKEN` to usage
 
 ## v0.1.1
 
