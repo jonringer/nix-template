@@ -98,7 +98,7 @@ fn get_json(request: reqwest::blocking::RequestBuilder) -> Result<String, reqwes
 
 pub fn fetch_pypi_project_info(pypi_repo: &types::PypiRepo) -> types::PypiResponse {
     let request_client = Client::new();
-    let mut request = request_client
+    let request = request_client
         .get(format!("https://pypi.io/pypi/{}/json", pypi_repo.project))
         .header("User-Agent", "reqwest")
         .header("Content", "application/json");
