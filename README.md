@@ -33,10 +33,10 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
 - Better integration with fetchers
   - Automatically determine version and sha256
     - [X] Github (need a way to pass owner and repo)
-    - [ ] Pypi (will need a way to pass pypi pname, as it may differ from installable path)
+    - [X] Pypi (will need a way to pass pypi pname, as it may differ from installable path)
 - [X] Implement shell completion (nix-template completions <SHELL>)
 
-## Current Usage (github only)
+## Current Usage (github and pypi only)
 
 ```bash
 $ nix-template rust -n --from-url github.com/jonringer/nix-template

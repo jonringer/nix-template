@@ -6,9 +6,11 @@ use regex::{Captures, Regex};
 
 pub mod gh_release_response;
 pub mod gh_repo_response;
+pub mod pypi;
 
 pub use gh_release_response::*;
 pub use gh_repo_response::*;
+pub use pypi::*;
 
 lazy_static! {
     static ref DOCUMENTATION_LINKS: HashMap<&'static str, &'static str> = {
@@ -59,6 +61,17 @@ arg_enum! {
 }
 
 #[derive(Debug)]
+pub enum Repo {
+    Pypi(PypiRepo),
+    Github(GithubRepo),
+}
+
+#[derive(Debug)]
+pub struct PypiRepo {
+    pub project: String,
+}
+
+#[derive(Debug)]
 pub struct GithubRepo {
     pub owner: String,
     pub repo: String,
@@ -80,6 +93,7 @@ pub struct ExpressionInfo {
     pub owner: String,
     pub src_sha: String,
     pub description: String,
+    pub homepage: String,
 }
 
 impl ExpressionInfo {
@@ -99,6 +113,7 @@ impl ExpressionInfo {
             .replace("@rev@", &rev)
             .replace("@src_sha@", &self.src_sha)
             .replace("@description@", &self.description)
+            .replace("@homepage@", &self.homepage)
             .replace("@license@", &self.license)
             .replace("@maintainer@", &self.maintainer);
 

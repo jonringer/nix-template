@@ -1,4 +1,6 @@
 use crate::types;
+use crate::types::Repo::{Github, Pypi};
+
 use anyhow::anyhow;
 use anyhow::Result;
 use log::{debug, error};
@@ -13,6 +15,11 @@ lazy_static! {
     static ref GITHUB_URL_REGEX: Regex = {
         // e.g. github.com/jonringer/nix-template
         Regex::new("github.com/([^/]*)/([^/]*)/?").unwrap()
+    };
+
+    static ref PYPI_URL_REGEX: Regex = {
+        // e.g. pypi.org/project/requests
+        Regex::new("pypi.org/project/([^/]*)/?").unwrap()
     };
 
     static ref VERSION_REGEX: Regex = {
@@ -35,12 +42,22 @@ lazy_static! {
         m.insert("unlicense", "unlicense");
         m
     };
+
+    static ref PYPI_TO_NIXPKGS_LICENSE: HashMap<&'static str, &'static str> = {
+        let mut m = HashMap::new();
+        // TODO: add more licenses
+        m.insert("Apache 2.0", "asl20");
+        m.insert("BSD-3-clause", "bsd3");
+        m.insert("MIT License", "mit");
+        m
+    };
+
 }
 
 const LOG_TARGET: &str = "nix-template::url";
 
 // This will just crazy the program, so no need to return a value
-fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::GithubRepo> {
+fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> {
     if url.starts_with("github.com") {
         if !GITHUB_URL_REGEX.is_match(url) {
             return Err(anyhow!(
@@ -50,13 +67,25 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Github
 
         let captures = GITHUB_URL_REGEX.captures(url).unwrap();
 
-        return Ok(types::GithubRepo {
+        return Ok(Github(types::GithubRepo {
             owner: captures.get(1).unwrap().as_str().to_owned(),
             repo: captures.get(2).unwrap().as_str().to_owned(),
-        });
+        }));
+    } else if url.starts_with("pypi.org") {
+        if !PYPI_URL_REGEX.is_match(url) {
+            return Err(anyhow!(
+                "Error: please provide a pypi url of shape 'pypi.org/pypi/<repo>'"
+            ));
+        }
+
+        let captures = PYPI_URL_REGEX.captures(url).unwrap();
+
+        return Ok(Pypi(types::PypiRepo {
+            project: captures.get(1).unwrap().as_str().to_owned(),
+        }));
     } else {
         Err(anyhow!(
-            "{} is not a supported url. Only github.com is supported currently",
+            "{} is not a supported url. Only github.com and pypi.org are supported currently",
             original_url
         ))
     }
@@ -65,6 +94,26 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Github
 fn get_json(request: reqwest::blocking::RequestBuilder) -> Result<String, reqwest::Error> {
     let response: reqwest::blocking::Response = request.send()?;
     response.text()
+}
+
+pub fn fetch_pypi_project_info(pypi_repo: &types::PypiRepo) -> types::PypiResponse {
+    let request_client = Client::new();
+    let mut request = request_client
+        .get(format!("https://pypi.io/pypi/{}/json", pypi_repo.project))
+        .header("User-Agent", "reqwest")
+        .header("Content", "application/json");
+
+    let body = get_json(request).expect("Unable to get remote data.");
+    match serde_json::from_str(&body) {
+        Ok(s) => s,
+        Err(e) => {
+            error!(
+                target: LOG_TARGET,
+                "Unable to parse response from pypi.io to json: {:?}", e
+            );
+            exit(1)
+        }
+    }
 }
 
 pub fn fetch_github_repo_info(repo: &types::GithubRepo) -> types::GhRepoResponse {
@@ -122,60 +171,125 @@ pub fn fetch_github_release_info(repo: &types::GithubRepo) -> types::GhReleaseRe
         }
     }
 }
+
+pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionInfo) {
+    eprintln!("Determining latest release for {}", &repo.repo);
+    let mut releases = fetch_github_release_info(&repo);
+    if !releases.is_empty() {
+        releases.sort_by(|a, b| {
+            VersionCompare::compare(&b.tag_name, &a.tag_name)
+                .unwrap()
+                .ord()
+                .unwrap()
+        });
+        releases = releases.into_iter().filter(|a| !a.prerelease).collect();
+        let parsed_version = VERSION_REGEX
+            .captures(&releases.first().unwrap().tag_name)
+            .unwrap();
+        info.version = parsed_version.get(2).unwrap().as_str().to_owned();
+        info.tag_prefix = parsed_version.get(1).unwrap().as_str().to_owned();
+
+        eprintln!("Determining sha256 for {}", &repo.repo);
+        let sha256_cmd = Command::new("nix-prefetch-url")
+            .args(&["--unpack", "--type", "sha256"])
+            .arg(format!(
+                "https://github.com/{}/{}/archive/refs/tags/{}{}.tar.gz",
+                &repo.owner, &repo.repo, &info.tag_prefix, &info.version
+            ))
+            .output();
+        info.src_sha = std::str::from_utf8(&sha256_cmd.unwrap().stdout)
+            .unwrap()
+            .trim()
+            .to_owned();
+    } else {
+        eprintln!(
+            "No releases found for github.com/{}/{}",
+            &repo.owner, &repo.repo
+        );
+    }
+
+    let repo_info = fetch_github_repo_info(&repo);
+    if repo_info.license.key != "other" {
+        info.license = GITHUB_TO_NIXPKGS_LICENSE
+            .get(&*repo_info.license.key)
+            .unwrap_or(&"CHANGE")
+            .to_string();
+    }
+    info.description = repo_info.description;
+
+    if info.pname == "CHANGE" {
+        info.pname = repo.repo.clone();
+    }
+    if info.owner == "CHANGE" {
+        info.owner = repo.owner.clone();
+    }
+}
+
+pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionInfo) {
+    eprintln!("Determining latest release for {}", &pypi_repo.project);
+    let pypi_response = fetch_pypi_project_info(pypi_repo);
+    let mut releases: Vec<String> = pypi_response
+        .releases
+        .keys()
+        .map(|a| a.to_owned())
+        .collect();
+    if !releases.is_empty() {
+        releases.sort_by(|a, b| VersionCompare::compare(&b, &a).unwrap().ord().unwrap());
+
+        let latest_version = releases.first().unwrap();
+
+        let dists = pypi_response.releases.get(latest_version).unwrap();
+
+        println!("{:?}", dists);
+        let latest_release = pypi_response
+            .releases
+            .get(latest_version)
+            .unwrap()
+            .iter()
+            .filter(|a| a.packagetype == "sdist")
+            .next();
+        println!("latest dist {:?}", latest_release);
+
+        info.pname = pypi_repo.project.clone();
+        info.version = latest_version.clone();
+        info.homepage = pypi_response.info.home_page.clone();
+        info.description = pypi_response.info.summary.trim_end_matches(".").to_string();
+
+        info.license = PYPI_TO_NIXPKGS_LICENSE
+            .get(&*pypi_response.info.license)
+            .unwrap_or(&"CHANGE")
+            .to_string();
+        match latest_release {
+            Some(dist) => {
+                info.fetcher = types::Fetcher::pypi;
+                info.src_sha = dist.digests.sha256.clone();
+            }
+            None => {
+                eprintln!(
+                    "Unable to find sdist for {}. Using default template",
+                    &pypi_repo.project
+                );
+            }
+        }
+    } else {
+        eprintln!(
+            "No releases found for pypi.org/project/{}",
+            &pypi_repo.project
+        );
+    }
+}
+
 pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo) {
     let trimmed_url = url
         .trim_start_matches("http://")
         .trim_start_matches("https://");
 
     match validate_and_parse_url(trimmed_url, url) {
-        Ok(repo) => {
-            eprintln!("Determining latest release for {}", &repo.repo);
-            let mut releases = fetch_github_release_info(&repo);
-            if !releases.is_empty() {
-                releases.sort_by(|a, b| {
-                    VersionCompare::compare(&b.tag_name, &a.tag_name)
-                        .unwrap()
-                        .ord()
-                        .unwrap()
-                });
-                releases = releases.into_iter().filter(|a| !a.prerelease).collect();
-                let parsed_version = VERSION_REGEX
-                    .captures(&releases.first().unwrap().tag_name)
-                    .unwrap();
-                info.version = parsed_version.get(2).unwrap().as_str().to_owned();
-                info.tag_prefix = parsed_version.get(1).unwrap().as_str().to_owned();
-
-                eprintln!("Determining sha256 for {}", &repo.repo);
-                let sha256_cmd = Command::new("nix-prefetch-url")
-                    .args(&["--unpack", "--type", "sha256"])
-                    .arg(format!(
-                        "https://github.com/{}/{}/archive/refs/tags/{}{}.tar.gz",
-                        &repo.owner, &repo.repo, &info.tag_prefix, &info.version
-                    ))
-                    .output();
-                info.src_sha = std::str::from_utf8(&sha256_cmd.unwrap().stdout)
-                    .unwrap()
-                    .trim()
-                    .to_owned();
-            } else {
-                eprintln!("No releases found for {}", &url);
-            }
-
-            let repo_info = fetch_github_repo_info(&repo);
-            if repo_info.license.key != "other" {
-                info.license = GITHUB_TO_NIXPKGS_LICENSE
-                    .get(&*repo_info.license.key)
-                    .unwrap_or(&"CHANGE")
-                    .to_string();
-            }
-            info.description = repo_info.description;
-
-            if info.pname == "CHANGE" {
-                info.pname = repo.repo;
-            }
-            if info.owner == "CHANGE" {
-                info.owner = repo.owner;
-            }
+        Ok(Github(repo)) => {
+            fill_github_info(&repo, info);
+        }
+        Ok(Pypi(pypi_repo)) => {
+            fill_pypi_info(&pypi_repo, info);
         }
         Err(e) => {
             eprintln!("{}", e);

@@ -57,7 +57,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
             "fetchPypi",
             "  @doc:fetcher@src = fetchPypi {
     inherit pname version;
-    sha256 = \"0000000000000000000000000000000000000000000000000000\";
+    sha256 = \"@src_sha@\";
   };",
         ),
     }
@@ -82,7 +82,7 @@ fn meta() -> &'static str {
     "
   @doc:meta@meta = with lib; {
     description = \"@description@\";
-    homepage = \"https://github.com/@owner@/@pname@/\";
+    homepage = \"@homepage@\";
     license = licenses.@license@;
     maintainers = with maintainers; [ @maintainer@ ];
   };"
