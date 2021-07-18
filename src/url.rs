@@ -302,6 +302,8 @@ pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo) {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    use crate::types::Repo::Github;
+    use crate::types::GithubRepo;
 
     #[test]
     fn test_url_parse() {
@@ -311,8 +313,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(repo.owner, "jonringer");
-        assert_eq!(repo.repo, "nix-template");
+        assert_eq!(repo, Github(GithubRepo {
+            owner: "jonringer".to_string(),
+            repo: "nix-template".to_string()
+        }));
     }
 
     #[test]

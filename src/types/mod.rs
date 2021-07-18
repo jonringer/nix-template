@@ -60,18 +60,18 @@ arg_enum! {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Repo {
     Pypi(PypiRepo),
     Github(GithubRepo),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct PypiRepo {
     pub project: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct GithubRepo {
     pub owner: String,
     pub repo: String,
