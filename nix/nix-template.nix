@@ -6,7 +6,7 @@ rustPlatform.buildRustPackage rec {
    src = nix-gitignore.gitignoreSource [] ../.;
 
    # this will need to be updated anytime Cargo.lock gets changed
-   cargoSha256 = "sha256-U/udYh7LcN6xHjcpOqB45fLUmjwXYDVDQ20RX1rHdWM=";
+   cargoSha256 = "sha256-K/8qhFroZDv39+jsjJu/n45bvWwX9KYQnNSxIbNR5CI=";
 
    nativeBuildInputs = [ pkg-config makeWrapper ];
    buildInputs = [ openssl ];

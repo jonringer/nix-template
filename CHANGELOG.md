@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.4
+
+- Cleanup pypi noise
+
 ## v0.1.3
 
 - Fix Cargo.lock file

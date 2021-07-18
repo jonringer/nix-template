@@ -15,7 +15,7 @@ where
 
 pub fn build_cli() -> App<'static, 'static> {
     App::new("nix-template")
-        .version("0.1.3")
+        .version("0.1.4")
         .author("Jon Ringer <jonringer117@gmail.com>")
         .about("Create common nix expressions")
         .version_short("V")
