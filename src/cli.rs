@@ -27,7 +27,11 @@ pub fn build_cli() -> App<'static, 'static> {
         // inherit global options
         .setting(AppSettings::ArgsNegateSubcommands)
         .after_help(
-            "EXAMPLES:
+            "ENV VARS:
+
+    GITHUB_TOKEN\tToken used during github api calls.
+
+EXAMPLES:
 
 # generate an expression for this package
 $ nix-template rust --from-url https://github.com/jonringer/nix-template
