@@ -113,7 +113,7 @@ in {
     services.dbus.packages = [ cfg.package ]; # if the package has dbus related configuration
 
     systemd.services.@pname@ = {
-      description = "@pname server daemon.";
+      description = "@pname@ server daemon.";
 
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ]; # if networking is needed
