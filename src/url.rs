@@ -47,6 +47,7 @@ lazy_static! {
         let mut m = HashMap::new();
         // TODO: add more licenses
         m.insert("Apache 2.0", "asl20");
+        m.insert("Apache Software License", "asl20");
         m.insert("BSD-3-clause", "bsd3");
         m.insert("MIT License", "mit");
         m
