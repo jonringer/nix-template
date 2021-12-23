@@ -45,9 +45,6 @@ pub struct GhReleaseResponseElement {
     #[serde(rename = "target_commitish")]
     target_commitish: String,
 
-    #[serde(rename = "name")]
-    name: String,
-
     #[serde(rename = "draft")]
     draft: bool,
 
@@ -68,9 +65,6 @@ pub struct GhReleaseResponseElement {
 
     #[serde(rename = "zipball_url")]
     zipball_url: String,
-
-    #[serde(rename = "body")]
-    body: String,
 
     #[serde(rename = "reactions")]
     reactions: Option<Reactions>,
