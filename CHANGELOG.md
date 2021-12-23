@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fix differences of writing to stdout vs file
+- Update flake template (overlay usage)
+- Flake template now requires -p,--pname
+
 ## v0.1.4
 
 - Cleanup pypi noise
