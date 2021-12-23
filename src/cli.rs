@@ -195,6 +195,9 @@ pub fn validate_and_serialize_matches(
         read_meta_from_url(url, &mut info);
     }
 
+    assert(!(matches.is_present("nixpkgs") && matches.occurrences_of("pname") == 0 && matches.occurrences_of("url") == 0),
+        "'-p,--pname' or '-u,--from-url' is required when using the -n,--nixpkgs flag");
+
     info
 }
 
