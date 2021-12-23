@@ -17,7 +17,10 @@ where
 pub fn assert(pred: bool, message: &str) {
     if !pred {
         eprintln!("{}", message);
+        #[cfg(not(test))]
         std::process::exit(1);
+        #[cfg(test)]
+        panic!("{}", message)
     }
 }
 
@@ -148,7 +151,7 @@ pub fn validate_and_serialize_matches(
     let include_documentation_links: bool = matches.is_present("documentation-links");
     let include_meta: bool = !matches.is_present("no-meta");
 
-    assert(matches.is_present("nixpkgs") && matches.occurrences_of("pname") == 0 && matches.occurrences_of("url") == 0,
+    assert(!(matches.is_present("nixpkgs") && matches.value_of("pname") == Some("CHANGE") && matches.value_of("from-url") == None),
         "'-p,--pname' or '-u,--from-url' is required when using the -n,--nixpkgs flag");
 
     let maintainer: String;
@@ -177,7 +180,7 @@ pub fn validate_and_serialize_matches(
         nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);
 
     assert(matches.is_present("stdout") || (!path_to_write.exists()),
-        &format!("Cannot write to file '{}', already exists", path.display()));
+        &format!("Cannot write to file '{}', already exists", path_to_write.display()));
 
     let mut info = ExpressionInfo {
         pname,
@@ -226,11 +229,22 @@ mod tests {
         assert_eq!(m.value_of("TEMPLATE"), Some("python"));
         assert_eq!(m.value_of("fetcher"), Some("pypi"));
         assert_eq!(m.value_of("v"), Some("0.0.1"));
+        assert_eq!(m.value_of("pname"), Some("requests"));
         assert_eq!(m.value_of("license"), Some("CHANGE"));
         assert_eq!(m.value_of("nixpkgs-root"), Some("/tmp"));
         assert_eq!(m.is_present("stdout"), false);
         assert_eq!(m.occurrences_of("PATH"), 0);
+        assert_eq!(m.is_present("nixpkgs"), true);
         assert!(m.occurrences_of("nixpkgs") >= 1);
+        assert_eq!(m.occurrences_of("from-url"), 0);
+    }
+
+    #[test]
+    fn test_url() {
+        let m = build_cli().get_matches_from(vec!["nix-template", "python", "-u", "https://pypi.org/project/requests/", "-n"]);
+        assert_eq!(m.is_present("stdout"), false);
+        assert_eq!(m.is_present("nixpkgs"), true);
+        assert_eq!(m.occurrences_of("from-url"), 1);
     }
 
     #[test]
@@ -239,6 +253,9 @@ mod tests {
         assert_eq!(m.is_present("stdout"), true);
         assert_eq!(m.value_of("TEMPLATE"), Some("mkshell"));
         assert_eq!(m.value_of("PATH"), Some("shell.nix"));
+        assert_eq!(m.value_of("pname"), Some("CHANGE"));
+        assert_eq!(m.is_present("nixpkgs"), false);
+        assert_eq!(m.occurrences_of("from-url"), 0);
     }
 
     #[test]
