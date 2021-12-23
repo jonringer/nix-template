@@ -100,10 +100,6 @@ fn main() {
             } else {
                 let path = &info.path_to_write;
 
-                if path.exists() {
-                    panic!("Cannot write to file '{}', already exists", path.display());
-                }
-
                 // ensure directory to file exists
                 if let Some(p) = path.parent() {
                     // TODO: better way to determine that file will be written PWD
