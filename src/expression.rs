@@ -214,7 +214,7 @@ mkShell rec {
 
             let inputs = [String::from("lib"), dh_input, f_input.to_string() ];
 
-            let header = format!("{{ {input_list} }}:", input_list = inputs.join(", "));
+            let header = format!("{{ {input_list}\n}}:", input_list = inputs.join("\n, "));
 
             info.format(&format!(
                 "{header}

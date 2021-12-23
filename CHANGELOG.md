@@ -6,6 +6,7 @@
 - Update flake template (overlay usage)
 - Flake template now requires -p,--pname
 - --from-url no longer errors with --nixpkgs when a pname is not supplied
+- Nix expresions now have input attrs in comma-leading style (one input per line)
 
 ## v0.1.4
 
