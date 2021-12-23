@@ -93,9 +93,10 @@ fn main() {
             let info = cli::validate_and_serialize_matches(&m, user_config.as_ref());
 
             let expr = expression::generate_expression(&info);
+            let output = info.format(&expr);
 
             if m.is_present("stdout") {
-                println!("{}", info.format(&expr));
+                println!("{}", output);
             } else {
                 let path = &info.path_to_write;
 
@@ -114,7 +115,7 @@ fn main() {
                     }
                 }
                 // write file
-                std::fs::write(path, expr)
+                std::fs::write(path, output)
                     .unwrap_or_else(|_| panic!("Was unable to write to file: {}", &path.display()));
                 println!(
                     "Generated a {} nix expression at {}",
