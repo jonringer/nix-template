@@ -56,23 +56,11 @@ pub struct Info {
     #[serde(rename = "download_url")]
     download_url: String,
 
-    #[serde(rename = "downloads")]
-    downloads: Downloads,
-
     #[serde(rename = "home_page")]
     pub home_page: String,
 
-    #[serde(rename = "keywords")]
-    keywords: String,
-
     #[serde(rename = "license")]
     pub license: String,
-
-    #[serde(rename = "maintainer")]
-    maintainer: String,
-
-    #[serde(rename = "maintainer_email")]
-    maintainer_email: String,
 
     #[serde(rename = "name")]
     name: String,
@@ -87,7 +75,7 @@ pub struct Info {
     project_url: String,
 
     #[serde(rename = "project_urls")]
-    project_urls: ProjectUrls,
+    project_urls: Option<ProjectUrls>,
 
     #[serde(rename = "release_url")]
     release_url: String,
@@ -109,18 +97,6 @@ pub struct Info {
 
     #[serde(rename = "yanked_reason")]
     yanked_reason: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Downloads {
-    #[serde(rename = "last_day")]
-    last_day: i64,
-
-    #[serde(rename = "last_month")]
-    last_month: i64,
-
-    #[serde(rename = "last_week")]
-    last_week: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
