@@ -131,14 +131,14 @@ in {
   meta.maintainers = with lib.maintainers; [ @maintainer@ ];
 }"#.to_owned(),
         Template::flake   => r#"{
-  description = "CHANGEME";
+  description = "@pname@ flake";
 
   inputs = {
     utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
   };
 
-  outputs = { self, nixpkgs, utils }:
+  outputs = { self, nixpkgs, utils, ... }:
     let
       # put devShell and any other required packages into local overlay
       localOverlay = import ./nix/overlay.nix;
@@ -157,19 +157,19 @@ in {
     in utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" ] (system: rec {
       legacyPackages = pkgsForSystem system;
       packages = utils.lib.flattenTree {
-        inherit (legacyPackages) devShell myPkg;
+        inherit (legacyPackages) devShell @pname@;
       };
-      defaultPackage = packages.myPkg;
-      apps.<mypkg> = utils.lib.mkApp { drv = packages.myPkg; };  # use as `nix run <mypkg>`
-      hydraJobs = { inherit (legacyPackages) myPkg; };
-      checks = { inherit (legacyPackages) myPkg; };              # items to be ran as part of `nix flake check`
+      defaultPackage = packages.@pname@;
+      apps.@pname@ = utils.lib.@pname@ { drv = packages.@pname@; };  # use as `nix run .#@pname@`
+      hydraJobs = { inherit (legacyPackages) @pname@; };
+      checks = { inherit (legacyPackages) @pname@; };              # items to be ran as part of `nix flake check`
   }) // {
     # non-system suffixed items should go here
     inherit overlays;
-    overlay = nixpkgs.lib.composeManyExtensions overlays;
-    nixosModule = { config }: { options = {}; config = {};}; # export single module
+    overlay = nixpkgs.lib.composeManyExtensions overlays; # expose overlay which contains all dependent overlays
+    nixosModule = { config, ... }: { options = {}; config = {};}; # export single module
     nixosModules = {}; # attr set or list
-    nixosConfigurations.hostname = { config, pkgs }: {};
+    nixosConfigurations.hostname = { config, pkgs, ... }: {};
   };
 }"#.to_string(),
         Template::test => r#"import ./make-test-python.nix ({ pkgs, ... }:
