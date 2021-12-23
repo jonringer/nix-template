@@ -13,6 +13,14 @@ where
     arg.unwrap().parse::<T>().unwrap()
 }
 
+// There is the assert macro, but the panic output does not look great
+pub fn assert(pred: bool, message: &str) {
+    if !pred {
+        eprintln!("{}", message);
+        std::process::exit(1);
+    }
+}
+
 pub fn build_cli() -> App<'static, 'static> {
     App::new("nix-template")
         .version("0.1.4")
@@ -83,7 +91,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "-v [version] 'Set version of package'",
             ).default_value("0.0.1"))
         .arg(Arg::from_usage(
-            "-p,--pname [pname] 'Package name to be used in expresion'",
+            "-p,--pname [pname] 'Package name to be used in expression'",
             ).default_value("CHANGE"))
         .arg(Arg::from_usage(
             "-r,--nixpkgs-root [path] 'Set root of the nixpkgs directory'",
@@ -157,6 +165,10 @@ pub fn validate_and_serialize_matches(
         maintainer = matches.value_of("maintainer").unwrap_or("").to_string();
         nixpkgs_root = matches.value_of("nixpkgs-root").unwrap_or("").to_string();
     };
+
+    if template == Template::flake {
+        assert(matches.occurrences_of("pname") != 0, "Must provide value for -p,--pname when using flake template.");
+    }
 
     let (path_to_write, top_level_path) =
         nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);
