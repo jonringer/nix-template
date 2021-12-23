@@ -148,6 +148,9 @@ pub fn validate_and_serialize_matches(
     let include_documentation_links: bool = matches.is_present("documentation-links");
     let include_meta: bool = !matches.is_present("no-meta");
 
+    assert(matches.is_present("nixpkgs") && matches.occurrences_of("pname") == 0 && matches.occurrences_of("url") == 0,
+        "'-p,--pname' or '-u,--from-url' is required when using the -n,--nixpkgs flag");
+
     let maintainer: String;
     let nixpkgs_root: String;
     if let Some(ref config) = user_config {
@@ -194,9 +197,6 @@ pub fn validate_and_serialize_matches(
     if let Some(url) = matches.value_of("from-url") {
         read_meta_from_url(url, &mut info);
     }
-
-    assert(!(matches.is_present("nixpkgs") && matches.occurrences_of("pname") == 0 && matches.occurrences_of("url") == 0),
-        "'-p,--pname' or '-u,--from-url' is required when using the -n,--nixpkgs flag");
 
     info
 }
