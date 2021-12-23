@@ -15,10 +15,6 @@ pub fn nix_file_paths(
     nixpkgs_root: &str,
 ) -> (PathBuf, PathBuf) {
     if matches.is_present("nixpkgs") {
-        if matches.occurrences_of("pname") == 0 {
-            eprintln!("'-p,--pname' is required when using the -n,--nixpkgs flag");
-            exit(1);
-        }
 
         let mut radix: PathBuf;
         if matches.occurrences_of("PATH") == 0 {

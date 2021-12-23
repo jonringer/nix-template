@@ -5,6 +5,7 @@
 - Fix differences of writing to stdout vs file
 - Update flake template (overlay usage)
 - Flake template now requires -p,--pname
+- --from-url no longer errors with --nixpkgs when a pname is not supplied
 
 ## v0.1.4
 
