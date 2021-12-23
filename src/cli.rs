@@ -176,6 +176,9 @@ pub fn validate_and_serialize_matches(
     let (path_to_write, top_level_path) =
         nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);
 
+    assert(matches.is_present("stdout") || (!path_to_write.exists()),
+        &format!("Cannot write to file '{}', already exists", path.display()));
+
     let mut info = ExpressionInfo {
         pname,
         version,
