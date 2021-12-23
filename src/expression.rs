@@ -145,7 +145,7 @@ in {
       overlays = [
         localOverlay
       ];
-      
+
       pkgsForSystem = system: import nixpkgs {
         # if you have additional overlays, you may add them here
         overlays = [
