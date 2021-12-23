@@ -142,7 +142,10 @@ in {
     let
       # put devShell and any other required packages into local overlay
       localOverlay = import ./nix/overlay.nix;
-
+      overlays = [
+        localOverlay
+      ];
+      
       pkgsForSystem = system: import nixpkgs {
         # if you have additional overlays, you may add them here
         overlays = [
@@ -162,8 +165,8 @@ in {
       checks = { inherit (legacyPackages) myPkg; };              # items to be ran as part of `nix flake check`
   }) // {
     # non-system suffixed items should go here
-    overlay = localOverlay;
-    overlays = []; # list or attr set of overlays
+    inherit overlays;
+    overlay = nixpkgs.lib.composeManyExtensions overlays;
     nixosModule = { config }: { options = {}; config = {};}; # export single module
     nixosModules = {}; # attr set or list
     nixosConfigurations.hostname = { config, pkgs }: {};
