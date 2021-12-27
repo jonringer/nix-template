@@ -4,6 +4,8 @@
 
 Make creating nix expressions easy. Provide a nice way to create largely boilerplate nix-expressions.
 
+[![Packaging status](https://repology.org/badge/vertical-allrepos/nix-template.svg)](https://repology.org/project/nix-template/versions)
+
 ## Roadmap
 
 - [ ] Finalize cli semantics
