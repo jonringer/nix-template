@@ -1,14 +1,17 @@
 # Changelog
 
-## Unreleased
+## v0.2.0
 
-- Fix differences of writing to stdout vs file
-- Update flake template (overlay usage)
-- Flake template now requires -p,--pname
-- --from-url no longer errors with --nixpkgs when a pname is not supplied
-- Nix expresions now have input attrs in comma-leading style (one input per line)
-- Failures from already existing file locations occur sooner
-  - Particularly irritating with `--from-url`, which would compute release and sha256 info
+- Breaking Changes / Behaviors:
+  - Flake template now requires -p,--pname
+  - Nix expresions now have input attrs in comma-leading style (one input per line)
+
+- Fixes:
+  - --from-url no longer errors with --nixpkgs when a pname is not supplied
+  - Fix differences of writing to stdout vs file
+  - Update flake template (overlay usage)
+  - Failures from already existing file locations occur sooner
+    - Particularly irritating with `--from-url`, which would compute release and sha256 info
 
 ## v0.1.4
 
