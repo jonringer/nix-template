@@ -38,7 +38,7 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
     - [X] Pypi (will need a way to pass pypi pname, as it may differ from installable path)
 - [X] Implement shell completion (nix-template completions <SHELL>)
 
-## Current Usage (github and pypi only)
+## Current Usage (--from-url, github and pypi only)
 
 ```bash
 $ nix-template rust -n --from-url github.com/jonringer/nix-template
@@ -51,17 +51,20 @@ Please add the following line to the approriate file in top-level:
 The resulting file:
 ```
 # $NIXPKGS_ROOT/pkgs/applications/misc/nix-template/default.nix
-{ lib, rustPlatform, fetchFromGitHub }:
+{ lib
+, rustPlatform
+, fetchFromGitHub
+}:
 
 rustPlatform.buildRustPackage rec {
   pname = "nix-template";
-  version = "0.1.0";
+  version = "0.2.0";
 
   src = fetchFromGitHub {
     owner = "jonringer";
     repo = pname;
     rev = "v${version}";
-    sha256 = "1h6xdvhzg7nb0s82b3r5bsh8bfdb1l5sm7fa24lfwd396xp9yyig";
+    sha256 = "0iw2ag0mnb373kgi39c8sgi6ij44xmpfl0vs1471aq6ly54n3lch";
   };
 
   cargoSha256 = "0000000000000000000000000000000000000000000000000000";
@@ -85,7 +88,7 @@ $ nix-template config name jonringer
 $ nix-template config nixpkgs-root /home/jon/projects/nixpkgs
 
 # add a package
-$ nix-template python --pname requests -f pypi -l asl20
+$ nix-template python --nixpkgs --pname requests -f pypi -l asl20
 Creating directory: /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/
 Generating python expression at /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/default.nix
 Please add the following line to the approriate file in top-level:
@@ -94,7 +97,10 @@ Please add the following line to the approriate file in top-level:
 ```
 ```nix
 # pkgs/development/python-modules/requests/default.nix
-{ lib, buildPythonPackage, fetchPypi }:
+{ lib
+, buildPythonPackage
+, fetchPypi
+}:
 
 buildPythonPackage rec {
   pname = "requests";
@@ -140,6 +146,8 @@ $ cargo install --path .
 Installing depedencies on nixpkgs:
 ```
 nix-shell
+# or
+nix develop
 ```
 
 Other platforms, you'll need the following dependencies:
@@ -147,7 +155,7 @@ Other platforms, you'll need the following dependencies:
   - rustc
   - rust-clippy
 
-## End Goal
+## End Goal (Only better nixpkgs support missing)
 
 ```bash
 # only need to config once per user
@@ -155,29 +163,31 @@ $ nix-template config name jonringer
 $ nix-template config nixpkgs-root /home/jon/projects/nixpkgs
 
 # add a package
-$ nix-template python --pname requests -f pypi -l asl20
-Found latest stable release to be 2.24.0 on pypi.com
+$ nix-template python --nixpkgs -u https://pypi.org/project/requests/
+Determining latest release for requests
 Creating directory: /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/
 Generating python expression at /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/default.nix
 For an addition to nixpkgs as a python package, please add the following to pkgs/top-level/python-packages.nix:
 
-  requests = callPackage ../development/python-modules/<PNAME> { };
+  requests = callPackage ../development/python-modules/requests { };
 
 For an addition to nixpkgs as a python application, please add the following to pkgs/top-level/all-packages.nix:
 
-  requests = python3Packages.callPackage <PATH_FROM_CLI> { };
+  requests = with python3Packages; toPythonApplication requests { };
 ```
 ```nix
-# pkgs/development/python-modules/requests/default.nix
-{ lib, buildPythonPackage, fetchPypi }:
+{ lib
+, buildPythonPackage
+, fetchPypi
+}:
 
 buildPythonPackage rec {
   pname = "requests";
-  version = "2.24.0";
+  version = "2.26.0";
 
   src = fetchPypi {
     inherit pname version;
-    sha256 = "b3559a131db72c33ee969480840fff4bb6dd111de7dd27c8ee1f820f4f00231b";
+    sha256 = "b8aa58f8cf793ffd8782d3d8cb19e66ef36f7aba4353eec859e74678b01b07a7";
   };
 
   propagatedBuildInputs = [ ];
@@ -185,10 +195,10 @@ buildPythonPackage rec {
   pythonImportsCheck = [ "requests" ];
 
   meta = with lib; {
-    description = "CHANGEME";
-    homepage = "https://github.com/CHANGEME/requests/";
+    description = "Python HTTP for Humans";
+    homepage = "https://requests.readthedocs.io";
     license = licenses.asl20;
-    maintainer = with maintainers; [ jonringer ];
+    maintainers = with maintainers; [ jonringer ];
   };
 }
 ```
