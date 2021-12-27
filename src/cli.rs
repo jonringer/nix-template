@@ -26,7 +26,7 @@ pub fn assert(pred: bool, message: &str) {
 
 pub fn build_cli() -> App<'static, 'static> {
     App::new("nix-template")
-        .version("0.1.4")
+        .version("0.2.0")
         .author("Jon Ringer <jonringer117@gmail.com>")
         .about("Create common nix expressions")
         .version_short("V")
