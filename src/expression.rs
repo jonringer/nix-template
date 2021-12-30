@@ -26,7 +26,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
             "  @doc:fetcher@src = fetchFromGitHub {
     owner = \"@owner@\";
     repo = pname;
-    rev = \"@rev@\";
+    rev = @rev@;
     sha256 = \"@src_sha@\";
   };",
         ),
