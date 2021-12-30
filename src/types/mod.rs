@@ -101,7 +101,7 @@ impl ExpressionInfo {
         let rev: String = if self.tag_prefix.is_empty() {
             "version".to_owned()
         } else {
-            format!(r"{}${{version}}", &self.tag_prefix)
+            format!(r#""{}${{version}}""#, &self.tag_prefix)
         };
 
         let result = s
