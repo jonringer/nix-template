@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Improvements:
+  - Serialization errors will now mention which assumption caused the failure @blaggacao
+  - Updated github.com auto-detected licenses to include recently added `Apache License 2.0`
+
+- Fixes:
+  - Fix unprefixed versions being generated as `version = "version";` @blaggacao
+
 ## v0.2.0
 
 - Breaking Changes / Behaviors:
