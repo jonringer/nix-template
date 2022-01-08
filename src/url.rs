@@ -105,7 +105,8 @@ pub fn fetch_pypi_project_info(pypi_repo: &types::PypiRepo) -> types::PypiRespon
         .header("Content", "application/json");
 
     let body = get_json(request).expect("Unable to get remote data.");
-    match serde_json::from_str(&body) {
+    let jd = &mut serde_json::Deserializer::from_str(&body);
+    match serde_path_to_error::deserialize(jd) {
         Ok(s) => s,
         Err(e) => {
             error!(
@@ -133,7 +134,8 @@ pub fn fetch_github_repo_info(repo: &types::GithubRepo) -> types::GhRepoResponse
     }
 
     let body = get_json(request).expect("Unable to get remote data.");
-    match serde_json::from_str(&body) {
+    let jd = &mut serde_json::Deserializer::from_str(&body);
+    match serde_path_to_error::deserialize(jd) {
         Ok(s) => s,
         Err(e) => {
             error!(
@@ -161,7 +163,8 @@ pub fn fetch_github_release_info(repo: &types::GithubRepo) -> types::GhReleaseRe
     }
 
     let body = get_json(request).expect("Unable to get remote data.");
-    match serde_json::from_str(&body) {
+    let jd = &mut serde_json::Deserializer::from_str(&body);
+    match serde_path_to_error::deserialize(jd) {
         Ok(s) => s,
         Err(e) => {
             error!(
