@@ -29,6 +29,7 @@ lazy_static! {
     static ref GITHUB_TO_NIXPKGS_LICENSE: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
         m.insert("agpl-3.0", "agpl3");
+        m.insert("apache-2.0", "asl20");
         m.insert("bsd-2-clause", "bsd2");
         m.insert("bsd-3-clause", "bsd3");
         m.insert("bsl-1.0", "bsl11");
