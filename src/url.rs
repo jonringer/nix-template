@@ -219,7 +219,7 @@ pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionIn
             .unwrap_or(&"CHANGE")
             .to_string();
     }
-    info.description = repo_info.description;
+    info.description = repo_info.description.unwrap_or("CHANGE".to_owned());
 
     if info.pname == "CHANGE" {
         info.pname = repo.repo.clone();
