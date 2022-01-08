@@ -188,7 +188,7 @@ pub struct GhRepoResponse {
     watchers_count: i64,
 
     #[serde(rename = "language")]
-    language: String,
+    language: Option<String>,
 
     #[serde(rename = "has_issues")]
     has_issues: bool,
