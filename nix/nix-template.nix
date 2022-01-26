@@ -1,4 +1,4 @@
-{ lib, rustPlatform, nix-gitignore, clippy, makeWrapper, nix, openssl, pkg-config }:
+{ lib, rustPlatform, nix-gitignore, clippy, makeWrapper, nix, openssl, pkg-config, stdenv, darwin }:
 
 rustPlatform.buildRustPackage rec {
    name = "nix-template";
@@ -8,7 +8,7 @@ rustPlatform.buildRustPackage rec {
    cargoLock.lockFile = ../Cargo.lock;
 
    nativeBuildInputs = [ pkg-config makeWrapper ];
-   buildInputs = [ openssl ];
+   buildInputs = [ openssl ] ++ lib.optionals stdenv.isDarwin [ darwin.apple_sdk.frameworks.Security ];
 
    doCheck = true;
    checkInputs = [ clippy ];
