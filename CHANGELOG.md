@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Additions:
+  - `aarch64-darwin` added to flake system defaults
+
 - Improvements:
   - Serialization errors will now mention which assumption caused the failure @blaggacao
   - Updated github.com auto-detected licenses to include recently added `Apache License 2.0`
