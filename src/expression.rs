@@ -160,7 +160,7 @@ in {
         inherit (legacyPackages) devShell @pname@;
       };
       defaultPackage = packages.@pname@;
-      apps.@pname@ = utils.lib.@pname@ { drv = packages.@pname@; };  # use as `nix run .#@pname@`
+      apps.@pname@ = utils.lib.mkApp { drv = packages.@pname@; };  # use as `nix run .#@pname@`
       hydraJobs = { inherit (legacyPackages) @pname@; };
       checks = { inherit (legacyPackages) @pname@; };              # items to be ran as part of `nix flake check`
   }) // {
