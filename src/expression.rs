@@ -142,15 +142,14 @@ in {
     let
       # put devShell and any other required packages into local overlay
       localOverlay = import ./nix/overlay.nix;
-      overlays = [
-        localOverlay
+
+      # if you have additional overlays from other flakes, you may add them here
+      allOverlays = [
+        localOverlay # this should expose devShell
       ];
 
       pkgsForSystem = system: import nixpkgs {
-        # if you have additional overlays, you may add them here
-        overlays = [
-          localOverlay # this should expose devShell
-        ];
+        overlays = allOverlays;
         inherit system;
       };
     # https://github.com/numtide/flake-utils#usage for more examples
@@ -165,8 +164,11 @@ in {
       checks = { inherit (legacyPackages) @pname@; };              # items to be ran as part of `nix flake check`
   }) // {
     # non-system suffixed items should go here
-    inherit overlays;
-    overlay = nixpkgs.lib.composeManyExtensions overlays; # expose overlay which contains all dependent overlays
+    overlays = {
+      local = localOverlay;
+    };
+    # expose overlay which contains all dependent overlays
+    overlay = final: prev: (nixpkgs.lib.composeManyExtensions allOverlays) final prev;
     nixosModule = { config, ... }: { options = {}; config = {};}; # export single module
     nixosModules = {}; # attr set or list
     nixosConfigurations.hostname = { config, pkgs, ... }: {};

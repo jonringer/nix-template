@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Breaking Changes:
+  - `overlays` exposed in flake are now an attr set, to better align with more recent nix versions
+
 - Additions:
   - `aarch64-darwin` added to flake system defaults
 
