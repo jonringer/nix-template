@@ -59,10 +59,11 @@ pub fn nix_file_paths(
             return (file_path, module);
         }
 
+        // assume that they want a directory for the individual package
         if !radix.ends_with(&pname) && radix.extension() != Some(std::ffi::OsStr::new("nix")) {
             radix.push(&pname);
         }
-
+        
         // nix_path is the path used in pkgs/top-level/*.nix or nixos/tests/all-tests.nix
         let mut nix_path = PathBuf::from("..");
         nix_path.push(&radix);
@@ -80,7 +81,16 @@ pub fn nix_file_paths(
         return (file_path, nix_path);
     }
 
-    (path.to_path_buf(), PathBuf::from(""))
+    let mut path_buf = path.to_path_buf();
+
+    // if it's a directory, we need to default to using the default.nix which `import` expects
+    // Path.is_dir() appears to return false if the directory doesn't exist, so stringify and assert if path ends in '/'
+    if path.to_str().unwrap().ends_with("/") {
+      path_buf.push("default.nix");
+      eprintln!("Directory was passed as [PATH], defaulting to {:?}", path_buf.display());
+    }
+
+    (path_buf, PathBuf::from(""))
 }
 
 #[cfg(test)]
@@ -141,6 +151,18 @@ mod tests {
         let expected = (
             PathBuf::from("nixos/tests/newpkg.nix"),
             PathBuf::from("./newpkg.nix"),
+        );
+        assert_paths(m, expected);
+    }
+
+    #[test]
+    #[serial]
+    fn test_dir_to_default_nix() {
+        let m =
+            build_cli().get_matches_from(vec!["nix-template", "python", "-p", "requests", "local/"]);
+        let expected = (
+            PathBuf::from("local/default.nix"),
+            PathBuf::from(""),
         );
         assert_paths(m, expected);
     }

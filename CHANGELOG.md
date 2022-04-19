@@ -15,6 +15,7 @@
 
 - Fixes:
   - Fix unprefixed versions being generated as `version = "version";` @blaggacao
+  - Fixed directories being passed as `[PATH]` not becoming `dir/default.nix`
 
 ## v0.2.0
 
