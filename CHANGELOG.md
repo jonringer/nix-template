@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0
 
 - Breaking Changes:
   - `overlays` exposed in flake are now an attr set, to better align with more recent nix versions

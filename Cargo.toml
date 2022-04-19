@@ -1,6 +1,6 @@
 [package]
 name        = "nix-template"
-version     = "0.2.0"
+version     = "0.3.0"
 description = "Utility to generate common nix expressions"
 license     = "CC0-1.0"
 homepage    = "https://github.com/jonringer/nix-template"
