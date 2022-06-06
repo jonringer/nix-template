@@ -69,7 +69,7 @@ pub struct Info {
     package_url: String,
 
     #[serde(rename = "platform")]
-    platform: String,
+    platform: Option<String>,
 
     #[serde(rename = "project_url")]
     project_url: String,
