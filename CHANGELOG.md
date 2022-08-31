@@ -7,6 +7,7 @@
 
 - Fixes:
   - Fix failure with pypi responses not containing a platform
+  - `-u` with pypi will now filter out pre-releases when determining latest release
 
 ## v0.3.0
 

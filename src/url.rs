@@ -26,6 +26,10 @@ lazy_static! {
         Regex::new("^([^0-9]*)(.+)").unwrap()
     };
 
+    static ref STABLE_RELEASE_REGEX: Regex = {
+        Regex::new(r"^([0-9.]*)+$").unwrap()
+    };
+
     static ref GITHUB_TO_NIXPKGS_LICENSE: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
         m.insert("agpl-3.0", "agpl3");
@@ -237,7 +241,10 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
         .releases
         .keys()
         .map(|a| a.to_owned())
+        .filter(|v| STABLE_RELEASE_REGEX.is_match(v))
         .collect();
+
+    eprintln!("Releases: {:?}", releases);
     if !releases.is_empty() {
         releases.sort_by(|a, b| VersionCompare::compare(&b, &a).unwrap().ord().unwrap());
 
