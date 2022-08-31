@@ -5,6 +5,9 @@
 - Breaking Changes:
   - `overlay` for flake template has been moved to `overlays.default` to align with upstream changes
 
+- Fixes:
+  - Fix failure with pypi responses not containing a platform
+
 ## v0.3.0
 
 - Breaking Changes:
