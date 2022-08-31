@@ -165,10 +165,8 @@ in {
   }) // {
     # non-system suffixed items should go here
     overlays = {
-      local = localOverlay;
+      default = localOverlay;
     };
-    # expose overlay which contains all dependent overlays
-    overlay = final: prev: (nixpkgs.lib.composeManyExtensions allOverlays) final prev;
     nixosModule = { config, ... }: { options = {}; config = {};}; # export single module
     nixosModules = {}; # attr set or list
     nixosConfigurations.hostname = { config, pkgs, ... }: {};

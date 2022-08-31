@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Breaking Changes:
+  - `overlay` for flake template has been moved to `overlays.default` to align with upstream changes
+
 ## v0.3.0
 
 - Breaking Changes:
