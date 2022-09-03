@@ -58,13 +58,13 @@ The resulting file:
 
 rustPlatform.buildRustPackage rec {
   pname = "nix-template";
-  version = "0.2.0";
+  version = "0.3.0";
 
   src = fetchFromGitHub {
     owner = "jonringer";
     repo = pname;
     rev = "v${version}";
-    sha256 = "0iw2ag0mnb373kgi39c8sgi6ij44xmpfl0vs1471aq6ly54n3lch";
+    sha256 = "sha256-5redgssfwbNEgpjmakIcU8cL4Xg1kPvyK88v+xMqAtw=";
   };
 
   cargoSha256 = "0000000000000000000000000000000000000000000000000000";
@@ -73,7 +73,7 @@ rustPlatform.buildRustPackage rec {
 
   meta = with lib; {
     description = "Make creating nix expressions easy";
-    homepage = "https://github.com/jonringer/nix-template/";
+    homepage = "https://github.com/jonringer/nix-template";
     license = licenses.cc0;
     maintainers = with maintainers; [ jonringer ];
   };
@@ -179,18 +179,27 @@ For an addition to nixpkgs as a python application, please add the following to 
 { lib
 , buildPythonPackage
 , fetchPypi
+, certifi
+, charset-normalizer
+, idna
+, urllib3
 }:
 
 buildPythonPackage rec {
   pname = "requests";
-  version = "2.26.0";
+  version = "2.28.1";
 
   src = fetchPypi {
     inherit pname version;
-    sha256 = "b8aa58f8cf793ffd8782d3d8cb19e66ef36f7aba4353eec859e74678b01b07a7";
+    sha256 = "sha256-fFWZsQL+3apmHIJsVqtP7ii/0X9avKHrvj5/GdfJeYM=";
   };
 
-  propagatedBuildInputs = [ ];
+  propagatedBuildInputs = [
+    certifi
+    charset-normalizer
+    idna
+    urllib3
+  ];
 
   pythonImportsCheck = [ "requests" ];
 
