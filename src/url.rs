@@ -244,7 +244,6 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
         .filter(|v| STABLE_RELEASE_REGEX.is_match(v))
         .collect();
 
-    eprintln!("Releases: {:?}", releases);
     if !releases.is_empty() {
         releases.sort_by(|a, b| VersionCompare::compare(&b, &a).unwrap().ord().unwrap());
 
