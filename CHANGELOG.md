@@ -6,6 +6,9 @@
   - `overlay` for flake template has been moved to `overlays.default` to align with upstream changes
   - `-u` will now use an sri hash, to align with nix 2.4+ behavior
 
+- Additions:
+  - `-u` when fetching from pypi will now automatically add dependencies
+
 - Fixes:
   - Fix failure with pypi responses not containing a platform
   - `-u` with pypi will now filter out pre-releases when determining latest release
