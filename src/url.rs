@@ -62,6 +62,17 @@ lazy_static! {
 
 const LOG_TARGET: &str = "nix-template::url";
 
+fn to_sri(hash: &str) -> String {
+   let sha256_cmd = Command::new("nix")
+     .args(&["hash", "to-sri", "--type", "sha256", "--experimental-features", "nix-command"])
+     .arg(hash)
+     .output();
+   std::str::from_utf8(&sha256_cmd.expect("failed to run 'nix hash'").stdout)
+     .unwrap()
+     .trim()
+     .to_owned()
+}
+
 // This will just crazy the program, so no need to return a value
 fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> {
     if url.starts_with("github.com") {
@@ -206,10 +217,11 @@ pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionIn
                 &repo.owner, &repo.repo, &info.tag_prefix, &info.version
             ))
             .output();
-        info.src_sha = std::str::from_utf8(&sha256_cmd.unwrap().stdout)
+        let output = std::str::from_utf8(&sha256_cmd.unwrap().stdout)
             .unwrap()
             .trim()
             .to_owned();
+        info.src_sha = to_sri(&output);
     } else {
         eprintln!(
             "No releases found for github.com/{}/{}",
@@ -280,7 +292,7 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
         match latest_release {
             Some(dist) => {
                 info.fetcher = types::Fetcher::pypi;
-                info.src_sha = dist.digests.sha256.clone();
+                info.src_sha = to_sri(&dist.digests.sha256);
             }
             None => {
                 eprintln!(

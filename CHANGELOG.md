@@ -4,6 +4,7 @@
 
 - Breaking Changes:
   - `overlay` for flake template has been moved to `overlays.default` to align with upstream changes
+  - `-u` will now use an sri hash, to align with nix 2.4+ behavior
 
 - Fixes:
   - Fix failure with pypi responses not containing a platform
