@@ -49,7 +49,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
         Fetcher::zip => (
             "fetchzip",
             "  @doc:fetcher@src = fetchzip {
-    url = \"CHANAGE\";
+    url = \"CHANGE\";
     sha256 = \"0000000000000000000000000000000000000000000000000000\";
   };",
         ),
