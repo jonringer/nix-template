@@ -198,6 +198,7 @@ pub fn validate_and_serialize_matches(
         src_sha: "0000000000000000000000000000000000000000000000000000".to_owned(),
         description: "CHANGE".to_owned(),
         homepage: "https://github.com/@owner@/@pname@".to_owned(),
+        propagated_build_inputs: Vec::new(),
     };
 
     if let Some(url) = matches.value_of("from-url") {

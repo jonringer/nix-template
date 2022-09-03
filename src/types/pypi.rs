@@ -81,7 +81,7 @@ pub struct Info {
     release_url: String,
 
     #[serde(rename = "requires_dist")]
-    requires_dist: Option<Vec<String>>,
+    pub requires_dist: Option<Vec<String>>,
 
     #[serde(rename = "requires_python")]
     requires_python: String,

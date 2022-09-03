@@ -94,6 +94,7 @@ pub struct ExpressionInfo {
     pub src_sha: String,
     pub description: String,
     pub homepage: String,
+    pub propagated_build_inputs: Vec<String>,
 }
 
 impl ExpressionInfo {
@@ -103,6 +104,15 @@ impl ExpressionInfo {
         } else {
             format!(r#""{}${{version}}""#, &self.tag_prefix)
         };
+
+        fn format_inputs(inputs: &Vec<String>) -> String {
+            if inputs.is_empty() {
+                "".to_owned()
+            } else {
+                let body = inputs.join("\n    ");
+                format!("\n    {}\n ", body)
+            }
+        }
 
         let result = s
             .to_owned()
@@ -115,7 +125,8 @@ impl ExpressionInfo {
             .replace("@description@", &self.description)
             .replace("@homepage@", &self.homepage)
             .replace("@license@", &self.license)
-            .replace("@maintainer@", &self.maintainer);
+            .replace("@maintainer@", &self.maintainer)
+            .replace("@propagated_build_inputs@", &format_inputs(&self.propagated_build_inputs));
 
         if self.include_documentation_links {
             Self::insert_documentation_links(result)

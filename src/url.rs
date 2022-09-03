@@ -266,6 +266,17 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
             .get(&*pypi_response.info.license)
             .unwrap_or(&"CHANGE")
             .to_string();
+
+        // Grab dependencies, filter out extras, normalize names
+        let mut dependencies: Vec<String> = pypi_response.info.requires_dist
+            .unwrap_or_else(|| Vec::new())
+            .into_iter()
+            .filter(|s| !s.contains("extra =="))
+            .map(|s| s.split(" ").next().unwrap().to_string().replace(".", "-").replace("_", "-"))
+            .collect();
+        dependencies.sort();
+        info.propagated_build_inputs = dependencies;
+
         match latest_release {
             Some(dist) => {
                 info.fetcher = types::Fetcher::pypi;

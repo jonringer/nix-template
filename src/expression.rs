@@ -65,7 +65,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
 
 fn build_inputs(template: &Template) -> &'static str {
     match template {
-        Template::python => "  @doc:buildDependencies@propagatedBuildInputs = [ ];
+        Template::python => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
 
   pythonImportsCheck = [ \"@pname-import-check@\" ];",
         Template::rust => "  @doc:buildDependencies@cargoSha256 = \"0000000000000000000000000000000000000000000000000000\";
@@ -212,7 +212,8 @@ mkShell rec {
             let (dh_input, dh_block) = derivation_helper(&info.template);
             let (f_input, f_block) = fetch_block(&info.fetcher);
 
-            let inputs = [String::from("lib"), dh_input, f_input.to_string() ];
+            let mut inputs = vec!(String::from("lib"), dh_input, f_input.to_string());
+            inputs.extend(info.propagated_build_inputs.iter().map(|s| s.to_owned()));
 
             let header = format!("{{ {input_list}\n}}:", input_list = inputs.join("\n, "));
 
