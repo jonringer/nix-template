@@ -63,7 +63,7 @@ pub struct Info {
     pub license: String,
 
     #[serde(rename = "name")]
-    name: String,
+    pub name: String,
 
     #[serde(rename = "package_url")]
     package_url: String,

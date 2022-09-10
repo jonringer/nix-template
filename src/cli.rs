@@ -176,12 +176,6 @@ pub fn validate_and_serialize_matches(
         assert(matches.occurrences_of("pname") != 0, "Must provide value for -p,--pname when using flake template.");
     }
 
-    let (path_to_write, top_level_path) =
-        nix_file_paths(&matches, &template, &path, &pname, &nixpkgs_root);
-
-    assert(matches.is_present("stdout") || (!path_to_write.exists()),
-        &format!("Cannot write to file '{}', already exists", path_to_write.display()));
-
     let mut info = ExpressionInfo {
         pname,
         version,
@@ -189,8 +183,8 @@ pub fn validate_and_serialize_matches(
         maintainer,
         template,
         fetcher,
-        path_to_write,
-        top_level_path,
+        path_to_write: std::path::PathBuf::new(),
+        top_level_path: std::path::PathBuf::new(),
         include_documentation_links,
         include_meta,
         tag_prefix: "".to_owned(),
@@ -204,6 +198,15 @@ pub fn validate_and_serialize_matches(
     if let Some(url) = matches.value_of("from-url") {
         read_meta_from_url(url, &mut info);
     }
+
+    let (path_to_write, top_level_path) =
+        nix_file_paths(&matches, &info.template, &path, &info.pname, &nixpkgs_root);
+
+    info.path_to_write = path_to_write.clone();
+    info.top_level_path = top_level_path.clone();
+
+    assert(matches.is_present("stdout") || (!path_to_write.exists()),
+        &format!("Cannot write to file '{}', already exists", path_to_write.display()));
 
     info
 }

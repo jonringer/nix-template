@@ -193,6 +193,10 @@ pub fn fetch_github_release_info(repo: &types::GithubRepo) -> types::GhReleaseRe
 }
 
 pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionInfo) {
+    if info.pname == "CHANGE" {
+        info.pname = repo.repo.to_string();
+    }
+
     eprintln!("Determining latest release for {}", &repo.repo);
     let mut releases = fetch_github_release_info(&repo);
     if !releases.is_empty() {
@@ -247,8 +251,13 @@ pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionIn
 }
 
 pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionInfo) {
+
     eprintln!("Determining latest release for {}", &pypi_repo.project);
     let pypi_response = fetch_pypi_project_info(pypi_repo);
+    if info.pname == "CHANGE" {
+        info.pname = pypi_repo.project.clone();
+    }
+
     let mut releases: Vec<String> = pypi_response
         .releases
         .keys()
@@ -269,7 +278,6 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
             .filter(|a| a.packagetype == "sdist")
             .next();
 
-        info.pname = pypi_repo.project.clone();
         info.version = latest_version.clone();
         info.homepage = pypi_response.info.home_page.clone();
         info.description = pypi_response.info.summary.trim_end_matches(".").to_string();
