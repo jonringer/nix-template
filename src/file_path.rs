@@ -63,7 +63,7 @@ pub fn nix_file_paths(
         if !radix.ends_with(&pname) && radix.extension() != Some(std::ffi::OsStr::new("nix")) {
             radix.push(&pname);
         }
-        
+
         // nix_path is the path used in pkgs/top-level/*.nix or nixos/tests/all-tests.nix
         let mut nix_path = PathBuf::from("..");
         nix_path.push(&radix);
