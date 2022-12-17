@@ -28,7 +28,7 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
   - [x] NixOS Test
   - [ ] Haskell
   - [ ] and many more...
-- [ ] Add option (--comments?) to embed noob-friendly comments and explanations about common usage patterns
+- [ ] Add option (-d, --documentation-url) to embed noob-friendly comments and explanations about common usage patterns
 - Allow contributor information to be set locally (similar to git settings)
   - [X] Set maintainer name through `$XDG_CONFIG_HOME`
   - [X] Set nixpkgs-root path through `$XDG_CONFIG_HOME`
@@ -37,6 +37,8 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
     - [X] Github (need a way to pass owner and repo)
     - [X] Pypi (will need a way to pass pypi pname, as it may differ from installable path)
 - [X] Implement shell completion (nix-template completions <SHELL>)
+- [ ] Implement `project` subcommand, for creating a flake setup for new projects #51
+  - [ ] Implement `init` subcommand, for creating new projects #52
 
 ## Current Usage (--from-url, github and pypi only)
 
