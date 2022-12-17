@@ -63,6 +63,13 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
     }
 }
 
+fn addtional_pkg_attr_headers(template: &Template) -> &'static str {
+    match template {
+        Template::python => "\n  format = \"setuptools\";",
+        _ => "",
+    }
+}
+
 fn build_inputs(template: &Template) -> &'static str {
     match template {
         Template::python => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
@@ -211,6 +218,7 @@ mkShell rec {
             // Generate nix expression
             let (dh_input, dh_block) = derivation_helper(&info.template);
             let (f_input, f_block) = fetch_block(&info.fetcher);
+            let addtional_pkg_attr_headers = addtional_pkg_attr_headers(&info.template);
 
             let mut inputs = vec!(String::from("lib"), dh_input, f_input.to_string());
             inputs.extend(info.propagated_build_inputs.iter().map(|s| s.to_owned()));
@@ -222,7 +230,7 @@ mkShell rec {
 
 {dh_helper} rec {{
   pname = \"{pname}\";
-  version = \"{version}\";
+  version = \"{version}\";{addtional_pkg_attr_headers}
 
 {f_block}
 
@@ -234,6 +242,7 @@ mkShell rec {
                 dh_helper = dh_block,
                 pname = &info.pname,
                 version = &info.version,
+                addtional_pkg_attr_headers = addtional_pkg_attr_headers,
                 f_block = f_block,
                 build_inputs = build_inputs(&info.template),
                 meta = if info.include_meta { meta() } else { "" },

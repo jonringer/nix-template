@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Additions:
+  - Python template defaults to adding a 'format = "setuptools";' to align with nixpkgs preferences
+
 ## v0.4.0
 
 - Breaking Changes:
