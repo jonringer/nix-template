@@ -110,6 +110,7 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> 
 
 fn get_json(request: reqwest::blocking::RequestBuilder) -> Result<String, reqwest::Error> {
     let response: reqwest::blocking::Response = request.send()?;
+    response.error_for_status_ref()?;
     response.text()
 }
 
@@ -145,7 +146,7 @@ pub fn fetch_github_repo_info(repo: &types::GithubRepo) -> types::GhRepoResponse
         .header("Accept", "application/vnd.github.v3+json");
 
     if let Ok(github_token) = std::env::var("GITHUB_TOKEN") {
-        debug!(target: LOG_TARGET, "Using github token for polling events");
+        debug!(target: LOG_TARGET, "Using github token for github api request");
         request = request.header("Authorization", format!("token {}", github_token));
     }
 

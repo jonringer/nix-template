@@ -5,6 +5,9 @@
 - Additions:
   - Python template defaults to adding a 'format = "setuptools";' to align with nixpkgs preferences
 
+- Fixes:
+  - Clearer error when repository doesn't exist
+
 ## v0.4.0
 
 - Breaking Changes:
