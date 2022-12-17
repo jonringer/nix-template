@@ -7,6 +7,7 @@
 
 - Fixes:
   - Clearer error when repository doesn't exist
+  - Minor pypi serialization fixes
 
 ## v0.4.0
 

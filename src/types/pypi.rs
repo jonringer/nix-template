@@ -108,7 +108,7 @@ pub struct ProjectUrls {
     documentation: Option<String>,
 
     #[serde(rename = "Homepage")]
-    homepage: String,
+    homepage: Option<String>,
 
     #[serde(rename = "Source Code")]
     source_code: Option<String>,
@@ -120,7 +120,7 @@ pub struct ProjectUrls {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Url {
     #[serde(rename = "comment_text")]
-    comment_text: String,
+    comment_text: Option<String>,
 
     #[serde(rename = "digests")]
     pub digests: Digests,
