@@ -30,8 +30,7 @@
       checks = { inherit (legacyPackages) nix-template; };              # items to be ran as part of `nix flake check`
   }) // {
     # non-system suffixed items should go here
-    overlay = localOverlay;
-    overlays = []; # list or attr set of overlays
+    overlays.default = localOverlay;
     nixosModule = { config }: { options = {}; config = {};}; # export single module
     nixosModules = {}; # attr set or list
     nixosConfigurations.hostname = { config, pkgs }: {};
