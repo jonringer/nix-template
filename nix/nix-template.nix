@@ -11,7 +11,7 @@ rustPlatform.buildRustPackage rec {
    buildInputs = [ openssl ] ++ lib.optionals stdenv.isDarwin [ darwin.apple_sdk.frameworks.Security ];
 
    doCheck = true;
-   checkInputs = [ clippy ];
+   nativeCheckInputs = [ clippy ];
    postCheck = ''
      cargo clippy
    '';

@@ -23,11 +23,15 @@
       legacyPackages = pkgsForSystem system;
       packages = utils.lib.flattenTree {
         inherit (legacyPackages) devShell nix-template;
+        default = legacyPackages.nix-template;
       };
-      defaultPackage = packages.nix-template;
       apps.nix-template = utils.lib.mkApp { drv = packages.nix-template; };  # use as `nix run <mypkg>`
       hydraJobs = { inherit (legacyPackages) nix-template; };
       checks = { inherit (legacyPackages) nix-template; };              # items to be ran as part of `nix flake check`
+      devShells.default = with legacyPackages; mkShell {
+        nativeBuildInputs = [ rustc cargo clippy pkg-config ];
+        buildInputs = [ openssl ];
+      };
   }) // {
     # non-system suffixed items should go here
     overlays.default = localOverlay;
