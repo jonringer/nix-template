@@ -54,7 +54,7 @@ pub struct Info {
     docs_url: Option<serde_json::Value>,
 
     #[serde(rename = "download_url")]
-    download_url: String,
+    download_url: Option<String>,
 
     #[serde(rename = "home_page")]
     pub home_page: String,
