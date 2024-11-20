@@ -289,13 +289,19 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
             .to_string();
 
         // Grab dependencies, filter out extras, normalize names
+        debug!("Python dependencies before normalization: {:?}", &pypi_response.info.requires_dist);
         let mut dependencies: Vec<String> = pypi_response.info.requires_dist
             .unwrap_or_else(|| Vec::new())
             .into_iter()
             .filter(|s| !s.contains("extra =="))
-            .map(|s| s.split(" ").next().unwrap().to_string().replace(".", "-").replace("_", "-"))
+            .map(|s| s.split(" ").next().unwrap()
+                // Remove version information
+                .chars().take_while( |&ch| ch != '!' && ch != '<' && ch != '>' && ch != '=').collect::<String>()
+                // Normalize name to adhere to Nixpkgs conventions
+                .replace(".", "-").replace("_", "-"))
             .collect();
         dependencies.sort();
+        debug!("dependencies after normalization: {:?}", &dependencies);
         info.propagated_build_inputs = dependencies;
 
         match latest_release {
