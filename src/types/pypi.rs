@@ -33,10 +33,10 @@ pub struct PypiResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Info {
     #[serde(rename = "author")]
-    author: String,
+    author: Option<String>,
 
     #[serde(rename = "author_email")]
-    author_email: String,
+    author_email: Option<String>,
 
     #[serde(rename = "bugtrack_url")]
     bugtrack_url: Option<serde_json::Value>,
@@ -57,7 +57,7 @@ pub struct Info {
     download_url: Option<String>,
 
     #[serde(rename = "home_page")]
-    pub home_page: String,
+    pub home_page: Option<String>,
 
     #[serde(rename = "license")]
     pub license: String,

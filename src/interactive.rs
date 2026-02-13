@@ -178,7 +178,7 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 pname: pypi_repo.project.clone(),
                 license,
                 description: pypi_response.info.summary.trim_end_matches('.').to_string(),
-                homepage: pypi_response.info.home_page.clone(),
+                homepage: pypi_response.info.home_page.unwrap_or("CHANGE".to_string()),
                 fetcher: Fetcher::pypi,
                 owner: None,
             })
