@@ -4,6 +4,7 @@ extern crate lazy_static;
 mod cli;
 mod expression;
 mod file_path;
+mod interactive;
 mod types;
 mod url;
 
@@ -90,7 +91,33 @@ fn main() {
                     None
                 };
 
-            let info = cli::validate_and_serialize_matches(&m, user_config.as_ref());
+            // Detect if we should enter interactive mode
+            // Enter interactive mode if:
+            // 1. Template was not explicitly provided (using default)
+            // 2. AND no URL was provided
+            // 3. AND pname is still "CHANGE"
+            let should_use_interactive = m.occurrences_of("TEMPLATE") == 0
+                && m.occurrences_of("from-url") == 0
+                && m.value_of("pname") == Some("CHANGE");
+
+            let info = if should_use_interactive {
+                // Enter interactive mode
+                match interactive::run_interactive_mode(None, user_config.as_ref()) {
+                    Ok(interactive_data) => {
+                        cli::build_expression_info_from_interactive(
+                            interactive_data,
+                            user_config.as_ref(),
+                        )
+                    }
+                    Err(e) => {
+                        eprintln!("Interactive mode cancelled or failed: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                // Use traditional CLI mode
+                cli::validate_and_serialize_matches(&m, user_config.as_ref())
+            };
 
             let expr = expression::generate_expression(&info);
             let output = info.format(&expr);
