@@ -280,7 +280,7 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
             .next();
 
         info.version = latest_version.clone();
-        info.homepage = pypi_response.info.home_page.clone();
+        info.homepage = pypi_response.info.home_page.unwrap_or("CHANGE".to_string());
         info.description = pypi_response.info.summary.trim_end_matches(".").to_string();
 
         info.license = PYPI_TO_NIXPKGS_LICENSE
