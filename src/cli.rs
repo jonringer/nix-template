@@ -1,6 +1,7 @@
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
 use crate::file_path::nix_file_paths;
+use crate::interactive::InteractiveData;
 use crate::types::{ExpressionInfo, Fetcher, Template, UserConfig};
 use crate::url::read_meta_from_url;
 
@@ -207,6 +208,53 @@ pub fn validate_and_serialize_matches(
 
     assert(matches.is_present("stdout") || (!path_to_write.exists()),
         &format!("Cannot write to file '{}', already exists", path_to_write.display()));
+
+    info
+}
+
+/// Build ExpressionInfo from interactive mode data
+pub fn build_expression_info_from_interactive(
+    data: InteractiveData,
+    user_config: Option<&UserConfig>,
+) -> ExpressionInfo {
+    let path = std::path::PathBuf::from(&data.output_path);
+    let nixpkgs_root = user_config
+        .and_then(|c| c.nixpkgs_root.as_deref())
+        .unwrap_or("");
+
+    let mut info = ExpressionInfo {
+        pname: data.pname.clone(),
+        version: data.version,
+        license: data.license,
+        maintainer: data.maintainer,
+        template: data.template,
+        fetcher: data.fetcher,
+        path_to_write: std::path::PathBuf::new(),
+        top_level_path: std::path::PathBuf::new(),
+        include_documentation_links: data.include_documentation_links,
+        include_meta: data.include_meta,
+        tag_prefix: "".to_owned(),
+        owner: "CHANGE".to_owned(),
+        src_sha: "0000000000000000000000000000000000000000000000000000".to_owned(),
+        description: data.description,
+        homepage: data.homepage,
+        propagated_build_inputs: Vec::new(),
+    };
+
+    // If URL was provided, fetch metadata
+    if let Some(url) = data.url {
+        read_meta_from_url(&url, &mut info);
+    }
+
+    // Set the paths - use the path directly since we collected it interactively
+    info.path_to_write = path.clone();
+    info.top_level_path = if !nixpkgs_root.is_empty() {
+        let mut p = std::path::PathBuf::from(nixpkgs_root);
+        p.push(&path);
+        p
+    } else {
+        path
+    };
 
     info
 }
