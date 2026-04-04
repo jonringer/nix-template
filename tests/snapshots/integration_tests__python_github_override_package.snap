@@ -1,0 +1,32 @@
+---
+source: tests/integration_tests.rs
+expression: package_nix
+---
+{ lib
+, buildPythonPackage
+, fetchFromGitHub
+}:
+
+buildPythonPackage rec {
+  pname = "requests";
+  version = "2.31.0";
+  format = "setuptools";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = pname;
+    rev = version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  propagatedBuildInputs = [ ];
+
+  pythonImportsCheck = [ "requests" ];
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/requests";
+    license = licenses.asl20;
+    maintainers = with maintainers; [  ];
+  };
+}

@@ -70,8 +70,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             Arg::from_usage("[PATH] 'directory or file to be written. In the case of a directory, a default.nix will be created. When used with --nixpkgs, it will be appended to nixpkgs-root to determine path location.'")
                 .default_value("default.nix")
                 .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix")
-                .default_value_if("TEMPLATE", Some("test"), "test.nix")
-                .default_value_if("TEMPLATE", Some("flake"), "flake.nix"),
+                .default_value_if("TEMPLATE", Some("test"), "test.nix"),
         )
         .arg(Arg::from_usage(
             "-u,--from-url [url] 'Point to a github repo, and use github api to determine package values'",
@@ -91,6 +90,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
         .arg(Arg::from_usage(
             "-s,--stdout 'Write expression to stdout, instead of PATH'",
             ))
+        .arg(Arg::from_usage(
+            "--init-flake 'Generate a flake.nix alongside the package expression'",
+            ).takes_value(false))
         .arg(Arg::from_usage(
             "-v [version] 'Set version of package'",
             ).default_value("0.0.1"))
@@ -172,10 +174,6 @@ pub fn validate_and_serialize_matches(
         maintainer = matches.value_of("maintainer").unwrap_or("").to_string();
         nixpkgs_root = matches.value_of("nixpkgs-root").unwrap_or("").to_string();
     };
-
-    if template == Template::flake {
-        assert(matches.occurrences_of("pname") != 0, "Must provide value for -p,--pname when using flake template.");
-    }
 
     let mut info = ExpressionInfo {
         pname,

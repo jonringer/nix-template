@@ -94,7 +94,6 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
         ("go", "Go package with buildGoModule"),
         ("qt", "Qt application with mkDerivation"),
         ("mkshell", "Development shell.nix"),
-        ("flake", "Nix flake template"),
         ("module", "NixOS module"),
         ("test", "NixOS test"),
     ];
@@ -127,7 +126,6 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
         "go" => Template::go,
         "qt" => Template::qt,
         "mkshell" => Template::mkshell,
-        "flake" => Template::flake,
         "module" => Template::module,
         "test" => Template::test,
         _ => Template::stdenv,
@@ -538,7 +536,6 @@ pub fn run_interactive_mode(
     let default_path = match template {
         Template::mkshell => "shell.nix",
         Template::test => "test.nix",
-        Template::flake => "flake.nix",
         _ => "default.nix",
     };
     let output_path = prompt_output_path(&template, default_path)?;
