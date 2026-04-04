@@ -8,9 +8,8 @@ fn derivation_helper(template: &Template) -> (String, String) {
         Template::qt => ("mkDerivation", "mkDerivation", None),
         Template::go => ("buildGoModule", "buildGoModule", None),
         Template::rust => ("rustPlatform", "rustPlatform.buildRustPackage", None),
-        Template::flake => ("", "", None), // flakes aren't a normal expression
         Template::test => ("", "", None),  // Tests aren't a normal expression
-        Template::module => ("", "", None), // Tests aren't a normal expression
+        Template::module => ("", "", None), // Modules aren't a normal expression
     };
 
     match documentation_key {
@@ -137,48 +136,6 @@ in {
 
   meta.maintainers = with lib.maintainers; [ @maintainer@ ];
 }"#.to_owned(),
-        Template::flake   => r#"{
-  description = "@pname@ flake";
-
-  inputs = {
-    utils.url = "github:numtide/flake-utils";
-    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-  };
-
-  outputs = { self, nixpkgs, utils, ... }:
-    let
-      # put devShell and any other required packages into local overlay
-      localOverlay = import ./nix/overlay.nix;
-
-      # if you have additional overlays from other flakes, you may add them here
-      allOverlays = [
-        localOverlay # this should expose devShell
-      ];
-
-      pkgsForSystem = system: import nixpkgs {
-        overlays = allOverlays;
-        inherit system;
-      };
-    # https://github.com/numtide/flake-utils#usage for more examples
-    in utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ] (system: rec {
-      legacyPackages = pkgsForSystem system;
-      packages = utils.lib.flattenTree {
-        inherit (legacyPackages) devShell @pname@;
-      };
-      defaultPackage = packages.@pname@;
-      apps.@pname@ = utils.lib.mkApp { drv = packages.@pname@; };  # use as `nix run .#@pname@`
-      hydraJobs = { inherit (legacyPackages) @pname@; };
-      checks = { inherit (legacyPackages) @pname@; };              # items to be ran as part of `nix flake check`
-  }) // {
-    # non-system suffixed items should go here
-    overlays = {
-      default = localOverlay;
-    };
-    nixosModule = { config, ... }: { options = {}; config = {};}; # export single module
-    nixosModules = {}; # attr set or list
-    nixosConfigurations.hostname = { config, pkgs, ... }: {};
-  };
-}"#.to_string(),
         Template::test => r#"import ./make-test-python.nix ({ pkgs, ... }:
 {
   name = "@pname@";
@@ -249,4 +206,45 @@ mkShell rec {
             ))
         }
     }
+}
+
+pub fn generate_flake_nix(template: &Template, output_file: &str, directory_name: &str) -> String {
+    let inner_attr_path = if *template == Template::python {
+        ".python3Packages"
+    } else {
+        ""
+    };
+
+    format!(r#"{{
+  # This should be the directory name
+  description = "{directory}";
+
+  inputs = {{
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  }};
+
+  outputs =
+    {{ self, nixpkgs, ... }}:
+    let
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+    in
+    {{
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${{system}};
+        in
+        {{
+          default = pkgs{inner_attr_path}.callPackage ./{output_file} {{ }};
+        }}
+      );
+    }};
+}}
+"#, directory = directory_name, inner_attr_path = inner_attr_path, output_file = output_file)
 }

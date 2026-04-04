@@ -122,8 +122,33 @@ fn main() {
             let expr = expression::generate_expression(&info);
             let output = info.format(&expr);
 
+            // Handle --init-flake flag
+            let init_flake = m.is_present("init-flake");
+            let flake_content = if init_flake {
+                // Get current directory name for flake description
+                let cwd = std::env::current_dir().expect("Failed to get current directory");
+                let directory_name = cwd
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("CHANGE");
+
+                // Get the output filename (not full path)
+                let output_filename = info.path_to_write
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("default.nix");
+
+                Some(expression::generate_flake_nix(&info.template, output_filename, directory_name))
+            } else {
+                None
+            };
+
             if m.is_present("stdout") {
                 println!("{}", output);
+                if let Some(flake) = flake_content {
+                    println!("\n# ===== flake.nix =====\n");
+                    println!("{}", flake);
+                }
             } else {
                 let path = &info.path_to_write;
 
@@ -145,6 +170,22 @@ fn main() {
                     &info.template,
                     &path.canonicalize().unwrap().display()
                 );
+
+                // Write flake.nix if --init-flake was provided
+                if let Some(flake) = flake_content {
+                    let flake_path = if let Some(parent) = path.parent() {
+                        parent.join("flake.nix")
+                    } else {
+                        std::path::PathBuf::from("flake.nix")
+                    };
+
+                    std::fs::write(&flake_path, flake)
+                        .unwrap_or_else(|_| panic!("Was unable to write to file: {}", &flake_path.display()));
+                    println!(
+                        "Generated flake.nix at {}",
+                        &flake_path.canonicalize().unwrap().display()
+                    );
+                }
 
                 // print helpful message about line to be included in pkgs/top-level
                 if m.is_present("nixpkgs") {

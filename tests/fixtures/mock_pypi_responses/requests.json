@@ -1,0 +1,131 @@
+{
+  "info": {
+    "author": "Kenneth Reitz",
+    "author_email": "me@kennethreitz.org",
+    "bugtrack_url": null,
+    "classifiers": [],
+    "description": "Python HTTP for Humans.",
+    "description_content_type": "text/markdown",
+    "docs_url": null,
+    "download_url": "",
+    "downloads": {
+      "last_day": -1,
+      "last_month": -1,
+      "last_week": -1
+    },
+    "home_page": "https://requests.readthedocs.io",
+    "keywords": "HTTP,requests",
+    "license": "Apache 2.0",
+    "maintainer": "",
+    "maintainer_email": "",
+    "name": "requests",
+    "package_url": "https://pypi.org/project/requests/",
+    "platform": null,
+    "project_url": "https://pypi.org/project/requests/",
+    "project_urls": {
+      "Documentation": "https://requests.readthedocs.io",
+      "Source": "https://github.com/psf/requests"
+    },
+    "release_url": "https://pypi.org/project/requests/2.31.0/",
+    "requires_dist": [
+      "charset-normalizer (<4,>=2)",
+      "idna (<4,>=2.5)",
+      "urllib3 (<3,>=1.21.1)",
+      "certifi (>=2017.4.17)",
+      "PySocks (!=1.5.7,>=1.5.6) ; extra == 'socks'",
+      "chardet (<6,>=3.0.2) ; extra == 'use_chardet_on_py3'"
+    ],
+    "requires_python": ">=3.7",
+    "summary": "Python HTTP for Humans.",
+    "version": "2.31.0",
+    "yanked": false,
+    "yanked_reason": null
+  },
+  "last_serial": 18548496,
+  "releases": {
+    "2.31.0": [
+      {
+        "comment_text": "",
+        "digests": {
+          "md5": "xxx",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "downloads": -1,
+        "filename": "requests-2.31.0-py3-none-any.whl",
+        "has_sig": false,
+        "md5_digest": "xxx",
+        "packagetype": "bdist_wheel",
+        "python_version": "py3",
+        "requires_python": ">=3.7",
+        "size": 62574,
+        "upload_time": "2023-05-22T13:00:00",
+        "upload_time_iso_8601": "2023-05-22T13:00:00.000000Z",
+        "url": "https://files.pythonhosted.org/packages/xx/requests-2.31.0-py3-none-any.whl",
+        "yanked": false,
+        "yanked_reason": null
+      },
+      {
+        "comment_text": "",
+        "digests": {
+          "md5": "xxx",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "downloads": -1,
+        "filename": "requests-2.31.0.tar.gz",
+        "has_sig": false,
+        "md5_digest": "xxx",
+        "packagetype": "sdist",
+        "python_version": "source",
+        "requires_python": ">=3.7",
+        "size": 110794,
+        "upload_time": "2023-05-22T13:00:00",
+        "upload_time_iso_8601": "2023-05-22T13:00:00.000000Z",
+        "url": "https://files.pythonhosted.org/packages/xx/requests-2.31.0.tar.gz",
+        "yanked": false,
+        "yanked_reason": null
+      }
+    ]
+  },
+  "urls": [
+    {
+      "comment_text": "",
+      "digests": {
+        "md5": "xxx",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "downloads": -1,
+      "filename": "requests-2.31.0-py3-none-any.whl",
+      "has_sig": false,
+      "md5_digest": "xxx",
+      "packagetype": "bdist_wheel",
+      "python_version": "py3",
+      "requires_python": ">=3.7",
+      "size": 62574,
+      "upload_time": "2023-05-22T13:00:00",
+      "upload_time_iso_8601": "2023-05-22T13:00:00.000000Z",
+      "url": "https://files.pythonhosted.org/packages/xx/requests-2.31.0-py3-none-any.whl",
+      "yanked": false,
+      "yanked_reason": null
+    },
+    {
+      "comment_text": "",
+      "digests": {
+        "md5": "xxx",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "downloads": -1,
+      "filename": "requests-2.31.0.tar.gz",
+      "has_sig": false,
+      "md5_digest": "xxx",
+      "packagetype": "sdist",
+      "python_version": "source",
+      "requires_python": ">=3.7",
+      "size": 110794,
+      "upload_time": "2023-05-22T13:00:00",
+      "upload_time_iso_8601": "2023-05-22T13:00:00.000000Z",
+      "url": "https://files.pythonhosted.org/packages/xx/requests-2.31.0.tar.gz",
+      "yanked": false,
+      "yanked_reason": null
+    }
+  ]
+}
