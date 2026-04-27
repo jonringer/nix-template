@@ -64,7 +64,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
 
 fn addtional_pkg_attr_headers(template: &Template) -> &'static str {
     match template {
-        Template::python => "\n  format = \"setuptools\";",
+        Template::python => "\n  @doc:pythonFormat@format = \"setuptools\";",
         _ => "",
     }
 }
@@ -73,13 +73,15 @@ fn build_inputs(template: &Template) -> &'static str {
     match template {
         Template::python => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
 
-  pythonImportsCheck = [ \"@pname-import-check@\" ];",
-        Template::rust => "  @doc:buildDependencies@cargoSha256 = \"0000000000000000000000000000000000000000000000000000\";
+  @doc:pythonImportsCheck@pythonImportsCheck = [ \"@pname-import-check@\" ];",
+        Template::rust => "  @doc:buildDependencies@
+  @doc:cargoSha256@cargoSha256 = \"0000000000000000000000000000000000000000000000000000\";
 
   buildInputs = [ ];",
-        Template::go => "  @doc:buildDependencies@vendorSha256 = \"0000000000000000000000000000000000000000000000000000\";
+        Template::go => "  @doc:buildDependencies@
+  @doc:vendorSha256@vendorSha256 = \"0000000000000000000000000000000000000000000000000000\";
 
-  subPackages = [ \".\" ];",
+  @doc:goSubPackages@subPackages = [ \".\" ];",
         _ => "  buildInputs = [ ];",
     }
 }
@@ -96,7 +98,7 @@ fn meta() -> &'static str {
 
 pub fn generate_expression(info: &ExpressionInfo) -> String {
     match &info.template {
-        Template::module   => r#"{ pkgs, lib, config, ... }:
+        Template::module   => r#"@doc:nixosModules@{ pkgs, lib, config, ... }:
 
 with lib;
 
@@ -190,7 +192,7 @@ mkShell rec {
   version = \"{version}\";{addtional_pkg_attr_headers}
 
 {f_block}
-
+@doc:buildPhases@
 {build_inputs}
 {meta}
 }}
