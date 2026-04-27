@@ -15,18 +15,50 @@ pub use pypi::*;
 lazy_static! {
     static ref DOCUMENTATION_LINKS: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
+        // Updated to use nix-book as primary reference
         m.insert(
             "buildDependencies",
-            "https://nixos.org/nixpkgs/manual/#ssec-stdenv-dependencies\n  ",
+            "https://ekala-project.github.io/nix-book/ch06-04-build-dependencies.html\n  ",
         );
+        m.insert(
+            "stdenvMkDerivation",
+            "https://ekala-project.github.io/nix-book/ch06-02-stdenv.html\n  ",
+        );
+        // Fallback to nixpkgs manual (not yet in nix-book)
         m.insert(
             "fetcher",
             "https://nixos.org/nixpkgs/manual/#chap-pkgs-fetchers\n  ",
         );
         m.insert("meta", "https://nixos.org/nixpkgs/manual/#chap-meta\n  ");
+        // Template-specific documentation
         m.insert(
-            "stdenvMkDerivation",
-            "https://nixos.org/nixpkgs/manual/#sec-using-stdenv\n  ",
+            "pythonImportsCheck",
+            "https://ekala-project.github.io/nix-book/ch07-04-python.html\n  ",
+        );
+        m.insert(
+            "pythonFormat",
+            "https://ekala-project.github.io/nix-book/ch07-04-python.html\n  ",
+        );
+        m.insert(
+            "cargoSha256",
+            "https://ekala-project.github.io/nix-book/ch07-05-rust.html\n  ",
+        );
+        m.insert(
+            "vendorSha256",
+            "https://ekala-project.github.io/nix-book/ch07-06-go.html\n  ",
+        );
+        m.insert(
+            "goSubPackages",
+            "https://ekala-project.github.io/nix-book/ch07-06-go.html\n  ",
+        );
+        // Build phases and NixOS modules
+        m.insert(
+            "buildPhases",
+            "https://ekala-project.github.io/nix-book/ch06-03-phases.html\n  ",
+        );
+        m.insert(
+            "nixosModules",
+            "https://ekala-project.github.io/nix-book/ch09-00-nixos-modules.html\n  ",
         );
         m
     };
