@@ -84,24 +84,36 @@ fn addtional_pkg_attr_headers(template: &Template) -> &'static str {
     }
 }
 
-fn build_inputs(info: &ExpressionInfo) -> &'static str {
+fn build_inputs(info: &ExpressionInfo) -> String {
     match info.template {
         // Python applications don't carry a Python-import smoke test the way
         // libraries do; their entry points are exercised at runtime.
         Template::python if info.python_application =>
-            "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];",
+            "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];".to_owned(),
         Template::python => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
 
-  @doc:pythonImportsCheck@pythonImportsCheck = [ \"@pname-import-check@\" ];",
-        Template::rust => "  @doc:buildDependencies@
+  @doc:pythonImportsCheck@pythonImportsCheck = [ \"@pname-import-check@\" ];".to_owned(),
+        Template::rust => {
+            // Conditionally render `nativeBuildInputs` only when inferred,
+            // to keep the output tidy for projects without system deps.
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n  nativeBuildInputs = [@native_build_inputs@ ];\n".to_owned()
+            };
+            format!(
+                "  @doc:buildDependencies@
   @doc:cargoHash@cargoHash = \"@cargo_hash@\";
-
-  buildInputs = [ ];",
+{native}
+  buildInputs = [@build_inputs@ ];",
+                native = native,
+            )
+        }
         Template::go => "  @doc:buildDependencies@
   @doc:vendorHash@vendorHash = \"@vendor_hash@\";
 
-  @doc:goSubPackages@subPackages = [ \".\" ];",
-        _ => "  buildInputs = [ ];",
+  @doc:goSubPackages@subPackages = [ \".\" ];".to_owned(),
+        _ => "  buildInputs = [ ];".to_owned(),
     }
 }
 
@@ -200,6 +212,11 @@ mkShell rec {
 
             let mut inputs = vec!(String::from("lib"), dh_input, f_input.to_string());
             inputs.extend(info.propagated_build_inputs.iter().map(|s| s.to_owned()));
+            // Inferred Rust system deps: surface each in the function
+            // header so `callPackage` can pass them in. nativeBuildInputs
+            // are listed first to mirror nixpkgs convention.
+            inputs.extend(info.native_build_inputs.iter().map(|s| s.to_owned()));
+            inputs.extend(info.build_inputs.iter().map(|s| s.to_owned()));
 
             let header = format!("{{ {input_list}\n}}:", input_list = inputs.join("\n, "));
 
@@ -226,6 +243,78 @@ mkShell rec {
                 meta = if info.include_meta { meta() } else { "" },
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{ExpressionInfo, Fetcher, Template};
+
+    fn rust_info() -> ExpressionInfo {
+        ExpressionInfo {
+            pname: "demo".to_owned(),
+            version: "1.0.0".to_owned(),
+            license: "mit".to_owned(),
+            maintainer: "me".to_owned(),
+            fetcher: Fetcher::github,
+            template: Template::rust,
+            path_to_write: std::path::PathBuf::new(),
+            top_level_path: std::path::PathBuf::new(),
+            include_documentation_links: false,
+            include_meta: true,
+            tag_prefix: "".to_owned(),
+            owner: "demo".to_owned(),
+            src_sha: "sha256-demo".to_owned(),
+            description: "demo".to_owned(),
+            homepage: "https://example.com".to_owned(),
+            propagated_build_inputs: Vec::new(),
+            cargo_hash: "sha256-cargo".to_owned(),
+            vendor_hash: "sha256-vendor".to_owned(),
+            domain: "".to_owned(),
+            python_application: false,
+            build_inputs: Vec::new(),
+            native_build_inputs: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn rust_without_inferred_deps_omits_native_build_inputs() {
+        let info = rust_info();
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        assert!(out.contains("buildInputs = [ ];"));
+        assert!(
+            !out.contains("nativeBuildInputs"),
+            "should not render nativeBuildInputs when none inferred:\n{}",
+            out
+        );
+    }
+
+    #[test]
+    fn rust_with_inferred_deps_renders_both_lists() {
+        let mut info = rust_info();
+        info.build_inputs = vec!["openssl".to_owned()];
+        info.native_build_inputs = vec!["pkg-config".to_owned()];
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        // format_inputs joins with `\n    ` and pads the closing
+        // bracket with a space, so a single-entry list renders as
+        // `[\n    name\n  ];` (note: two spaces before `];`).
+        assert!(
+            out.contains("nativeBuildInputs = [\n    pkg-config\n  ];"),
+            "missing nativeBuildInputs in:\n{}",
+            out
+        );
+        assert!(
+            out.contains("buildInputs = [\n    openssl\n  ];"),
+            "missing buildInputs in:\n{}",
+            out
+        );
+        // The function-header should also list both crates so callPackage
+        // can wire them through.
+        assert!(out.contains(", pkg-config"), "header missing pkg-config: {}", out);
+        assert!(out.contains(", openssl"), "header missing openssl: {}", out);
     }
 }
 

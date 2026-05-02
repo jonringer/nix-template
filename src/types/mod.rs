@@ -148,6 +148,12 @@ pub struct ExpressionInfo {
     /// `buildPythonPackage` (libraries) to `buildPythonApplication`
     /// (end-user programs). Has no effect for non-Python templates.
     pub python_application: bool,
+    /// Inferred system libraries that need to be linked at build time
+    /// (rendered into `buildInputs` for the `rust` template).
+    pub build_inputs: Vec<String>,
+    /// Inferred build-time tools (rendered into `nativeBuildInputs` for
+    /// the `rust` template). Common entries: `pkg-config`, `cmake`.
+    pub native_build_inputs: Vec<String>,
 }
 
 /// Default SRI placeholder used by `lib.fakeHash` in nixpkgs.
@@ -185,7 +191,9 @@ impl ExpressionInfo {
             .replace("@homepage@", &self.homepage)
             .replace("@license@", &self.license)
             .replace("@maintainer@", &self.maintainer)
-            .replace("@propagated_build_inputs@", &format_inputs(&self.propagated_build_inputs));
+            .replace("@propagated_build_inputs@", &format_inputs(&self.propagated_build_inputs))
+            .replace("@build_inputs@", &format_inputs(&self.build_inputs))
+            .replace("@native_build_inputs@", &format_inputs(&self.native_build_inputs));
 
         if self.include_documentation_links {
             Self::insert_documentation_links(result)

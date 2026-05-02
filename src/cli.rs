@@ -2,6 +2,7 @@ use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
 use crate::file_path::nix_file_paths;
 use crate::interactive::InteractiveData;
+use crate::rust_deps::infer_rust_dependencies;
 use crate::types::{ExpressionInfo, Fetcher, Template, UserConfig, FAKE_SRI_HASH};
 use crate::url::{prefetch_dependency_hash, read_meta_from_url};
 
@@ -98,6 +99,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             ).takes_value(false))
         .arg(Arg::from_usage(
             "--python-application 'Use buildPythonApplication instead of buildPythonPackage when generating a python template. Also defaults the package path to pkgs/applications/misc/ under --nixpkgs.'",
+            ).takes_value(false))
+        .arg(Arg::from_usage(
+            "--infer-deps 'For rust templates, materialise the source and parse Cargo.toml to infer required buildInputs/nativeBuildInputs. Requires --from-url so a real src hash is known.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
             "-v [version] 'Set version of package'",
@@ -202,6 +206,8 @@ pub fn validate_and_serialize_matches(
         vendor_hash: FAKE_SRI_HASH.to_owned(),
         domain: "CHANGE".to_owned(),
         python_application: matches.is_present("python-application"),
+        build_inputs: Vec::new(),
+        native_build_inputs: Vec::new(),
     };
 
     if let Some(url) = matches.value_of("from-url") {
@@ -215,6 +221,13 @@ pub fn validate_and_serialize_matches(
                 Template::go => info.vendor_hash = hash,
                 _ => {}
             }
+        }
+    }
+
+    if matches.is_present("infer-deps") && info.template == Template::rust {
+        if let Some((build, native)) = infer_rust_dependencies(&info) {
+            info.build_inputs = build;
+            info.native_build_inputs = native;
         }
     }
 
@@ -242,6 +255,7 @@ pub fn build_expression_info_from_interactive(
 
     let prefetch_hashes = data.prefetch_hashes;
     let python_application = data.python_application;
+    let infer_deps = data.infer_deps;
     let mut info = ExpressionInfo {
         pname: data.pname.clone(),
         version: data.version,
@@ -263,6 +277,8 @@ pub fn build_expression_info_from_interactive(
         vendor_hash: FAKE_SRI_HASH.to_owned(),
         domain: "CHANGE".to_owned(),
         python_application,
+        build_inputs: Vec::new(),
+        native_build_inputs: Vec::new(),
     };
 
     // If URL was provided, fetch metadata
@@ -277,6 +293,13 @@ pub fn build_expression_info_from_interactive(
                 Template::go => info.vendor_hash = hash,
                 _ => {}
             }
+        }
+    }
+
+    if infer_deps && info.template == Template::rust {
+        if let Some((build, native)) = infer_rust_dependencies(&info) {
+            info.build_inputs = build;
+            info.native_build_inputs = native;
         }
     }
 

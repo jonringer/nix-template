@@ -5,6 +5,7 @@ mod cli;
 mod expression;
 mod file_path;
 mod interactive;
+mod rust_deps;
 mod types;
 mod url;
 
