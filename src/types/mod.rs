@@ -85,6 +85,7 @@ arg_enum! {
     pub enum Fetcher {
         github,
         gitlab,
+        gitea,
         url,
         zip,
         pypi,
@@ -95,6 +96,7 @@ arg_enum! {
 pub enum Repo {
     Pypi(PypiRepo),
     Github(GithubRepo),
+    Gitea(GiteaRepo),
 }
 
 #[derive(Debug, PartialEq)]
@@ -104,6 +106,13 @@ pub struct PypiRepo {
 
 #[derive(Debug, PartialEq)]
 pub struct GithubRepo {
+    pub owner: String,
+    pub repo: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct GiteaRepo {
+    pub domain: String,
     pub owner: String,
     pub repo: String,
 }
@@ -132,6 +141,9 @@ pub struct ExpressionInfo {
     /// SRI hash of the Go module vendor tree (used for `go` template).
     /// Defaults to `lib.fakeHash` when unknown.
     pub vendor_hash: String,
+    /// Domain of the Gitea instance (used by the `gitea` fetcher), e.g.
+    /// "codeberg.org" or "gitea.com". Empty for non-Gitea fetchers.
+    pub domain: String,
 }
 
 /// Default SRI placeholder used by `lib.fakeHash` in nixpkgs.
@@ -164,6 +176,7 @@ impl ExpressionInfo {
             .replace("@src_sha@", &self.src_sha)
             .replace("@cargo_hash@", &self.cargo_hash)
             .replace("@vendor_hash@", &self.vendor_hash)
+            .replace("@domain@", &self.domain)
             .replace("@description@", &self.description)
             .replace("@homepage@", &self.homepage)
             .replace("@license@", &self.license)
