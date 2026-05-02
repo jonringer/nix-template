@@ -101,7 +101,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "--python-application 'Use buildPythonApplication instead of buildPythonPackage when generating a python template. Also defaults the package path to pkgs/applications/misc/ under --nixpkgs.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
-            "--infer-deps 'For rust templates, materialise the source and parse Cargo.toml to infer required buildInputs/nativeBuildInputs. Requires --from-url so a real src hash is known.'",
+            "--no-infer-deps 'Disable automatic inference of buildInputs/nativeBuildInputs for the rust template. By default, when --from-url is provided, nix-template materialises the source and parses Cargo.toml/Cargo.lock to detect well-known *-sys crates.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
             "-v [version] 'Set version of package'",
@@ -224,7 +224,12 @@ pub fn validate_and_serialize_matches(
         }
     }
 
-    if matches.is_present("infer-deps") && info.template == Template::rust {
+    // Inference is on by default for the rust template whenever we have a
+    // real source to inspect. Users can disable via `--no-infer-deps`.
+    let should_infer_deps = info.template == Template::rust
+        && matches.is_present("from-url")
+        && !matches.is_present("no-infer-deps");
+    if should_infer_deps {
         if let Some((build, native)) = infer_rust_dependencies(&info) {
             info.build_inputs = build;
             info.native_build_inputs = native;
