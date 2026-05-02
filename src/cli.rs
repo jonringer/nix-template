@@ -2,8 +2,8 @@ use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
 use crate::file_path::nix_file_paths;
 use crate::interactive::InteractiveData;
-use crate::types::{ExpressionInfo, Fetcher, Template, UserConfig};
-use crate::url::read_meta_from_url;
+use crate::types::{ExpressionInfo, Fetcher, Template, UserConfig, FAKE_SRI_HASH};
+use crate::url::{prefetch_dependency_hash, read_meta_from_url};
 
 // clap will validate inputs, only use on functions with possible_values defined
 pub fn arg_to_type<T>(arg: Option<&str>) -> T
@@ -92,6 +92,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             ))
         .arg(Arg::from_usage(
             "--init-flake 'Generate a flake.nix alongside the package expression'",
+            ).takes_value(false))
+        .arg(Arg::from_usage(
+            "--prefetch-hashes 'For rust/go templates, run nix-build with a fake hash to compute cargoHash/vendorHash. Requires nix to be installed and a known src hash (i.e. used together with --from-url).'",
             ).takes_value(false))
         .arg(Arg::from_usage(
             "-v [version] 'Set version of package'",
@@ -192,10 +195,22 @@ pub fn validate_and_serialize_matches(
         description: "CHANGE".to_owned(),
         homepage: "https://github.com/@owner@/@pname@".to_owned(),
         propagated_build_inputs: Vec::new(),
+        cargo_hash: FAKE_SRI_HASH.to_owned(),
+        vendor_hash: FAKE_SRI_HASH.to_owned(),
     };
 
     if let Some(url) = matches.value_of("from-url") {
         read_meta_from_url(url, &mut info);
+    }
+
+    if matches.is_present("prefetch-hashes") {
+        if let Some(hash) = prefetch_dependency_hash(&info) {
+            match info.template {
+                Template::rust => info.cargo_hash = hash,
+                Template::go => info.vendor_hash = hash,
+                _ => {}
+            }
+        }
     }
 
     let (path_to_write, top_level_path) =
@@ -220,6 +235,7 @@ pub fn build_expression_info_from_interactive(
         .and_then(|c| c.nixpkgs_root.as_deref())
         .unwrap_or("");
 
+    let prefetch_hashes = data.prefetch_hashes;
     let mut info = ExpressionInfo {
         pname: data.pname.clone(),
         version: data.version,
@@ -237,11 +253,23 @@ pub fn build_expression_info_from_interactive(
         description: data.description,
         homepage: data.homepage,
         propagated_build_inputs: Vec::new(),
+        cargo_hash: FAKE_SRI_HASH.to_owned(),
+        vendor_hash: FAKE_SRI_HASH.to_owned(),
     };
 
     // If URL was provided, fetch metadata
     if let Some(url) = data.url {
         read_meta_from_url(&url, &mut info);
+    }
+
+    if prefetch_hashes {
+        if let Some(hash) = prefetch_dependency_hash(&info) {
+            match info.template {
+                Template::rust => info.cargo_hash = hash,
+                Template::go => info.vendor_hash = hash,
+                _ => {}
+            }
+        }
     }
 
     // Set the paths - use the path directly since we collected it interactively

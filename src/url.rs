@@ -1,5 +1,6 @@
 use crate::types;
 use crate::types::Repo::{Github, Pypi};
+use crate::types::{Template, FAKE_SRI_HASH};
 
 use anyhow::anyhow;
 use anyhow::Result;
@@ -28,6 +29,14 @@ lazy_static! {
 
     static ref STABLE_RELEASE_REGEX: Regex = {
         Regex::new(r"^([0-9.]*)+$").unwrap()
+    };
+
+    /// Matches the "got:" line emitted by `nix-build` when a fixed-output
+    /// derivation has a hash mismatch. Examples:
+    ///     got:    sha256-abcdef...=
+    ///     got: sha256-abcdef...=
+    static ref GOT_HASH_REGEX: Regex = {
+        Regex::new(r"got:\s+(sha256-[A-Za-z0-9+/=]+)").unwrap()
     };
 
     static ref GITHUB_TO_NIXPKGS_LICENSE: HashMap<&'static str, &'static str> = {
@@ -322,6 +331,148 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
             &pypi_repo.project
         );
     }
+}
+
+/// Prefetch the `cargoHash` (for `rust` template) or `vendorHash` (for `go`
+/// template) by performing a build with `lib.fakeHash` and parsing the
+/// resulting hash mismatch from `nix-build`'s stderr.
+///
+/// The expression at `info` must already have a known `src_sha`. The function
+/// renders the package expression to a temporary file, invokes `nix-build`
+/// against it via `callPackage`, and extracts the SRI hash from the
+/// "got:" line that nix prints on hash mismatch.
+///
+/// Returns `None` if the build did not produce a hash mismatch (e.g. nix is
+/// not installed, the source failed to fetch, the hash placeholder was
+/// already correct, etc.). Logs progress to stderr.
+pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> {
+    use std::io::Write;
+
+    // Only Rust and Go packages need this dance.
+    match info.template {
+        Template::rust | Template::go => (),
+        _ => return None,
+    }
+
+    // We can't prefetch without a real source hash to feed the builder.
+    if info.src_sha.is_empty()
+        || info.src_sha.starts_with("0000000000000000000000000000000000000000000000000000")
+    {
+        eprintln!("Skipping hash prefetch: src_sha is not yet known");
+        return None;
+    }
+
+    // Render the expression with a fake cargoHash/vendorHash so that nix
+    // is forced to fetch the dependencies and emit a "got:" line.
+    let probe_info = types::ExpressionInfo {
+        pname: info.pname.clone(),
+        version: info.version.clone(),
+        license: info.license.clone(),
+        maintainer: info.maintainer.clone(),
+        fetcher: info.fetcher.clone(),
+        template: info.template.clone(),
+        path_to_write: std::path::PathBuf::new(),
+        top_level_path: std::path::PathBuf::new(),
+        // Documentation links and meta would clutter / break the probe expression
+        // (e.g. `licenses.CHANGE` does not exist).
+        include_documentation_links: false,
+        include_meta: false,
+        tag_prefix: info.tag_prefix.clone(),
+        owner: info.owner.clone(),
+        src_sha: info.src_sha.clone(),
+        description: info.description.clone(),
+        homepage: info.homepage.clone(),
+        propagated_build_inputs: info.propagated_build_inputs.clone(),
+        cargo_hash: FAKE_SRI_HASH.to_owned(),
+        vendor_hash: FAKE_SRI_HASH.to_owned(),
+    };
+
+    let probe_expr = crate::expression::generate_expression(&probe_info);
+    let probe_text = probe_info.format(&probe_expr);
+
+    // Write to a temp file (deleted when the variable goes out of scope).
+    let tmp_dir = match tempfile_dir() {
+        Some(d) => d,
+        None => {
+            eprintln!("Skipping hash prefetch: unable to create temporary directory");
+            return None;
+        }
+    };
+    let probe_path = tmp_dir.join("probe.nix");
+    {
+        let mut f = match std::fs::File::create(&probe_path) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("Skipping hash prefetch: failed to write probe expression: {}", e);
+                return None;
+            }
+        };
+        if let Err(e) = f.write_all(probe_text.as_bytes()) {
+            eprintln!("Skipping hash prefetch: failed to write probe expression: {}", e);
+            return None;
+        }
+    }
+
+    let kind = match info.template {
+        Template::rust => "cargoHash",
+        Template::go => "vendorHash",
+        _ => unreachable!(),
+    };
+    eprintln!("Prefetching {} for {} (this may take a while)...", kind, &info.pname);
+
+    let output = Command::new("nix-build")
+        .args(&["--no-out-link", "-E"])
+        .arg(format!(
+            "(import <nixpkgs> {{}}).callPackage {} {{}}",
+            probe_path.display()
+        ))
+        .output();
+
+    let output = match output {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("Skipping hash prefetch: failed to invoke nix-build: {}", e);
+            return None;
+        }
+    };
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    debug!(target: LOG_TARGET, "nix-build stderr: {}", stderr);
+
+    let captured = GOT_HASH_REGEX
+        .captures_iter(&stderr)
+        .filter_map(|c| c.get(1).map(|m| m.as_str().to_owned()))
+        // The first hash mismatch is the dependency hash (cargo deps / go
+        // vendor tree); subsequent hashes (if any) belong to later phases.
+        .next();
+
+    match captured {
+        Some(h) => {
+            eprintln!("Determined {} = {}", kind, &h);
+            Some(h)
+        }
+        None => {
+            eprintln!(
+                "Could not determine {} from nix-build output. The placeholder will remain.",
+                kind
+            );
+            None
+        }
+    }
+}
+
+/// Create a unique temporary directory under `$TMPDIR` (or `/tmp`).
+/// Returns `None` on failure. The directory is leaked (not deleted) by the
+/// caller so the user can inspect it on failure.
+fn tempfile_dir() -> Option<std::path::PathBuf> {
+    let base = std::env::temp_dir();
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    let dir = base.join(format!("nix-template-prefetch-{}", nanos));
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir)
 }
 
 pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo) {
