@@ -109,10 +109,29 @@ fn build_inputs(info: &ExpressionInfo) -> String {
                 native = native,
             )
         }
-        Template::go => "  @doc:buildDependencies@
-  @doc:vendorHash@vendorHash = \"@vendor_hash@\";
+        Template::go => {
+            // Mirror the Rust path: only emit nativeBuildInputs / buildInputs
+            // attributes when CGO inference produced something. Empty
+            // attributes would just be noise users have to delete.
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+            format!(
+                "  @doc:buildDependencies@
+  @doc:vendorHash@vendorHash = \"@vendor_hash@\";{native}{build}
 
-  @doc:goSubPackages@subPackages = [ \".\" ];".to_owned(),
+  @doc:goSubPackages@subPackages = [ \".\" ];",
+                native = native,
+                build = build,
+            )
+        }
         _ => "  buildInputs = [ ];".to_owned(),
     }
 }
