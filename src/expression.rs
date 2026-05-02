@@ -75,11 +75,11 @@ fn build_inputs(template: &Template) -> &'static str {
 
   @doc:pythonImportsCheck@pythonImportsCheck = [ \"@pname-import-check@\" ];",
         Template::rust => "  @doc:buildDependencies@
-  @doc:cargoSha256@cargoSha256 = \"0000000000000000000000000000000000000000000000000000\";
+  @doc:cargoHash@cargoHash = \"@cargo_hash@\";
 
   buildInputs = [ ];",
         Template::go => "  @doc:buildDependencies@
-  @doc:vendorSha256@vendorSha256 = \"0000000000000000000000000000000000000000000000000000\";
+  @doc:vendorHash@vendorHash = \"@vendor_hash@\";
 
   @doc:goSubPackages@subPackages = [ \".\" ];",
         _ => "  buildInputs = [ ];",

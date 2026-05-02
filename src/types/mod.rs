@@ -40,11 +40,11 @@ lazy_static! {
             "https://ekala-project.github.io/nix-book/ch07-04-python.html\n  ",
         );
         m.insert(
-            "cargoSha256",
+            "cargoHash",
             "https://ekala-project.github.io/nix-book/ch07-05-rust.html\n  ",
         );
         m.insert(
-            "vendorSha256",
+            "vendorHash",
             "https://ekala-project.github.io/nix-book/ch07-06-go.html\n  ",
         );
         m.insert(
@@ -66,7 +66,7 @@ lazy_static! {
 
 arg_enum! {
     #[allow(non_camel_case_types)]
-    #[derive(Debug,PartialEq)]
+    #[derive(Debug, PartialEq, Clone)]
     pub enum Template {
         stdenv,
         python,
@@ -126,7 +126,16 @@ pub struct ExpressionInfo {
     pub description: String,
     pub homepage: String,
     pub propagated_build_inputs: Vec<String>,
+    /// SRI hash of the cargo dependencies (used for `rust` template).
+    /// Defaults to `lib.fakeHash` when unknown.
+    pub cargo_hash: String,
+    /// SRI hash of the Go module vendor tree (used for `go` template).
+    /// Defaults to `lib.fakeHash` when unknown.
+    pub vendor_hash: String,
 }
+
+/// Default SRI placeholder used by `lib.fakeHash` in nixpkgs.
+pub const FAKE_SRI_HASH: &str = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
 impl ExpressionInfo {
     pub fn format(&self, s: &str) -> String {
@@ -153,6 +162,8 @@ impl ExpressionInfo {
             .replace("@owner@", &self.owner)
             .replace("@rev@", &rev)
             .replace("@src_sha@", &self.src_sha)
+            .replace("@cargo_hash@", &self.cargo_hash)
+            .replace("@vendor_hash@", &self.vendor_hash)
             .replace("@description@", &self.description)
             .replace("@homepage@", &self.homepage)
             .replace("@license@", &self.license)

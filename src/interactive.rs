@@ -549,6 +549,17 @@ pub fn run_interactive_mode(
         .with_default(true)
         .prompt()?;
 
+    // Offer hash prefetching for Rust/Go templates when we have a real source.
+    let prefetch_hashes = if matches!(template, Template::rust | Template::go)
+        && url_with_metadata.is_some()
+    {
+        Confirm::new("Prefetch cargoHash/vendorHash by running nix-build? (slow)")
+            .with_default(false)
+            .prompt()?
+    } else {
+        false
+    };
+
     Ok(InteractiveData {
         template,
         pname,
@@ -562,6 +573,7 @@ pub fn run_interactive_mode(
         url: url_with_metadata.map(|(url, _)| url),
         include_documentation_links: include_docs,
         include_meta,
+        prefetch_hashes,
     })
 }
 
@@ -580,4 +592,7 @@ pub struct InteractiveData {
     pub url: Option<String>,
     pub include_documentation_links: bool,
     pub include_meta: bool,
+    /// Whether to prefetch `cargoHash` (rust) / `vendorHash` (go) by running
+    /// nix-build against a probe expression with `lib.fakeHash`.
+    pub prefetch_hashes: bool,
 }
