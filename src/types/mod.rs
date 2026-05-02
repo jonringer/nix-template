@@ -144,6 +144,10 @@ pub struct ExpressionInfo {
     /// Domain of the Gitea instance (used by the `gitea` fetcher), e.g.
     /// "codeberg.org" or "gitea.com". Empty for non-Gitea fetchers.
     pub domain: String,
+    /// When the `python` template is used, switches the builder from
+    /// `buildPythonPackage` (libraries) to `buildPythonApplication`
+    /// (end-user programs). Has no effect for non-Python templates.
+    pub python_application: bool,
 }
 
 /// Default SRI placeholder used by `lib.fakeHash` in nixpkgs.

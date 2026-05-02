@@ -42,7 +42,7 @@ pub struct Info {
     bugtrack_url: Option<serde_json::Value>,
 
     #[serde(rename = "classifiers")]
-    classifiers: Vec<String>,
+    pub classifiers: Vec<String>,
 
     #[serde(rename = "description")]
     description: String,

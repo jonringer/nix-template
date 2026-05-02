@@ -75,6 +75,9 @@ pub struct UrlMetadata {
     pub homepage: String,
     pub fetcher: Fetcher,
     pub owner: Option<String>,
+    /// Heuristic flag set when PyPI metadata suggests this is an end-user
+    /// application (e.g. classifiers mention `Environment ::`).
+    pub is_python_application: bool,
 }
 
 impl Default for UrlMetadata {
@@ -86,7 +89,60 @@ impl Default for UrlMetadata {
             homepage: "".to_string(),
             fetcher: Fetcher::github,
             owner: None,
+            is_python_application: false,
         }
+    }
+}
+
+/// Best-effort heuristic: classify a PyPI project as application vs library
+/// by inspecting its classifiers. Looks for `Environment :: Console`,
+/// `Environment :: X11 Applications`, `Environment :: MacOS X`,
+/// or `Environment :: Win32 (MS Windows)` which are typical for end-user
+/// programs. Web-environment projects are intentionally excluded since
+/// those are usually consumed as libraries (e.g. WSGI apps).
+pub fn classifiers_suggest_application(classifiers: &[String]) -> bool {
+    classifiers.iter().any(|c| {
+        c.starts_with("Environment :: Console")
+            || c.starts_with("Environment :: X11 Applications")
+            || c.starts_with("Environment :: MacOS X")
+            || c.starts_with("Environment :: Win32")
+            || c.starts_with("Environment :: Handhelds")
+    })
+}
+
+#[cfg(test)]
+mod heuristic_tests {
+    use super::classifiers_suggest_application;
+
+    #[test]
+    fn console_application_detected() {
+        let classifiers = vec![
+            "Programming Language :: Python".to_string(),
+            "Environment :: Console".to_string(),
+        ];
+        assert!(classifiers_suggest_application(&classifiers));
+    }
+
+    #[test]
+    fn pure_library_not_detected() {
+        let classifiers = vec![
+            "Programming Language :: Python".to_string(),
+            "Topic :: Software Development :: Libraries".to_string(),
+            "Intended Audience :: Developers".to_string(),
+        ];
+        assert!(!classifiers_suggest_application(&classifiers));
+    }
+
+    #[test]
+    fn web_environment_not_classed_as_application() {
+        // WSGI / web frameworks are typically consumed as libraries.
+        let classifiers = vec!["Environment :: Web Environment".to_string()];
+        assert!(!classifiers_suggest_application(&classifiers));
+    }
+
+    #[test]
+    fn empty_classifiers() {
+        assert!(!classifiers_suggest_application(&[]));
     }
 }
 
@@ -165,6 +221,7 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 homepage,
                 fetcher: Fetcher::github,
                 owner: Some(gh_repo.owner.clone()),
+                is_python_application: false,
             })
         }
         Repo::Pypi(pypi_repo) => {
@@ -177,6 +234,9 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 .unwrap_or(&"CHANGE")
                 .to_string();
 
+            let is_python_application =
+                classifiers_suggest_application(&pypi_response.info.classifiers);
+
             Ok(UrlMetadata {
                 pname: pypi_repo.project.clone(),
                 license,
@@ -184,6 +244,7 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 homepage: pypi_response.info.home_page.unwrap_or("CHANGE".to_string()),
                 fetcher: Fetcher::pypi,
                 owner: None,
+                is_python_application,
             })
         }
         Repo::Gitea(gitea_repo) => {
@@ -206,6 +267,7 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 homepage,
                 fetcher: Fetcher::gitea,
                 owner: Some(gitea_repo.owner.clone()),
+                is_python_application: false,
             })
         }
     }
@@ -603,6 +665,25 @@ pub fn run_interactive_mode(
         false
     };
 
+    // For the python template, ask whether this is an end-user application
+    // (uses `buildPythonApplication`) rather than a library
+    // (uses `buildPythonPackage`). Default is auto-detected from PyPI
+    // classifiers when available.
+    let python_application = if template == Template::python {
+        let default = metadata.is_python_application;
+        let help = if default {
+            "PyPI classifiers suggest an end-user program; press Enter to accept"
+        } else {
+            "Choose 'yes' for end-user programs, 'no' for libraries imported by other packages"
+        };
+        Confirm::new("Is this a Python application (uses buildPythonApplication)?")
+            .with_default(default)
+            .with_help_message(help)
+            .prompt()?
+    } else {
+        false
+    };
+
     Ok(InteractiveData {
         template,
         pname,
@@ -617,6 +698,7 @@ pub fn run_interactive_mode(
         include_documentation_links: include_docs,
         include_meta,
         prefetch_hashes,
+        python_application,
     })
 }
 
@@ -638,4 +720,7 @@ pub struct InteractiveData {
     /// Whether to prefetch `cargoHash` (rust) / `vendorHash` (go) by running
     /// nix-build against a probe expression with `lib.fakeHash`.
     pub prefetch_hashes: bool,
+    /// When the python template is selected, switches the builder from
+    /// `buildPythonPackage` to `buildPythonApplication`.
+    pub python_application: bool,
 }

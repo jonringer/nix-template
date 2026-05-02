@@ -1,8 +1,13 @@
 use crate::types::{ExpressionInfo, Fetcher, Template};
 
-fn derivation_helper(template: &Template) -> (String, String) {
-    let (input, derivation, documentation_key): (&str, &str, Option<&str>) = match template {
+fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
+    let (input, derivation, documentation_key): (&str, &str, Option<&str>) = match info.template {
         Template::stdenv => ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation")),
+        // For Python, switch between the library and application builders
+        // depending on `info.python_application`.
+        Template::python if info.python_application => {
+            ("buildPythonApplication", "buildPythonApplication", None)
+        }
         Template::python => ("buildPythonPackage", "buildPythonPackage", None),
         Template::mkshell => ("pkgs ? import <nixpkgs> {}", "with pkgs;\n\nmkShell", None),
         Template::qt => ("mkDerivation", "mkDerivation", None),
@@ -79,8 +84,12 @@ fn addtional_pkg_attr_headers(template: &Template) -> &'static str {
     }
 }
 
-fn build_inputs(template: &Template) -> &'static str {
-    match template {
+fn build_inputs(info: &ExpressionInfo) -> &'static str {
+    match info.template {
+        // Python applications don't carry a Python-import smoke test the way
+        // libraries do; their entry points are exercised at runtime.
+        Template::python if info.python_application =>
+            "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];",
         Template::python => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
 
   @doc:pythonImportsCheck@pythonImportsCheck = [ \"@pname-import-check@\" ];",
@@ -185,7 +194,7 @@ mkShell rec {
         .to_string(),
         _ => {
             // Generate nix expression
-            let (dh_input, dh_block) = derivation_helper(&info.template);
+            let (dh_input, dh_block) = derivation_helper(info);
             let (f_input, f_block) = fetch_block(&info.fetcher);
             let addtional_pkg_attr_headers = addtional_pkg_attr_headers(&info.template);
 
@@ -213,7 +222,7 @@ mkShell rec {
                 version = &info.version,
                 addtional_pkg_attr_headers = addtional_pkg_attr_headers,
                 f_block = f_block,
-                build_inputs = build_inputs(&info.template),
+                build_inputs = build_inputs(info),
                 meta = if info.include_meta { meta() } else { "" },
             ))
         }
