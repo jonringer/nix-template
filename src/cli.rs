@@ -97,6 +97,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "--prefetch-hashes 'For rust/go templates, run nix-build with a fake hash to compute cargoHash/vendorHash. Requires nix to be installed and a known src hash (i.e. used together with --from-url).'",
             ).takes_value(false))
         .arg(Arg::from_usage(
+            "--python-application 'Use buildPythonApplication instead of buildPythonPackage when generating a python template. Also defaults the package path to pkgs/applications/misc/ under --nixpkgs.'",
+            ).takes_value(false))
+        .arg(Arg::from_usage(
             "-v [version] 'Set version of package'",
             ).default_value("0.0.1"))
         .arg(Arg::from_usage(
@@ -198,6 +201,7 @@ pub fn validate_and_serialize_matches(
         cargo_hash: FAKE_SRI_HASH.to_owned(),
         vendor_hash: FAKE_SRI_HASH.to_owned(),
         domain: "CHANGE".to_owned(),
+        python_application: matches.is_present("python-application"),
     };
 
     if let Some(url) = matches.value_of("from-url") {
@@ -237,6 +241,7 @@ pub fn build_expression_info_from_interactive(
         .unwrap_or("");
 
     let prefetch_hashes = data.prefetch_hashes;
+    let python_application = data.python_application;
     let mut info = ExpressionInfo {
         pname: data.pname.clone(),
         version: data.version,
@@ -257,6 +262,7 @@ pub fn build_expression_info_from_interactive(
         cargo_hash: FAKE_SRI_HASH.to_owned(),
         vendor_hash: FAKE_SRI_HASH.to_owned(),
         domain: "CHANGE".to_owned(),
+        python_application,
     };
 
     // If URL was provided, fetch metadata
