@@ -2,6 +2,7 @@ use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
 use crate::file_path::nix_file_paths;
 use crate::interactive::InteractiveData;
+use crate::go_deps::infer_go_dependencies;
 use crate::rust_deps::infer_rust_dependencies;
 use crate::types::{ExpressionInfo, Fetcher, Template, UserConfig, FAKE_SRI_HASH};
 use crate::url::{prefetch_dependency_hash, read_meta_from_url};
@@ -101,7 +102,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "--python-application 'Use buildPythonApplication instead of buildPythonPackage when generating a python template. Also defaults the package path to pkgs/applications/misc/ under --nixpkgs.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
-            "--no-infer-deps 'Disable automatic inference of buildInputs/nativeBuildInputs for the rust template. By default, when --from-url is provided, nix-template materialises the source and parses Cargo.toml/Cargo.lock to detect well-known *-sys crates.'",
+            "--no-infer-deps 'Disable automatic inference of buildInputs/nativeBuildInputs. By default, when --from-url is provided, nix-template materialises the source: for the rust template it parses Cargo.toml/Cargo.lock to detect well-known *-sys crates; for the go template it scans *.go files for `// #cgo` directives to detect pkg-config tokens and -l libraries.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
             "-v [version] 'Set version of package'",
@@ -224,15 +225,25 @@ pub fn validate_and_serialize_matches(
         }
     }
 
-    // Inference is on by default for the rust template whenever we have a
-    // real source to inspect. Users can disable via `--no-infer-deps`.
-    let should_infer_deps = info.template == Template::rust
-        && matches.is_present("from-url")
+    // Inference is on by default for the rust and go templates whenever we
+    // have a real source to inspect. Users can disable via `--no-infer-deps`.
+    let infer_enabled = matches.is_present("from-url")
         && !matches.is_present("no-infer-deps");
-    if should_infer_deps {
-        if let Some((build, native)) = infer_rust_dependencies(&info) {
-            info.build_inputs = build;
-            info.native_build_inputs = native;
+    if infer_enabled {
+        match info.template {
+            Template::rust => {
+                if let Some((build, native)) = infer_rust_dependencies(&info) {
+                    info.build_inputs = build;
+                    info.native_build_inputs = native;
+                }
+            }
+            Template::go => {
+                if let Some((build, native)) = infer_go_dependencies(&info) {
+                    info.build_inputs = build;
+                    info.native_build_inputs = native;
+                }
+            }
+            _ => {}
         }
     }
 
@@ -301,10 +312,21 @@ pub fn build_expression_info_from_interactive(
         }
     }
 
-    if infer_deps && info.template == Template::rust {
-        if let Some((build, native)) = infer_rust_dependencies(&info) {
-            info.build_inputs = build;
-            info.native_build_inputs = native;
+    if infer_deps {
+        match info.template {
+            Template::rust => {
+                if let Some((build, native)) = infer_rust_dependencies(&info) {
+                    info.build_inputs = build;
+                    info.native_build_inputs = native;
+                }
+            }
+            Template::go => {
+                if let Some((build, native)) = infer_go_dependencies(&info) {
+                    info.build_inputs = build;
+                    info.native_build_inputs = native;
+                }
+            }
+            _ => {}
         }
     }
 

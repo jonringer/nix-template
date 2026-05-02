@@ -665,14 +665,20 @@ pub fn run_interactive_mode(
         false
     };
 
-    // Offer dependency inference for Rust templates: parse Cargo.toml /
-    // Cargo.lock from the unpacked source and pre-fill
-    // buildInputs/nativeBuildInputs for known *-sys / system-binding crates.
-    // Default is on — users can decline at the prompt.
-    let infer_deps = if template == Template::rust && url_with_metadata.is_some() {
-        Confirm::new("Infer system dependencies from Cargo.toml/Cargo.lock?")
-            .with_default(true)
-            .prompt()?
+    // Offer dependency inference for Rust and Go templates. For Rust we
+    // parse Cargo.toml/Cargo.lock and look up known *-sys crates; for Go
+    // we walk the source for `// #cgo` directives and translate
+    // pkg-config / -l tokens into nixpkgs inputs. Default is on — users
+    // can decline at the prompt.
+    let infer_deps = if (template == Template::rust || template == Template::go)
+        && url_with_metadata.is_some()
+    {
+        let prompt_text = if template == Template::rust {
+            "Infer system dependencies from Cargo.toml/Cargo.lock?"
+        } else {
+            "Infer system dependencies from CGO directives in *.go files?"
+        };
+        Confirm::new(prompt_text).with_default(true).prompt()?
     } else {
         false
     };

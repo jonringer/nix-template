@@ -4,6 +4,7 @@ extern crate lazy_static;
 mod cli;
 mod expression;
 mod file_path;
+mod go_deps;
 mod interactive;
 mod rust_deps;
 mod types;
