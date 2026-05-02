@@ -665,11 +665,12 @@ pub fn run_interactive_mode(
         false
     };
 
-    // Offer dependency inference for Rust templates: parse Cargo.toml from the
-    // unpacked source and pre-fill buildInputs/nativeBuildInputs for known
-    // *-sys / system-binding crates.
+    // Offer dependency inference for Rust templates: parse Cargo.toml /
+    // Cargo.lock from the unpacked source and pre-fill
+    // buildInputs/nativeBuildInputs for known *-sys / system-binding crates.
+    // Default is on — users can decline at the prompt.
     let infer_deps = if template == Template::rust && url_with_metadata.is_some() {
-        Confirm::new("Infer system dependencies from Cargo.toml? (parses *-sys crates)")
+        Confirm::new("Infer system dependencies from Cargo.toml/Cargo.lock?")
             .with_default(true)
             .prompt()?
     } else {

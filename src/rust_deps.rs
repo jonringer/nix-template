@@ -72,6 +72,41 @@ fn lookup_crate(name: &str) -> Option<(&'static [&'static str], &'static [&'stat
     }
 }
 
+/// Parse the given `Cargo.lock` text and return a deduplicated list of
+/// every package name in the lockfile. This is how we catch *transitive*
+/// system-library bindings (e.g. a project depends on `git2`, which in
+/// turn pulls in `libgit2-sys`, which we *can* map to `libgit2`).
+///
+/// The lockfile schema we rely on is `version >= 1`:
+///
+/// ```toml
+/// [[package]]
+/// name = "openssl-sys"
+/// version = "0.9.97"
+/// ```
+///
+/// The package corresponding to the project itself is included too; the
+/// caller normally won't have a mapping for it, so it's harmless.
+pub fn parse_cargo_lock(cargo_lock: &str) -> Vec<String> {
+    let parsed: Value = match cargo_lock.parse() {
+        Ok(v) => v,
+        Err(e) => {
+            debug!(target: LOG_TARGET, "failed to parse Cargo.lock: {}", e);
+            return Vec::new();
+        }
+    };
+
+    let mut names: BTreeSet<String> = BTreeSet::new();
+    if let Some(Value::Array(packages)) = parsed.get("package") {
+        for pkg in packages {
+            if let Some(Value::String(name)) = pkg.get("name") {
+                names.insert(name.clone());
+            }
+        }
+    }
+    names.into_iter().collect()
+}
+
 /// Parse the given `Cargo.toml` text and return a deduplicated list of
 /// direct dependency names (from `[dependencies]`, `[build-dependencies]`,
 /// `[dev-dependencies]` is intentionally *excluded* since it's only used
@@ -226,19 +261,27 @@ fn find_cargo_toml(source: &Path) -> Option<PathBuf> {
 }
 
 /// Top-level entry point: given a populated `ExpressionInfo` (with a known
-/// source hash), fetch the source, parse its `Cargo.toml`, and infer
-/// `(build_inputs, native_build_inputs)`. Logs progress to stderr; returns
-/// `None` only on hard failures (network, malformed manifest, etc.).
+/// source hash), fetch the source, parse its `Cargo.toml` and (when
+/// present) `Cargo.lock`, and infer `(build_inputs, native_build_inputs)`.
+///
+/// `Cargo.lock` is the more useful of the two because it lists *transitive*
+/// dependencies — that's where `*-sys` crates almost always live. We still
+/// parse `Cargo.toml` as a fallback for projects that don't ship a lockfile
+/// (libraries usually don't), and we union the two crate sets so anything
+/// matched by either source contributes to the result.
+///
+/// Logs progress to stderr; returns `None` only on hard failures
+/// (network, missing manifest, etc.).
 pub fn infer_rust_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Vec<String>)> {
     if info.template != Template::rust {
         return None;
     }
 
-    eprintln!("Materialising source to inspect Cargo.toml...");
+    eprintln!("Materialising source to inspect Cargo.toml/Cargo.lock...");
     let source = materialise_source(info)?;
     let cargo_toml = find_cargo_toml(&source)?;
 
-    let contents = match std::fs::read_to_string(&cargo_toml) {
+    let manifest = match std::fs::read_to_string(&cargo_toml) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("Failed to read {}: {}", cargo_toml.display(), e);
@@ -246,9 +289,34 @@ pub fn infer_rust_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Ve
         }
     };
 
-    let crates = parse_cargo_dependencies(&contents);
-    debug!(target: LOG_TARGET, "direct dependencies: {:?}", crates);
-    let (bi, nbi) = map_crates_to_nix(&crates);
+    let mut crates: BTreeSet<String> =
+        parse_cargo_dependencies(&manifest).into_iter().collect();
+    debug!(target: LOG_TARGET, "direct dependencies from Cargo.toml: {:?}", crates);
+
+    // Best-effort: scan Cargo.lock for transitive crates. Missing lockfile
+    // is fine — many libraries don't ship one.
+    let lock_path = source.join("Cargo.lock");
+    if lock_path.is_file() {
+        match std::fs::read_to_string(&lock_path) {
+            Ok(s) => {
+                let lock_crates = parse_cargo_lock(&s);
+                debug!(
+                    target: LOG_TARGET,
+                    "transitive crates from Cargo.lock: {} packages",
+                    lock_crates.len()
+                );
+                crates.extend(lock_crates);
+            }
+            Err(e) => {
+                debug!(target: LOG_TARGET, "failed to read {}: {}", lock_path.display(), e);
+            }
+        }
+    } else {
+        debug!(target: LOG_TARGET, "no Cargo.lock at {}", lock_path.display());
+    }
+
+    let crate_list: Vec<String> = crates.into_iter().collect();
+    let (bi, nbi) = map_crates_to_nix(&crate_list);
     eprintln!(
         "Inferred {} buildInputs ({:?}) and {} nativeBuildInputs ({:?})",
         bi.len(),
@@ -369,5 +437,136 @@ mod tests {
         let (bi, nbi) = map_crates_to_nix(&[]);
         assert!(bi.is_empty());
         assert!(nbi.is_empty());
+    }
+
+    #[test]
+    fn parse_cargo_lock_extracts_transitive_packages() {
+        // A minimal but realistic Cargo.lock fragment. Note that
+        // `openssl-sys` is *not* in the manifest's `[dependencies]`
+        // (it's transitively pulled in via `git2`), but we should
+        // still see it in the lock-derived list.
+        let lock = r#"
+version = 3
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+ "git2",
+]
+
+[[package]]
+name = "git2"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abcd"
+dependencies = [
+ "libgit2-sys",
+ "openssl-sys",
+]
+
+[[package]]
+name = "libgit2-sys"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef01"
+dependencies = [
+ "cc",
+ "libc",
+ "libssh2-sys",
+ "libz-sys",
+ "openssl-sys",
+ "pkg-config",
+]
+
+[[package]]
+name = "openssl-sys"
+version = "0.9.97"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2345"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+ "vcpkg",
+]
+
+[[package]]
+name = "libssh2-sys"
+version = "0.3.0"
+
+[[package]]
+name = "libz-sys"
+version = "1.1.0"
+"#;
+        let pkgs = parse_cargo_lock(lock);
+        assert!(pkgs.contains(&"git2".to_owned()));
+        assert!(pkgs.contains(&"libgit2-sys".to_owned()));
+        assert!(pkgs.contains(&"libssh2-sys".to_owned()));
+        assert!(pkgs.contains(&"libz-sys".to_owned()));
+        assert!(pkgs.contains(&"openssl-sys".to_owned()));
+        // The crate's own package entry is included; that's fine.
+        assert!(pkgs.contains(&"demo".to_owned()));
+    }
+
+    #[test]
+    fn parse_cargo_lock_handles_empty_or_malformed() {
+        // Empty file → empty result.
+        assert!(parse_cargo_lock("").is_empty());
+        // Malformed TOML → empty result rather than panicking.
+        assert!(parse_cargo_lock("this is :: not toml [[").is_empty());
+        // No `[[package]]` table → empty result.
+        assert!(parse_cargo_lock("version = 3\n").is_empty());
+    }
+
+    #[test]
+    fn lockfile_unlocks_transitive_sys_crates() {
+        // Cargo.toml only mentions `git2`, but the *lockfile* exposes the
+        // transitive `libgit2-sys`/`openssl-sys`/`libssh2-sys` that we
+        // can actually map. Combining the two sources catches them.
+        let manifest = r#"
+            [package]
+            name = "demo"
+            version = "0.1.0"
+
+            [dependencies]
+            git2 = "0.18"
+        "#;
+        let lock = r#"
+[[package]]
+name = "demo"
+version = "0.1.0"
+
+[[package]]
+name = "git2"
+version = "0.18.0"
+
+[[package]]
+name = "libgit2-sys"
+version = "0.16.0"
+
+[[package]]
+name = "openssl-sys"
+version = "0.9.97"
+
+[[package]]
+name = "libssh2-sys"
+version = "0.3.0"
+"#;
+        let mut crates: BTreeSet<String> =
+            parse_cargo_dependencies(manifest).into_iter().collect();
+        crates.extend(parse_cargo_lock(lock));
+        let crate_list: Vec<String> = crates.into_iter().collect();
+        let (bi, nbi) = map_crates_to_nix(&crate_list);
+        assert!(bi.contains(&"libgit2".to_owned()));
+        assert!(bi.contains(&"libssh2".to_owned()));
+        assert!(bi.contains(&"openssl".to_owned()));
+        // pkg-config should appear exactly once even though three crates ask for it.
+        assert_eq!(
+            nbi.iter().filter(|n| *n == "pkg-config").count(),
+            1,
+            "pkg-config should be deduplicated, got: {:?}",
+            nbi
+        );
     }
 }
