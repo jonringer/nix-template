@@ -38,6 +38,16 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
     sha256 = \"0000000000000000000000000000000000000000000000000000\";
   };",
         ),
+        Fetcher::gitea => (
+            "fetchFromGitea",
+            "  @doc:fetcher@src = fetchFromGitea {
+    domain = \"@domain@\";
+    owner = \"@owner@\";
+    repo = pname;
+    rev = @rev@;
+    sha256 = \"@src_sha@\";
+  };",
+        ),
         Fetcher::url => (
             "fetchurl",
             "  @doc:fetcher@src = fetchurl {

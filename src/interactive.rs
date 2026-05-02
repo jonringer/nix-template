@@ -1,4 +1,4 @@
-use crate::types::{Fetcher, GithubRepo, PypiRepo, Repo, Template, UserConfig};
+use crate::types::{Fetcher, GiteaRepo, GithubRepo, PypiRepo, Repo, Template, UserConfig};
 use crate::url::{fetch_github_release_info, fetch_github_repo_info, fetch_pypi_project_info};
 use anyhow::{anyhow, Result};
 use inquire::{Confirm, Select, Text};
@@ -12,6 +12,11 @@ lazy_static! {
     };
     static ref PYPI_URL_REGEX: Regex = {
         Regex::new("pypi.org/project/([^/]*)/?").unwrap()
+    };
+    /// Hosts recognised as Gitea instances for interactive metadata extraction.
+    static ref GITEA_HOSTS: Vec<&'static str> = vec!["codeberg.org", "gitea.com"];
+    static ref GITEA_URL_REGEX: Regex = {
+        Regex::new(r"(?P<domain>[^/]+)/(?P<owner>[^/]+)/(?P<repo>[^/]+)/?").unwrap()
     };
     static ref VERSION_REGEX: Regex = {
         Regex::new("^([^0-9]*)(.+)").unwrap()
@@ -181,12 +186,34 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 owner: None,
             })
         }
+        Repo::Gitea(gitea_repo) => {
+            // For interactive metadata extraction we don't perform the
+            // network call here; full metadata is filled later via
+            // `read_meta_from_url`. We surface only what we need to
+            // pre-populate the prompts.
+            eprintln!(
+                "Detected Gitea URL ({}/{}/{}), full metadata will be fetched later.",
+                gitea_repo.domain, gitea_repo.owner, gitea_repo.repo
+            );
+            let homepage = format!(
+                "https://{}/{}/{}",
+                gitea_repo.domain, gitea_repo.owner, gitea_repo.repo
+            );
+            Ok(UrlMetadata {
+                pname: gitea_repo.repo.clone(),
+                license: "CHANGE".to_string(),
+                description: "CHANGE".to_string(),
+                homepage,
+                fetcher: Fetcher::gitea,
+                owner: Some(gitea_repo.owner.clone()),
+            })
+        }
     }
 }
 
 /// Prompt for URL (GitHub or PyPI) and return URL with extracted metadata
 pub fn prompt_url() -> Result<Option<(String, UrlMetadata)>> {
-    let should_provide = Confirm::new("Do you want to fetch metadata from a URL (GitHub/PyPI)?")
+    let should_provide = Confirm::new("Do you want to fetch metadata from a URL (GitHub/PyPI/Gitea)?")
         .with_default(false)
         .prompt()?;
 
@@ -194,8 +221,10 @@ pub fn prompt_url() -> Result<Option<(String, UrlMetadata)>> {
         return Ok(None);
     }
 
-    let url = Text::new("Enter GitHub or PyPI URL:")
-        .with_help_message("Examples: github.com/owner/repo or pypi.org/project/package")
+    let url = Text::new("Enter GitHub, PyPI, or Gitea URL:")
+        .with_help_message(
+            "Examples: github.com/owner/repo, pypi.org/project/package, codeberg.org/owner/repo",
+        )
         .prompt()?;
 
     if url.is_empty() {
@@ -236,9 +265,19 @@ fn parse_url(url: &str) -> Result<Repo> {
         Ok(Repo::Pypi(PypiRepo {
             project: captures.get(1).unwrap().as_str().to_owned(),
         }))
+    } else if GITEA_HOSTS.iter().any(|h| normalized_url.starts_with(h)) {
+        let captures = GITEA_URL_REGEX
+            .captures(normalized_url)
+            .ok_or_else(|| anyhow!("Invalid Gitea URL"))?;
+        Ok(Repo::Gitea(GiteaRepo {
+            domain: captures.name("domain").unwrap().as_str().to_owned(),
+            owner: captures.name("owner").unwrap().as_str().to_owned(),
+            repo: captures.name("repo").unwrap().as_str().to_owned(),
+        }))
     } else {
         Err(anyhow!(
-            "Invalid URL. Only github.com and pypi.org URLs are supported."
+            "Invalid URL. Only github.com, pypi.org, and known Gitea hosts ({}) are supported.",
+            GITEA_HOSTS.join(", "),
         ))
     }
 }
@@ -314,6 +353,10 @@ pub fn prompt_version(url: Option<&str>, default: &str) -> Result<String> {
                     if let Ok(versions) = fetch_pypi_versions(&pypi_repo) {
                         fetched_versions = versions;
                     }
+                }
+                Repo::Gitea(_) => {
+                    // Version fetching for Gitea is handled later by
+                    // `read_meta_from_url`; skip prompt-time enumeration.
                 }
             }
         }

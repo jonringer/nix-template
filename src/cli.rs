@@ -197,6 +197,7 @@ pub fn validate_and_serialize_matches(
         propagated_build_inputs: Vec::new(),
         cargo_hash: FAKE_SRI_HASH.to_owned(),
         vendor_hash: FAKE_SRI_HASH.to_owned(),
+        domain: "CHANGE".to_owned(),
     };
 
     if let Some(url) = matches.value_of("from-url") {
@@ -255,6 +256,7 @@ pub fn build_expression_info_from_interactive(
         propagated_build_inputs: Vec::new(),
         cargo_hash: FAKE_SRI_HASH.to_owned(),
         vendor_hash: FAKE_SRI_HASH.to_owned(),
+        domain: "CHANGE".to_owned(),
     };
 
     // If URL was provided, fetch metadata

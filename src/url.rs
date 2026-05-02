@@ -1,5 +1,5 @@
 use crate::types;
-use crate::types::Repo::{Github, Pypi};
+use crate::types::Repo::{Gitea, Github, Pypi};
 use crate::types::{Template, FAKE_SRI_HASH};
 
 use anyhow::anyhow;
@@ -21,6 +21,16 @@ lazy_static! {
     static ref PYPI_URL_REGEX: Regex = {
         // e.g. pypi.org/project/requests
         Regex::new("pypi.org/project/([^/]*)/?").unwrap()
+    };
+
+    /// Hosts that we recognise as Gitea instances. Their REST APIs are
+    /// compatible with each other (and largely with GitHub's), so we use a
+    /// shared code path for fetching metadata.
+    static ref GITEA_HOSTS: Vec<&'static str> = vec!["codeberg.org", "gitea.com"];
+
+    static ref GITEA_URL_REGEX: Regex = {
+        // e.g. codeberg.org/user/repo
+        Regex::new(r"(?P<domain>[^/]+)/(?P<owner>[^/]+)/(?P<repo>[^/]+)/?").unwrap()
     };
 
     static ref VERSION_REGEX: Regex = {
@@ -109,10 +119,21 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> 
         return Ok(Pypi(types::PypiRepo {
             project: captures.get(1).unwrap().as_str().to_owned(),
         }));
+    } else if GITEA_HOSTS.iter().any(|host| url.starts_with(host)) {
+        let captures = GITEA_URL_REGEX.captures(url).ok_or_else(|| {
+            anyhow!("Error: please provide a gitea url of shape '<domain>/<owner>/<repo>'")
+        })?;
+
+        return Ok(Gitea(types::GiteaRepo {
+            domain: captures.name("domain").unwrap().as_str().to_owned(),
+            owner: captures.name("owner").unwrap().as_str().to_owned(),
+            repo: captures.name("repo").unwrap().as_str().to_owned(),
+        }));
     } else {
         Err(anyhow!(
-            "{} is not a supported url. Only github.com and pypi.org are supported currently",
-            original_url
+            "{} is not a supported url. Only github.com, pypi.org, and known gitea instances ({}) are supported currently",
+            original_url,
+            GITEA_HOSTS.join(", "),
         ))
     }
 }
@@ -260,6 +281,123 @@ pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionIn
     }
 }
 
+/// Populate `info` with metadata from a Gitea repository.
+///
+/// Gitea's REST API closely mirrors GitHub's: `/api/v1/repos/<owner>/<repo>`
+/// returns repo metadata, and `/api/v1/repos/<owner>/<repo>/releases`
+/// returns releases. We deserialize into the same response structs we use
+/// for GitHub to keep the code path narrow.
+///
+/// Releases are not always present on a Gitea instance, so the function
+/// gracefully degrades to leaving the version/hash placeholders alone if
+/// the API call fails or returns no releases.
+pub fn fill_gitea_info(repo: &types::GiteaRepo, info: &mut types::ExpressionInfo) {
+    if info.pname == "CHANGE" {
+        info.pname = repo.repo.to_string();
+    }
+    info.fetcher = types::Fetcher::gitea;
+    info.domain = repo.domain.clone();
+    if info.owner == "CHANGE" {
+        info.owner = repo.owner.clone();
+    }
+
+    let request_client = Client::new();
+
+    eprintln!("Determining latest release for {}/{}", &repo.owner, &repo.repo);
+    let releases_url = format!(
+        "https://{}/api/v1/repos/{}/{}/releases",
+        repo.domain, repo.owner, repo.repo
+    );
+    let releases_request = request_client
+        .get(&releases_url)
+        .header("User-Agent", "reqwest")
+        .header("Accept", "application/json");
+
+    match get_json(releases_request) {
+        Ok(body) => {
+            let parsed: Result<types::GhReleaseResponse, _> = serde_json::from_str(&body);
+            match parsed {
+                Ok(mut releases) if !releases.is_empty() => {
+                    releases.sort_by(|a, b| {
+                        VersionCompare::compare(&b.tag_name, &a.tag_name)
+                            .unwrap()
+                            .ord()
+                            .unwrap()
+                    });
+                    releases = releases.into_iter().filter(|a| !a.prerelease).collect();
+                    if let Some(latest) = releases.first() {
+                        let parsed_version =
+                            VERSION_REGEX.captures(&latest.tag_name).unwrap();
+                        info.version = parsed_version.get(2).unwrap().as_str().to_owned();
+                        info.tag_prefix =
+                            parsed_version.get(1).unwrap().as_str().to_owned();
+
+                        eprintln!("Determining sha256 for {}", &repo.repo);
+                        // Gitea archive URL: <domain>/<owner>/<repo>/archive/<tag>.tar.gz
+                        let archive_url = format!(
+                            "https://{}/{}/{}/archive/{}{}.tar.gz",
+                            &repo.domain,
+                            &repo.owner,
+                            &repo.repo,
+                            &info.tag_prefix,
+                            &info.version,
+                        );
+                        let sha256_cmd = Command::new("nix-prefetch-url")
+                            .args(&["--unpack", "--type", "sha256"])
+                            .arg(&archive_url)
+                            .output();
+                        if let Ok(out) = sha256_cmd {
+                            let raw = std::str::from_utf8(&out.stdout)
+                                .unwrap_or("")
+                                .trim()
+                                .to_owned();
+                            if !raw.is_empty() {
+                                info.src_sha = to_sri(&raw);
+                            }
+                        }
+                    }
+                }
+                Ok(_) => eprintln!(
+                    "No releases found for {}/{}/{}",
+                    &repo.domain, &repo.owner, &repo.repo
+                ),
+                Err(e) => error!(
+                    target: LOG_TARGET,
+                    "Unable to parse Gitea releases response: {:?}", e
+                ),
+            }
+        }
+        Err(e) => eprintln!("Failed to fetch Gitea releases: {}", e),
+    }
+
+    // Repo metadata: description and homepage.
+    let repo_url = format!(
+        "https://{}/api/v1/repos/{}/{}",
+        repo.domain, repo.owner, repo.repo
+    );
+    let repo_request = request_client
+        .get(&repo_url)
+        .header("User-Agent", "reqwest")
+        .header("Accept", "application/json");
+
+    if let Ok(body) = get_json(repo_request) {
+        // Gitea's repo response has a `description` field; reuse the
+        // GhRepoResponse deserializer where compatible.
+        if let Ok(parsed) = serde_json::from_str::<types::GhRepoResponse>(&body) {
+            if info.description == "CHANGE" {
+                info.description = parsed
+                    .description
+                    .unwrap_or_else(|| "CHANGE".to_owned());
+            }
+        }
+    }
+
+    info.homepage = format!(
+        "https://{}/{}/{}",
+        repo.domain, repo.owner, repo.repo
+    );
+}
+
 pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionInfo) {
 
     eprintln!("Determining latest release for {}", &pypi_repo.project);
@@ -385,6 +523,7 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         propagated_build_inputs: info.propagated_build_inputs.clone(),
         cargo_hash: FAKE_SRI_HASH.to_owned(),
         vendor_hash: FAKE_SRI_HASH.to_owned(),
+        domain: info.domain.clone(),
     };
 
     let probe_expr = crate::expression::generate_expression(&probe_info);
@@ -487,6 +626,9 @@ pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo) {
         Ok(Pypi(pypi_repo)) => {
             fill_pypi_info(&pypi_repo, info);
         }
+        Ok(Gitea(gitea_repo)) => {
+            fill_gitea_info(&gitea_repo, info);
+        }
         Err(e) => {
             eprintln!("{}", e);
             exit(1);
@@ -498,8 +640,8 @@ pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo) {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    use crate::types::Repo::Github;
-    use crate::types::GithubRepo;
+    use crate::types::Repo::{Github, Gitea};
+    use crate::types::{GiteaRepo, GithubRepo};
 
     #[test]
     fn test_url_parse() {
@@ -512,6 +654,36 @@ mod tests {
         assert_eq!(repo, Github(GithubRepo {
             owner: "jonringer".to_string(),
             repo: "nix-template".to_string()
+        }));
+    }
+
+    #[test]
+    fn test_codeberg_url_parse() {
+        let repo = validate_and_parse_url(
+            "codeberg.org/forgejo/forgejo",
+            "codeberg.org/forgejo/forgejo",
+        )
+        .unwrap();
+
+        assert_eq!(repo, Gitea(GiteaRepo {
+            domain: "codeberg.org".to_string(),
+            owner: "forgejo".to_string(),
+            repo: "forgejo".to_string(),
+        }));
+    }
+
+    #[test]
+    fn test_gitea_com_url_parse() {
+        let repo = validate_and_parse_url(
+            "gitea.com/user/project",
+            "gitea.com/user/project",
+        )
+        .unwrap();
+
+        assert_eq!(repo, Gitea(GiteaRepo {
+            domain: "gitea.com".to_string(),
+            owner: "user".to_string(),
+            repo: "project".to_string(),
         }));
     }
 
