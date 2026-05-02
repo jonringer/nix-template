@@ -665,6 +665,17 @@ pub fn run_interactive_mode(
         false
     };
 
+    // Offer dependency inference for Rust templates: parse Cargo.toml from the
+    // unpacked source and pre-fill buildInputs/nativeBuildInputs for known
+    // *-sys / system-binding crates.
+    let infer_deps = if template == Template::rust && url_with_metadata.is_some() {
+        Confirm::new("Infer system dependencies from Cargo.toml? (parses *-sys crates)")
+            .with_default(true)
+            .prompt()?
+    } else {
+        false
+    };
+
     // For the python template, ask whether this is an end-user application
     // (uses `buildPythonApplication`) rather than a library
     // (uses `buildPythonPackage`). Default is auto-detected from PyPI
@@ -699,6 +710,7 @@ pub fn run_interactive_mode(
         include_meta,
         prefetch_hashes,
         python_application,
+        infer_deps,
     })
 }
 
@@ -723,4 +735,7 @@ pub struct InteractiveData {
     /// When the python template is selected, switches the builder from
     /// `buildPythonPackage` to `buildPythonApplication`.
     pub python_application: bool,
+    /// When the rust template is selected, infer system dependencies by
+    /// inspecting the project's Cargo.toml.
+    pub infer_deps: bool,
 }
