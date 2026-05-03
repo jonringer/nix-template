@@ -190,7 +190,9 @@ fn main() {
                 }
 
                 // print helpful message about line to be included in pkgs/top-level
-                if m.is_present("nixpkgs") {
+                // RFC140 (--by-name) packages are auto-discovered, so we skip
+                // this hint when --by-name is set.
+                if m.is_present("nixpkgs") && !m.is_present("by-name") {
                     println!("Please add the following line to the appropriate file:");
                     println!();
                     match &info.template {
@@ -206,6 +208,14 @@ fn main() {
                             &info.top_level_path.display()
                         ),
                     }
+                    println!();
+                } else if m.is_present("by-name") {
+                    println!();
+                    println!(
+                        "RFC140 layout: '{}' will be auto-discovered from pkgs/by-name; \
+no addition to all-packages.nix is required.",
+                        &info.pname
+                    );
                     println!();
                 }
             }
