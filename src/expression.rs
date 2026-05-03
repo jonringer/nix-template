@@ -3,6 +3,11 @@ use crate::types::{ExpressionInfo, Fetcher, Template};
 fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
     let (input, derivation, documentation_key): (&str, &str, Option<&str>) = match info.template {
         Template::stdenv => ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation")),
+        Template::stdenvNoCC => (
+            "stdenvNoCC",
+            "stdenvNoCC.mkDerivation",
+            Some("stdenvNoCCMkDerivation"),
+        ),
         // For Python, switch between the library and application builders
         // depending on `info.python_application`.
         Template::python if info.python_application => {
@@ -306,6 +311,59 @@ mod tests {
         assert!(
             !out.contains("nativeBuildInputs"),
             "should not render nativeBuildInputs when none inferred:\n{}",
+            out
+        );
+    }
+
+    fn stdenv_no_cc_info() -> ExpressionInfo {
+        ExpressionInfo {
+            pname: "myfont".to_owned(),
+            version: "1.0.0".to_owned(),
+            license: "ofl".to_owned(),
+            maintainer: "me".to_owned(),
+            fetcher: Fetcher::github,
+            template: Template::stdenvNoCC,
+            path_to_write: std::path::PathBuf::new(),
+            top_level_path: std::path::PathBuf::new(),
+            include_documentation_links: false,
+            include_meta: true,
+            tag_prefix: "".to_owned(),
+            owner: "myfont".to_owned(),
+            src_sha: "sha256-demo".to_owned(),
+            description: "demo font".to_owned(),
+            homepage: "https://example.com".to_owned(),
+            propagated_build_inputs: Vec::new(),
+            cargo_hash: "".to_owned(),
+            vendor_hash: "".to_owned(),
+            domain: "".to_owned(),
+            python_application: false,
+            build_inputs: Vec::new(),
+            native_build_inputs: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn stdenv_no_cc_renders_stdenv_no_cc_mk_derivation() {
+        // The whole point of the stdenvNoCC template is that it should
+        // emit `stdenvNoCC.mkDerivation` (not `stdenv.mkDerivation`) and
+        // surface `stdenvNoCC` in the function header.
+        let info = stdenv_no_cc_info();
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        assert!(
+            out.contains("stdenvNoCC.mkDerivation"),
+            "expected stdenvNoCC.mkDerivation in:\n{}",
+            out
+        );
+        assert!(
+            !out.contains("stdenv.mkDerivation"),
+            "should not emit plain stdenv.mkDerivation:\n{}",
+            out
+        );
+        // The function header should list stdenvNoCC, not stdenv.
+        assert!(
+            out.contains(", stdenvNoCC"),
+            "header missing stdenvNoCC:\n{}",
             out
         );
     }

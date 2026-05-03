@@ -24,6 +24,12 @@ lazy_static! {
             "stdenvMkDerivation",
             "https://ekala-project.github.io/nix-book/ch06-02-stdenv.html\n  ",
         );
+        // stdenvNoCC shares the same chapter as stdenv; the documentation
+        // discusses both variants together.
+        m.insert(
+            "stdenvNoCCMkDerivation",
+            "https://ekala-project.github.io/nix-book/ch06-02-stdenv.html\n  ",
+        );
         // Fallback to nixpkgs manual (not yet in nix-book)
         m.insert(
             "fetcher",
@@ -64,11 +70,16 @@ lazy_static! {
     };
 }
 
+// `stdenvNoCC` is the C-compiler-less variant of `stdenv`. It follows the
+// same workflow as `stdenv` (same default install path, same fetcher
+// surface) but renders `stdenvNoCC.mkDerivation` for packages that don't
+// compile code — fonts, pure data, shell-script wrappers, etc.
 arg_enum! {
     #[allow(non_camel_case_types)]
     #[derive(Debug, PartialEq, Clone)]
     pub enum Template {
         stdenv,
+        stdenvNoCC,
         python,
         module,
         mkshell,
