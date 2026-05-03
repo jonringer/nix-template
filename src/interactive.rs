@@ -3,7 +3,8 @@ use crate::url::{fetch_github_release_info, fetch_github_repo_info, fetch_pypi_p
 use anyhow::{anyhow, Result};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-use inquire::{Confirm, Select, Text};
+use inquire::autocompletion::Replacement;
+use inquire::{Autocomplete, Confirm, CustomUserError, Select, Text};
 use regex::Regex;
 use std::collections::HashMap;
 use version_compare::VersionCompare;
@@ -34,6 +35,69 @@ fn fuzzy_scorer_string(input: &str, _opt: &String, value: &str, _idx: usize) -> 
 /// Scorer for `Select<&str>` (e.g. the static COMMON_LICENSES list).
 fn fuzzy_scorer_str(input: &str, _opt: &&str, value: &str, _idx: usize) -> Option<i64> {
     fuzzy_score(input, value)
+}
+
+/// `inquire::Autocomplete` implementation that powers Tab-completion on
+/// free-text prompts using the same SkimV2 fuzzy matcher as the
+/// `Select` scorers above.
+///
+/// As the user types, `get_suggestions` returns the suggestion list
+/// re-ranked by fuzzy score (best match first). When the user presses
+/// Tab, `get_completion` replaces their input with the highlighted
+/// suggestion, or the top fuzzy match if no row is highlighted.
+#[derive(Clone, Debug)]
+struct FuzzyAutocomplete {
+    suggestions: Vec<String>,
+}
+
+impl FuzzyAutocomplete {
+    fn new<I, S>(items: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self {
+            suggestions: items.into_iter().map(Into::into).collect(),
+        }
+    }
+
+    /// Return suggestions ranked by fuzzy match against `input`.
+    /// Empty input returns the full list in original order so the user
+    /// can browse before typing.
+    fn ranked(&self, input: &str) -> Vec<String> {
+        if input.trim().is_empty() {
+            return self.suggestions.clone();
+        }
+        let matcher = SkimMatcherV2::default();
+        let mut scored: Vec<(i64, &String)> = self
+            .suggestions
+            .iter()
+            .filter_map(|s| matcher.fuzzy_match(s, input).map(|score| (score, s)))
+            .collect();
+        // Higher score = better match; sort descending.
+        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.into_iter().map(|(_, s)| s.clone()).collect()
+    }
+}
+
+impl Autocomplete for FuzzyAutocomplete {
+    fn get_suggestions(&mut self, input: &str) -> Result<Vec<String>, CustomUserError> {
+        Ok(self.ranked(input))
+    }
+
+    fn get_completion(
+        &mut self,
+        input: &str,
+        highlighted_suggestion: Option<String>,
+    ) -> Result<Replacement, CustomUserError> {
+        // Prefer whatever the user has highlighted in the dropdown.
+        if let Some(s) = highlighted_suggestion {
+            return Ok(Replacement::Some(s));
+        }
+        // Otherwise fall back to the top fuzzy match for what they
+        // typed. This makes Tab behave like fzf's "accept best".
+        Ok(self.ranked(input).into_iter().next().map_or(Replacement::None, Replacement::Some))
+    }
 }
 
 lazy_static! {
@@ -217,6 +281,74 @@ mod fuzzy_tests {
     }
 }
 
+#[cfg(test)]
+mod autocomplete_tests {
+    use super::FuzzyAutocomplete;
+    use inquire::autocompletion::Replacement;
+    use inquire::Autocomplete;
+
+    fn licenses() -> FuzzyAutocomplete {
+        FuzzyAutocomplete::new(vec![
+            "mit", "asl20", "gpl3", "gpl2", "lgpl21", "bsd3", "bsd2",
+            "agpl3", "mpl20", "cc0", "unlicense",
+        ])
+    }
+
+    #[test]
+    fn empty_input_returns_full_list_in_order() {
+        let mut ac = licenses();
+        let suggestions = ac.get_suggestions("").unwrap();
+        assert_eq!(suggestions.len(), 11);
+        assert_eq!(suggestions[0], "mit");
+        assert_eq!(suggestions[10], "unlicense");
+    }
+
+    #[test]
+    fn input_filters_and_ranks() {
+        let mut ac = licenses();
+        let suggestions = ac.get_suggestions("gpl").unwrap();
+        // Every gpl-flavoured license should appear; non-gpl entries
+        // should be filtered out.
+        assert!(suggestions.iter().any(|s| s == "gpl3"));
+        assert!(suggestions.iter().any(|s| s == "gpl2"));
+        assert!(suggestions.iter().any(|s| s == "lgpl21"));
+        assert!(suggestions.iter().any(|s| s == "agpl3"));
+        assert!(!suggestions.iter().any(|s| s == "mit"));
+    }
+
+    #[test]
+    fn fuzzy_skipping_chars_matches() {
+        let mut ac = licenses();
+        // "ulcse" should fuzzy-match "unlicense"
+        let suggestions = ac.get_suggestions("ulcse").unwrap();
+        assert!(suggestions.iter().any(|s| s == "unlicense"));
+    }
+
+    #[test]
+    fn tab_with_highlight_returns_highlighted() {
+        let mut ac = licenses();
+        let r = ac
+            .get_completion("g", Some("gpl3".to_string()))
+            .unwrap();
+        assert_eq!(r, Replacement::Some("gpl3".to_string()));
+    }
+
+    #[test]
+    fn tab_without_highlight_returns_top_match() {
+        let mut ac = licenses();
+        // No row highlighted; Tab should accept the best fuzzy match.
+        let r = ac.get_completion("unlcs", None).unwrap();
+        assert_eq!(r, Replacement::Some("unlicense".to_string()));
+    }
+
+    #[test]
+    fn tab_with_no_match_returns_none() {
+        let mut ac = licenses();
+        let r = ac.get_completion("zzzzz", None).unwrap();
+        assert_eq!(r, Replacement::None);
+    }
+}
+
 /// Prompt for template type
 pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
     let options = vec![
@@ -359,8 +491,15 @@ pub fn prompt_url() -> Result<Option<(String, UrlMetadata)>> {
 
     let url = Text::new("Enter GitHub, PyPI, or Gitea URL:")
         .with_help_message(
-            "Examples: github.com/owner/repo, pypi.org/project/package, codeberg.org/owner/repo",
+            "Tab to complete a host prefix. Examples: github.com/owner/repo, pypi.org/project/package, codeberg.org/owner/repo",
         )
+        .with_autocomplete(FuzzyAutocomplete::new(vec![
+            "https://github.com/",
+            "https://pypi.org/project/",
+            "https://codeberg.org/",
+            "https://gitea.com/",
+            "https://gitlab.com/",
+        ]))
         .prompt()?;
 
     if url.is_empty() {
@@ -567,8 +706,13 @@ pub fn prompt_license(default: &str) -> Result<String> {
             .prompt()?;
 
         if selection == "Custom (enter manually)" {
+            // Even on the "manual entry" path, let users tab-complete
+            // against the common-license list — most "manual" entries
+            // are still in this set, just not the top item.
             let custom = Text::new("Enter license:")
                 .with_default(default)
+                .with_autocomplete(FuzzyAutocomplete::new(COMMON_LICENSES.iter().copied()))
+                .with_help_message("Tab to fuzzy-complete from common nixpkgs licenses")
                 .prompt()?;
             Ok(custom)
         } else {
@@ -577,6 +721,8 @@ pub fn prompt_license(default: &str) -> Result<String> {
     } else {
         let license = Text::new("License:")
             .with_default(default)
+            .with_autocomplete(FuzzyAutocomplete::new(COMMON_LICENSES.iter().copied()))
+            .with_help_message("Tab to fuzzy-complete from common nixpkgs licenses")
             .prompt()?;
         Ok(license)
     }
