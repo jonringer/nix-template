@@ -102,7 +102,7 @@ fn main() {
                 && m.occurrences_of("from-url") == 0
                 && m.value_of("pname") == Some("CHANGE");
 
-            let info = if should_use_interactive {
+            let mut info = if should_use_interactive {
                 // Enter interactive mode
                 match interactive::run_interactive_mode(None, user_config.as_ref()) {
                     Ok(interactive_data) => {
@@ -120,6 +120,33 @@ fn main() {
                 // Use traditional CLI mode
                 cli::validate_and_serialize_matches(&m, user_config.as_ref())
             };
+
+            // Handle --init-npins flag: if the package would be written
+            // as `default.nix`, the wrapper we want to generate would
+            // collide with it. Rename the package output to `package.nix`
+            // (mirrors the RFC140 by-name convention) so the wrapper can
+            // own `default.nix`.
+            let init_npins = m.is_present("init-npins");
+            if init_npins {
+                let needs_rename = info
+                    .path_to_write
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| n == "default.nix")
+                    .unwrap_or(false);
+                if needs_rename {
+                    let new_path = if let Some(parent) = info.path_to_write.parent() {
+                        parent.join("package.nix")
+                    } else {
+                        std::path::PathBuf::from("package.nix")
+                    };
+                    println!(
+                        "--init-npins: writing package as 'package.nix' to leave 'default.nix' \
+for the npins wrapper."
+                    );
+                    info.path_to_write = new_path;
+                }
+            }
 
             let expr = expression::generate_expression(&info);
             let output = info.format(&expr);
@@ -145,11 +172,73 @@ fn main() {
                 None
             };
 
+            // Handle --init-npins flag. The wrapper default.nix and the
+            // npins/ directory both live alongside the package file.
+            let npins_payload = if init_npins {
+                let parent = info
+                    .path_to_write
+                    .parent()
+                    .map(|p| p.to_path_buf())
+                    .unwrap_or_else(|| std::path::PathBuf::from(""));
+
+                let npins_dir = parent.join("npins");
+                let npins_default_path = npins_dir.join("default.nix");
+                let npins_sources_path = npins_dir.join("sources.json");
+                let wrapper_path = parent.join("default.nix");
+
+                // Wrapper imports the package by its on-disk basename
+                // (which may have been renamed to `package.nix` above).
+                let package_basename = info
+                    .path_to_write
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("package.nix")
+                    .to_string();
+
+                let wrapper_content =
+                    expression::generate_npins_wrapper_default_nix(&info.template, &package_basename);
+
+                Some((
+                    npins_dir,
+                    npins_default_path,
+                    expression::generate_npins_default_nix().to_string(),
+                    npins_sources_path,
+                    expression::generate_npins_sources_json().to_string(),
+                    wrapper_path,
+                    wrapper_content,
+                ))
+            } else {
+                None
+            };
+
             if m.is_present("stdout") {
                 println!("{}", output);
-                if let Some(flake) = flake_content {
+                if let Some(flake) = &flake_content {
                     println!("\n# ===== flake.nix =====\n");
                     println!("{}", flake);
+                }
+                if let Some((
+                    _npins_dir,
+                    npins_default_path,
+                    npins_default_content,
+                    npins_sources_path,
+                    npins_sources_content,
+                    wrapper_path,
+                    wrapper_content,
+                )) = &npins_payload
+                {
+                    println!(
+                        "\n# ===== {} =====\n",
+                        npins_default_path.display()
+                    );
+                    println!("{}", npins_default_content);
+                    println!(
+                        "\n# ===== {} =====\n",
+                        npins_sources_path.display()
+                    );
+                    println!("{}", npins_sources_content);
+                    println!("\n# ===== {} =====\n", wrapper_path.display());
+                    println!("{}", wrapper_content);
                 }
             } else {
                 let path = &info.path_to_write;
@@ -187,6 +276,90 @@ fn main() {
                         "Generated flake.nix at {}",
                         &flake_path.canonicalize().unwrap().display()
                     );
+                }
+
+                // Write npins scaffold if --init-npins was provided
+                if let Some((
+                    npins_dir,
+                    npins_default_path,
+                    npins_default_content,
+                    npins_sources_path,
+                    npins_sources_content,
+                    wrapper_path,
+                    wrapper_content,
+                )) = npins_payload
+                {
+                    // Refuse to clobber any of the three target files.
+                    for p in [&npins_default_path, &npins_sources_path, &wrapper_path].iter() {
+                        if p.exists() {
+                            eprintln!(
+                                "Refusing to overwrite existing file: {}",
+                                p.display()
+                            );
+                            std::process::exit(1);
+                        }
+                    }
+
+                    // Ensure npins/ directory exists
+                    if npins_dir.to_str() != Some("") && !npins_dir.exists() {
+                        println!("Creating directory: {}", npins_dir.display());
+                        std::fs::create_dir_all(&npins_dir).unwrap_or_else(|_| {
+                            panic!("Was unable to create directory {}", npins_dir.display())
+                        });
+                    }
+
+                    std::fs::write(&npins_default_path, npins_default_content)
+                        .unwrap_or_else(|_| {
+                            panic!(
+                                "Was unable to write to file: {}",
+                                &npins_default_path.display()
+                            )
+                        });
+                    println!(
+                        "Generated npins lockfile reader at {}",
+                        &npins_default_path.canonicalize().unwrap().display()
+                    );
+
+                    std::fs::write(&npins_sources_path, npins_sources_content)
+                        .unwrap_or_else(|_| {
+                            panic!(
+                                "Was unable to write to file: {}",
+                                &npins_sources_path.display()
+                            )
+                        });
+                    println!(
+                        "Generated empty npins/sources.json at {}",
+                        &npins_sources_path.canonicalize().unwrap().display()
+                    );
+
+                    std::fs::write(&wrapper_path, wrapper_content)
+                        .unwrap_or_else(|_| {
+                            panic!(
+                                "Was unable to write to file: {}",
+                                &wrapper_path.display()
+                            )
+                        });
+                    println!(
+                        "Generated npins wrapper default.nix at {}",
+                        &wrapper_path.canonicalize().unwrap().display()
+                    );
+
+                    println!();
+                    println!("Next steps:");
+                    let project_dir = npins_dir
+                        .parent()
+                        .map(|p| {
+                            let s = p.display().to_string();
+                            if s.is_empty() { ".".to_string() } else { s }
+                        })
+                        .unwrap_or_else(|| ".".into());
+                    println!(
+                        "  1. cd into {} (if not already there)",
+                        project_dir
+                    );
+                    println!("  2. Pin nixpkgs:  npins add channel nixpkgs-unstable");
+                    println!("  3. Build:        nix-build");
+                    println!();
                 }
 
                 // print helpful message about line to be included in pkgs/top-level
