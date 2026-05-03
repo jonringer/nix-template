@@ -25,6 +25,7 @@ log = "^0.4"
 anyhow = "^1.0"
 version-compare = "^0.0.11"
 inquire = "0.7"
+fuzzy-matcher = "0.3"
 
 [dev-dependencies]
 serial_test = "0.4"

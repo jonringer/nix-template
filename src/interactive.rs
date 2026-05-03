@@ -1,10 +1,40 @@
 use crate::types::{Fetcher, GiteaRepo, GithubRepo, PypiRepo, Repo, Template, UserConfig};
 use crate::url::{fetch_github_release_info, fetch_github_repo_info, fetch_pypi_project_info};
 use anyhow::{anyhow, Result};
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
 use inquire::{Confirm, Select, Text};
 use regex::Regex;
 use std::collections::HashMap;
 use version_compare::VersionCompare;
+
+/// Fuzzy scorer used by every interactive `Select`.
+///
+/// `inquire` 0.7's default scorer is a case-insensitive substring match
+/// (`value.contains(input) ? Some(0) : None`), so typing e.g. `stnv`
+/// does not match `stdenv`. We swap in `fuzzy-matcher`'s SkimV2
+/// algorithm so users get the contiguous-skip matching they expect from
+/// fzf-style pickers, with a real ranking score so closer matches sort
+/// to the top.
+///
+/// `inquire`'s `Scorer<'a, T>` is `&'a dyn Fn(&str, &T, &str, usize) ->
+/// Option<i64>`. `None` excludes the option; higher scores rank first.
+fn fuzzy_score(input: &str, value: &str) -> Option<i64> {
+    if input.trim().is_empty() {
+        return Some(0);
+    }
+    SkimMatcherV2::default().fuzzy_match(value, input)
+}
+
+/// Scorer for `Select<String>` (most prompts).
+fn fuzzy_scorer_string(input: &str, _opt: &String, value: &str, _idx: usize) -> Option<i64> {
+    fuzzy_score(input, value)
+}
+
+/// Scorer for `Select<&str>` (e.g. the static COMMON_LICENSES list).
+fn fuzzy_scorer_str(input: &str, _opt: &&str, value: &str, _idx: usize) -> Option<i64> {
+    fuzzy_score(input, value)
+}
 
 lazy_static! {
     static ref GITHUB_URL_REGEX: Regex = {
@@ -146,6 +176,47 @@ mod heuristic_tests {
     }
 }
 
+#[cfg(test)]
+mod fuzzy_tests {
+    use super::fuzzy_score;
+
+    #[test]
+    fn empty_input_passes_everything() {
+        // No filter input — every option should survive with a neutral
+        // score so the original ordering is preserved.
+        assert_eq!(fuzzy_score("", "stdenv"), Some(0));
+        assert_eq!(fuzzy_score("   ", "anything"), Some(0));
+    }
+
+    #[test]
+    fn substring_input_matches() {
+        assert!(fuzzy_score("std", "stdenv").is_some());
+        assert!(fuzzy_score("gpl", "lgpl21").is_some());
+    }
+
+    #[test]
+    fn skipping_chars_still_matches() {
+        // The whole point of swapping inquire's default substring scorer
+        // for SkimV2: non-contiguous characters should still match.
+        assert!(fuzzy_score("stnv", "stdenv").is_some());
+        assert!(fuzzy_score("gthb", "github").is_some());
+        assert!(fuzzy_score("lgp", "lgpl21").is_some());
+    }
+
+    #[test]
+    fn unrelated_input_excluded() {
+        assert!(fuzzy_score("xyzzy", "stdenv").is_none());
+    }
+
+    #[test]
+    fn closer_matches_score_higher() {
+        // SkimV2 ranks contiguous prefix matches above scattered ones.
+        let exact = fuzzy_score("stdenv", "stdenv").unwrap();
+        let scattered = fuzzy_score("sde", "stdenv").unwrap();
+        assert!(exact > scattered, "exact={} scattered={}", exact, scattered);
+    }
+}
+
 /// Prompt for template type
 pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
     let options = vec![
@@ -176,6 +247,7 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
 
     let selection = Select::new("Select template type:", display_options)
         .with_starting_cursor(default_idx.unwrap_or(0))
+        .with_scorer(&fuzzy_scorer_string)
         .prompt()?;
 
     // Extract template name from the formatted string
@@ -435,6 +507,7 @@ pub fn prompt_version(url: Option<&str>, default: &str) -> Result<String> {
 
         let selection = Select::new("Select version:", options)
             .with_starting_cursor(0)
+            .with_scorer(&fuzzy_scorer_string)
             .prompt()?;
 
         if selection == "Enter custom version" {
@@ -490,6 +563,7 @@ pub fn prompt_license(default: &str) -> Result<String> {
 
         let selection = Select::new("License:", COMMON_LICENSES.to_vec())
             .with_starting_cursor(default_idx)
+            .with_scorer(&fuzzy_scorer_str)
             .prompt()?;
 
         if selection == "Custom (enter manually)" {
@@ -543,6 +617,7 @@ pub fn prompt_fetcher(default: Fetcher, _template: &Template) -> Result<Fetcher>
 
     let selection = Select::new("Select fetcher:", display_options)
         .with_starting_cursor(default_idx)
+        .with_scorer(&fuzzy_scorer_string)
         .prompt()?;
 
     let fetcher_name = selection.split_whitespace().next().unwrap();
