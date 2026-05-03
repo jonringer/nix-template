@@ -1,0 +1,8 @@
+---
+source: tests/integration_tests.rs
+expression: sources_content
+---
+{
+  "pins": {},
+  "version": 7
+}

@@ -96,6 +96,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "--init-flake 'Generate a flake.nix alongside the package expression'",
             ).takes_value(false))
         .arg(Arg::from_usage(
+            "--init-npins 'Generate an npins/ scaffold (npins/default.nix + empty npins/sources.json) and a wrapper default.nix alongside the package expression. Combinable with --init-flake. See https://github.com/andir/npins for the dependency manager itself.'",
+            ).takes_value(false))
+        .arg(Arg::from_usage(
             "--prefetch-hashes 'For rust/go templates, run nix-build with a fake hash to compute cargoHash/vendorHash. Requires nix to be installed and a known src hash (i.e. used together with --from-url).'",
             ).takes_value(false))
         .arg(Arg::from_usage(
