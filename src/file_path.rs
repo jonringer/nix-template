@@ -7,6 +7,14 @@ use std::process::exit;
 /// returns (file_path_to_write, file_path_in_top_level)
 /// file_path_to_write: filepath to write to disk
 /// file_path_in_top_level: filepath to mention in top-level/*.nix
+/// Compute the RFC140 shard for a package name: the lowercased first two
+/// characters of `pname`. Names shorter than two characters are returned
+/// as-is (lowercased), matching nixpkgs' fallback.
+pub fn by_name_shard(pname: &str) -> String {
+    let lower = pname.to_lowercase();
+    lower.chars().take(2).collect()
+}
+
 pub fn nix_file_paths(
     matches: &clap::ArgMatches,
     template: &Template,
@@ -14,6 +22,22 @@ pub fn nix_file_paths(
     pname: &str,
     nixpkgs_root: &str,
 ) -> (PathBuf, PathBuf) {
+    // RFC140 by-name layout: pkgs/by-name/<shard>/<pname>/package.nix
+    // Auto-discovered, so no top-level addition line is required (we
+    // return an empty top_level path; main.rs uses that to suppress the
+    // helper message).
+    if matches.is_present("by-name") {
+        let shard = by_name_shard(pname);
+        let mut file_path = PathBuf::from(&nixpkgs_root);
+        file_path.push("pkgs");
+        file_path.push("by-name");
+        file_path.push(&shard);
+        file_path.push(pname);
+        file_path.push("package.nix");
+        let _ = template; // silence unused warning when no template-specific behaviour applies
+        return (file_path, PathBuf::from(""));
+    }
+
     if matches.is_present("nixpkgs") {
 
         let mut radix: PathBuf;
@@ -209,6 +233,72 @@ mod tests {
         let expected = (
             PathBuf::from("pkgs/compilers/test/mypackage/default.nix"),
             PathBuf::from("../compilers/test/mypackage"),
+        );
+        assert_paths(m, expected);
+    }
+
+    #[test]
+    fn by_name_shard_basic() {
+        assert_eq!(by_name_shard("hello"), "he");
+        assert_eq!(by_name_shard("ZLib"), "zl");
+        assert_eq!(by_name_shard("a"), "a");
+        assert_eq!(by_name_shard("ABC"), "ab");
+    }
+
+    #[test]
+    #[serial]
+    fn test_by_name_default() {
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "stdenv",
+            "--by-name",
+            "-r",
+            "/tmp",
+            "-p",
+            "hello",
+        ]);
+        let expected = (
+            PathBuf::from("/tmp/pkgs/by-name/he/hello/package.nix"),
+            PathBuf::from(""),
+        );
+        assert_paths(m, expected);
+    }
+
+    #[test]
+    #[serial]
+    fn test_by_name_rust() {
+        // by-name should work with non-default templates too
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "rust",
+            "--by-name",
+            "-r",
+            "/tmp",
+            "-p",
+            "ripgrep",
+        ]);
+        let expected = (
+            PathBuf::from("/tmp/pkgs/by-name/ri/ripgrep/package.nix"),
+            PathBuf::from(""),
+        );
+        assert_paths(m, expected);
+    }
+
+    #[test]
+    #[serial]
+    fn test_by_name_uppercase_pname_lowercased_shard() {
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "stdenv",
+            "--by-name",
+            "-r",
+            "/tmp",
+            "-p",
+            "FooBar",
+        ]);
+        let expected = (
+            PathBuf::from("/tmp/pkgs/by-name/fo/FooBar/package.nix"),
+            PathBuf::from(""),
         );
         assert_paths(m, expected);
     }

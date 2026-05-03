@@ -142,6 +142,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
         .arg(Arg::from_usage(
             "-n,--nixpkgs 'Intended be used within nixpkgs, will append pname to file path, and print addition statement'",
         ).takes_value(false))
+        .arg(Arg::from_usage(
+            "--by-name 'RFC140 layout: write the expression to pkgs/by-name/<shard>/<pname>/package.nix (relative to --nixpkgs-root). The shard is the lowercased first two characters of pname. Implies --nixpkgs and skips printing an all-packages.nix addition line, since by-name packages are auto-discovered.'",
+        ).takes_value(false))
         .arg(
             Arg::from_usage("-f,--fetcher [fetcher] 'Fetcher to use'")
                 .possible_values(&Fetcher::variants())
@@ -217,8 +220,18 @@ pub fn validate_and_serialize_matches(
     let include_documentation_links: bool = matches.is_present("documentation-links");
     let include_meta: bool = !matches.is_present("no-meta");
 
-    assert(!(matches.is_present("nixpkgs") && matches.value_of("pname") == Some("CHANGE") && matches.value_of("from-url") == None),
-        "'-p,--pname' or '-u,--from-url' is required when using the -n,--nixpkgs flag");
+    let nixpkgs_layout = matches.is_present("nixpkgs") || matches.is_present("by-name");
+    assert(!(nixpkgs_layout && matches.value_of("pname") == Some("CHANGE") && matches.value_of("from-url") == None),
+        "'-p,--pname' or '-u,--from-url' is required when using the -n,--nixpkgs or --by-name flag");
+
+    if matches.is_present("by-name") {
+        match arg_to_type::<Template>(matches.value_of("TEMPLATE")) {
+            Template::module | Template::test | Template::mkshell => {
+                assert(false, "--by-name cannot be used with the 'module', 'test', or 'mkshell' templates");
+            }
+            _ => {}
+        }
+    }
 
     let maintainer: String;
     let nixpkgs_root: String;
