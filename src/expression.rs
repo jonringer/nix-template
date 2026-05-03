@@ -137,7 +137,18 @@ fn build_inputs(info: &ExpressionInfo) -> String {
                 build = build,
             )
         }
-        _ => "  buildInputs = [ ];".to_owned(),
+        // stdenv / stdenvNoCC / qt: render `nativeBuildInputs` only when
+        // populated (via --native-build-inputs); always render
+        // `buildInputs` to preserve the existing template's ergonomic
+        // placeholder when no inputs are supplied.
+        _ => {
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "  nativeBuildInputs = [@native_build_inputs@ ];\n\n".to_owned()
+            };
+            format!("{native}  buildInputs = [@build_inputs@ ];", native = native)
+        }
     }
 }
 
@@ -236,11 +247,21 @@ mkShell rec {
 
             let mut inputs = vec!(String::from("lib"), dh_input, f_input.to_string());
             inputs.extend(info.propagated_build_inputs.iter().map(|s| s.to_owned()));
-            // Inferred Rust system deps: surface each in the function
-            // header so `callPackage` can pass them in. nativeBuildInputs
-            // are listed first to mirror nixpkgs convention.
+            // Inferred / user-supplied system deps: surface each in the
+            // function header so `callPackage` can pass them in.
+            // nativeBuildInputs are listed first to mirror the nixpkgs
+            // convention.
             inputs.extend(info.native_build_inputs.iter().map(|s| s.to_owned()));
             inputs.extend(info.build_inputs.iter().map(|s| s.to_owned()));
+
+            // A single attribute may legitimately appear in BOTH
+            // buildInputs and nativeBuildInputs (e.g. `protobuf` is
+            // commonly both a build-time tool and a runtime library).
+            // The function header still has to list it exactly once,
+            // since duplicate function arguments are a Nix syntax error.
+            // Preserve the order of first appearance.
+            let mut seen = std::collections::HashSet::new();
+            inputs.retain(|s| seen.insert(s.clone()));
 
             let header = format!("{{ {input_list}\n}}:", input_list = inputs.join("\n, "));
 
@@ -340,6 +361,88 @@ mod tests {
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),
         }
+    }
+
+    #[test]
+    fn shared_attr_dedupes_in_function_header() {
+        // The Nix language disallows duplicate function arguments, so an
+        // attribute that legitimately appears in both buildInputs and
+        // nativeBuildInputs (a common case for `protobuf`) must show up
+        // exactly once in the function header — even though both list
+        // bodies still mention it.
+        let mut info = rust_info();
+        info.build_inputs = vec!["protobuf".to_owned(), "openssl".to_owned()];
+        info.native_build_inputs = vec!["protobuf".to_owned(), "pkg-config".to_owned()];
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+
+        let header_end = out.find("}:").expect("function header");
+        let header = &out[..header_end];
+        let occurrences = header.matches("protobuf").count();
+        assert_eq!(
+            occurrences, 1,
+            "protobuf must appear exactly once in the function header, got {} in:\n{}",
+            occurrences, header
+        );
+
+        // It should still appear in BOTH list bodies, however. The list
+        // bodies preserve the user's insertion order rather than being
+        // sorted, so match against the as-given sequences.
+        let body = &out[header_end..];
+        assert!(
+            body.contains("nativeBuildInputs = [\n    protobuf\n    pkg-config\n  ];"),
+            "missing dedup'd nativeBuildInputs body in:\n{}",
+            body
+        );
+        assert!(
+            body.contains("buildInputs = [\n    protobuf\n    openssl\n  ];"),
+            "missing buildInputs body in:\n{}",
+            body
+        );
+    }
+
+    #[test]
+    fn stdenv_with_user_supplied_inputs_renders_native_section() {
+        // For non-rust/go templates the user can populate the input lists
+        // via --build-inputs / --native-build-inputs. Both sections must
+        // render and both attrs must surface in the function header.
+        let mut info = rust_info();
+        info.template = Template::stdenv;
+        info.build_inputs = vec!["zlib".to_owned()];
+        info.native_build_inputs = vec!["pkg-config".to_owned()];
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        assert!(
+            out.contains("nativeBuildInputs = [\n    pkg-config\n  ];"),
+            "missing nativeBuildInputs in:\n{}",
+            out
+        );
+        assert!(
+            out.contains("buildInputs = [\n    zlib\n  ];"),
+            "missing buildInputs in:\n{}",
+            out
+        );
+        assert!(out.contains(", pkg-config"), "header missing pkg-config: {}", out);
+        assert!(out.contains(", zlib"), "header missing zlib: {}", out);
+    }
+
+    #[test]
+    fn stdenv_with_no_inputs_keeps_empty_buildinputs_placeholder() {
+        // Existing behaviour: stdenv expressions render
+        // `buildInputs = [ ];` as a placeholder when nothing's supplied.
+        // No nativeBuildInputs section unless inferred/asked for.
+        let mut info = rust_info();
+        info.template = Template::stdenv;
+        info.build_inputs = Vec::new();
+        info.native_build_inputs = Vec::new();
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        assert!(out.contains("buildInputs = [ ];"), "missing placeholder in:\n{}", out);
+        assert!(
+            !out.contains("nativeBuildInputs"),
+            "should not render nativeBuildInputs without input:\n{}",
+            out
+        );
     }
 
     #[test]

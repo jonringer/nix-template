@@ -104,6 +104,32 @@ $ nix-template config nixpkgs-root ~/nixpkgs
         .arg(Arg::from_usage(
             "--no-infer-deps 'Disable automatic inference of buildInputs/nativeBuildInputs. By default, when --from-url is provided, nix-template materialises the source: for the rust template it parses Cargo.toml/Cargo.lock to detect well-known *-sys crates; for the go template it scans *.go files for `// #cgo` directives to detect pkg-config tokens and -l libraries.'",
             ).takes_value(false))
+        .arg(
+            // User-supplied buildInputs. Accepts comma-separated values
+            // and may be repeated, e.g. `--build-inputs zlib,openssl
+            // --binputs sqlite`. Merged with anything inference produced
+            // and deduped before rendering.
+            Arg::with_name("build-inputs")
+                .long("build-inputs")
+                .visible_alias("binputs")
+                .takes_value(true)
+                .multiple(true)
+                .number_of_values(1)
+                .use_delimiter(true)
+                .require_delimiter(false)
+                .help("Comma-separated list of nixpkgs attributes to add to buildInputs (and the function header). May be repeated. Combined with any inferred entries; duplicates are removed."),
+        )
+        .arg(
+            Arg::with_name("native-build-inputs")
+                .long("native-build-inputs")
+                .visible_alias("nbinputs")
+                .takes_value(true)
+                .multiple(true)
+                .number_of_values(1)
+                .use_delimiter(true)
+                .require_delimiter(false)
+                .help("Comma-separated list of nixpkgs attributes to add to nativeBuildInputs (and the function header). May be repeated. Combined with any inferred entries; duplicates are removed."),
+        )
         .arg(Arg::from_usage(
             "-v [version] 'Set version of package'",
             ).default_value("0.0.1"))
@@ -149,6 +175,32 @@ $ nix-template config nixpkgs-root ~/nixpkgs
                     .arg(Arg::from_usage("<nixpkgs-root>"))
                 )
         )
+}
+
+/// Pull every value supplied for an argument that allows comma-separated
+/// and/or repeated values, trim whitespace around each token, and drop
+/// empties. Returns an empty vec when the flag wasn't provided.
+fn collect_input_args(matches: &ArgMatches, name: &str) -> Vec<String> {
+    matches
+        .values_of(name)
+        .map(|vs| {
+            vs.flat_map(|s| s.split(','))
+                .map(|s| s.trim().to_owned())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Merge `extra` into `existing` and remove duplicates while preserving
+/// the order of first appearance. Used to combine inferred and
+/// user-supplied input lists without producing repeats.
+fn merge_dedup(existing: &[String], extra: Vec<String>) -> Vec<String> {
+    let mut combined: Vec<String> = existing.to_vec();
+    combined.extend(extra);
+    let mut seen = std::collections::HashSet::new();
+    combined.retain(|s| seen.insert(s.clone()));
+    combined
 }
 
 pub fn validate_and_serialize_matches(
@@ -246,6 +298,15 @@ pub fn validate_and_serialize_matches(
             _ => {}
         }
     }
+
+    // Merge any user-supplied `--build-inputs` / `--native-build-inputs`
+    // (alias `--binputs` / `--nbinputs`) into the lists. Inferred entries
+    // come first to preserve their order; user entries are appended and
+    // duplicates are stripped.
+    let cli_bi = collect_input_args(matches, "build-inputs");
+    let cli_nbi = collect_input_args(matches, "native-build-inputs");
+    info.build_inputs = merge_dedup(&info.build_inputs, cli_bi);
+    info.native_build_inputs = merge_dedup(&info.native_build_inputs, cli_nbi);
 
     let (path_to_write, top_level_path) =
         nix_file_paths(&matches, &info.template, &path, &info.pname, &nixpkgs_root);
@@ -400,6 +461,66 @@ mod tests {
         assert_eq!(m.value_of("TEMPLATE"), Some("test"));
         assert_eq!(m.value_of("PATH"), Some("test.nix"));
         assert_eq!(m.value_of("maintainer"), Some("myself"));
+    }
+
+    #[test]
+    fn build_inputs_flag_collects_comma_and_repeated() {
+        // Mix repeated `--build-inputs` flags with comma-separated values
+        // and the short `--binputs` alias; we should get a flat list.
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "stdenv",
+            "-p",
+            "demo",
+            "--build-inputs",
+            "zlib,openssl",
+            "--binputs",
+            "sqlite",
+        ]);
+        let collected = collect_input_args(&m, "build-inputs");
+        assert_eq!(collected, vec!["zlib", "openssl", "sqlite"]);
+    }
+
+    #[test]
+    fn native_build_inputs_flag_alias_works() {
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "stdenv",
+            "-p",
+            "demo",
+            "--nbinputs",
+            "pkg-config,cmake",
+        ]);
+        let collected = collect_input_args(&m, "native-build-inputs");
+        assert_eq!(collected, vec!["pkg-config", "cmake"]);
+    }
+
+    #[test]
+    fn merge_dedup_preserves_first_occurrence() {
+        let existing = vec!["openssl".to_owned(), "zlib".to_owned()];
+        let extra = vec![
+            "openssl".to_owned(), // dup of existing
+            "sqlite".to_owned(),  // new
+            "sqlite".to_owned(),  // intra-extra dup
+        ];
+        let result = merge_dedup(&existing, extra);
+        assert_eq!(result, vec!["openssl", "zlib", "sqlite"]);
+    }
+
+    #[test]
+    fn collect_input_args_trims_and_filters() {
+        // Whitespace around tokens and an empty trailing token must be
+        // tolerated.
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "stdenv",
+            "-p",
+            "demo",
+            "--build-inputs",
+            " zlib , openssl,",
+        ]);
+        let collected = collect_input_args(&m, "build-inputs");
+        assert_eq!(collected, vec!["zlib", "openssl"]);
     }
 
     #[test]
