@@ -853,6 +853,7 @@ dependencies = [
  "assert_cmd",
  "clap",
  "env_logger",
+ "fuzzy-matcher",
  "inquire",
  "insta",
  "lazy_static",
