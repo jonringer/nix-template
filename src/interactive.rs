@@ -150,6 +150,7 @@ mod heuristic_tests {
 pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
     let options = vec![
         ("stdenv", "Standard environment derivation"),
+        ("stdenvNoCC", "Standard environment without a C compiler (fonts, data, scripts)"),
         ("python", "Python package with buildPythonPackage"),
         ("rust", "Rust package with rustPlatform.buildRustPackage"),
         ("go", "Go package with buildGoModule"),
@@ -182,6 +183,7 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
 
     Ok(match template_name {
         "stdenv" => Template::stdenv,
+        "stdenvNoCC" => Template::stdenvNoCC,
         "python" => Template::python,
         "rust" => Template::rust,
         "go" => Template::go,

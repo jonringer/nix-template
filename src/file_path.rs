@@ -212,4 +212,22 @@ mod tests {
         );
         assert_paths(m, expected);
     }
+
+    #[test]
+    #[serial]
+    fn test_stdenv_no_cc_no_path() {
+        // stdenvNoCC mirrors the stdenv default-path behaviour.
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "stdenvNoCC",
+            "-n",
+            "-p",
+            "myfont",
+        ]);
+        let expected = (
+            PathBuf::from("pkgs/applications/misc/myfont/default.nix"),
+            PathBuf::from("../applications/misc/myfont"),
+        );
+        assert_paths(m, expected);
+    }
 }
