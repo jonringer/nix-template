@@ -15,6 +15,77 @@ pub fn by_name_shard(pname: &str) -> String {
     lower.chars().take(2).collect()
 }
 
+/// Paths produced by the standardized `nix/` project layout used by
+/// `--init-flake` (when opted into), `--init-npins`, and `--init-project`.
+///
+/// Layout (relative to the project root, which is `base_dir`):
+/// ```text
+/// <base_dir>/
+/// ├── flake.nix              (only when --init-flake)
+/// ├── default.nix            (only when --init-npins or --init-project)
+/// ├── npins/                 (only when --init-npins)
+/// └── nix/
+///     ├── overlay.nix
+///     ├── pkgs/<pname>/package.nix
+///     └── modules/<pname>/default.nix   (only when template is `module`)
+/// ```
+///
+/// Top-level entries (`flake.nix`, `default.nix`, `npins/`) live at the
+/// project root so that non-flake consumers can `import ./.` or
+/// `import ./nix/overlay.nix` directly. Modules and packages share the
+/// same `nix/` tree so they can be referenced from any of the entry
+/// points (`flake.nix`, `default.nix`, `release.nix`).
+#[derive(Debug, Clone)]
+pub struct NixDirLayout {
+    /// Project root (where `flake.nix` / `default.nix` live). Kept for
+    /// callers that want to derive additional paths (e.g. release.nix).
+    #[allow(dead_code)]
+    pub base_dir: PathBuf,
+    /// `<base_dir>/nix/pkgs/<pname>/package.nix`.
+    pub package_path: PathBuf,
+    /// `<base_dir>/nix/overlay.nix`.
+    pub overlay_path: PathBuf,
+    /// `<base_dir>/nix/modules/<pname>/default.nix` when the template is
+    /// `module`, otherwise `None`. We don't auto-generate a module file
+    /// for non-module templates to avoid surprising the user.
+    pub module_path: Option<PathBuf>,
+    /// `<base_dir>/default.nix` (top-level wrapper for non-flake users).
+    pub top_default_nix: PathBuf,
+    /// `<base_dir>/flake.nix`.
+    pub top_flake_nix: PathBuf,
+    /// `<base_dir>/npins/` directory.
+    pub npins_dir: PathBuf,
+}
+
+impl NixDirLayout {
+    /// Compute the standard nix/ layout for a package rooted at
+    /// `base_dir`. Pass an empty path to root at the current working
+    /// directory.
+    pub fn new(base_dir: &Path, pname: &str, template: &Template) -> Self {
+        let nix_dir = base_dir.join("nix");
+        let package_path = nix_dir.join("pkgs").join(pname).join("package.nix");
+        let overlay_path = nix_dir.join("overlay.nix");
+        let module_path = if *template == Template::module {
+            Some(nix_dir.join("modules").join(pname).join("default.nix"))
+        } else {
+            None
+        };
+        let top_default_nix = base_dir.join("default.nix");
+        let top_flake_nix = base_dir.join("flake.nix");
+        let npins_dir = base_dir.join("npins");
+
+        NixDirLayout {
+            base_dir: base_dir.to_path_buf(),
+            package_path,
+            overlay_path,
+            module_path,
+            top_default_nix,
+            top_flake_nix,
+            npins_dir,
+        }
+    }
+}
+
 pub fn nix_file_paths(
     matches: &clap::ArgMatches,
     template: &Template,

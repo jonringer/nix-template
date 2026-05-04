@@ -96,7 +96,10 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "--init-flake 'Generate a flake.nix alongside the package expression'",
             ).takes_value(false))
         .arg(Arg::from_usage(
-            "--init-npins 'Generate an npins/ scaffold (npins/default.nix + empty npins/sources.json) and a wrapper default.nix alongside the package expression. Combinable with --init-flake. See https://github.com/andir/npins for the dependency manager itself.'",
+            "--init-npins 'Generate an npins/ scaffold (npins/default.nix + empty npins/sources.json) and a wrapper default.nix at the project root. The package is placed under nix/pkgs/<pname>/package.nix and an overlay is generated at nix/overlay.nix. Combinable with --init-flake / --init-project. See https://github.com/andir/npins for the dependency manager itself.'",
+            ).takes_value(false))
+        .arg(Arg::from_usage(
+            "--init-project 'Scaffold a full project layout: top-level default.nix and nix/{overlay.nix, pkgs/<pname>/package.nix, modules/<pname>/default.nix (when -t module)}. Prompts for the template if none given. Combinable with --init-flake / --init-npins to add a flake.nix or npins/ directory.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
             "--prefetch-hashes 'For rust/go templates, run nix-build with a fake hash to compute cargoHash/vendorHash. Requires nix to be installed and a known src hash (i.e. used together with --from-url).'",
@@ -330,8 +333,18 @@ pub fn validate_and_serialize_matches(
     info.path_to_write = path_to_write.clone();
     info.top_level_path = top_level_path.clone();
 
-    assert(matches.is_present("stdout") || (!path_to_write.exists()),
-        &format!("Cannot write to file '{}', already exists", path_to_write.display()));
+    // The path may be rewritten downstream when one of the --init-* flags
+    // triggers the structured nix/ layout. Skip the existence check in
+    // that case; main.rs re-checks each artefact before writing.
+    let init_will_rewrite_path = matches.is_present("init-flake")
+        || matches.is_present("init-npins")
+        || matches.is_present("init-project");
+    assert(
+        matches.is_present("stdout")
+            || init_will_rewrite_path
+            || !path_to_write.exists(),
+        &format!("Cannot write to file '{}', already exists", path_to_write.display()),
+    );
 
     info
 }

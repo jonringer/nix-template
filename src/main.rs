@@ -11,6 +11,7 @@ mod types;
 mod url;
 
 use cli::arg_to_type;
+use file_path::NixDirLayout;
 use types::{Template, UserConfig};
 
 fn main() {
@@ -121,13 +122,91 @@ fn main() {
                 cli::validate_and_serialize_matches(&m, user_config.as_ref())
             };
 
-            // Handle --init-npins flag: if the package would be written
-            // as `default.nix`, the wrapper we want to generate would
-            // collide with it. Rename the package output to `package.nix`
-            // (mirrors the RFC140 by-name convention) so the wrapper can
-            // own `default.nix`.
+            // ----------------------------------------------------------------
+            // Init-flag bookkeeping. We support three orthogonal init flags:
+            //   --init-flake    write a top-level flake.nix
+            //   --init-npins    scaffold an npins/ directory + default.nix
+            //   --init-project  produce a structured nix/ layout, prompting
+            //                   for the template if not given
+            //
+            // When the structured layout is active (always for --init-project
+            // and --init-npins; opted into for --init-flake when no PATH was
+            // given), files land at:
+            //   ./flake.nix           (--init-flake)
+            //   ./default.nix         (--init-npins or --init-project)
+            //   ./npins/              (--init-npins)
+            //   ./nix/overlay.nix
+            //   ./nix/pkgs/<pname>/package.nix
+            //   ./nix/modules/<pname>/default.nix   (module template only)
+            // ----------------------------------------------------------------
+            let init_flake = m.is_present("init-flake");
             let init_npins = m.is_present("init-npins");
-            if init_npins {
+            let init_project = m.is_present("init-project");
+            let no_path_given = m.occurrences_of("PATH") == 0;
+
+            // Decide whether to use the structured nix/ layout.
+            //   - Always for --init-project, --init-npins, and --init-flake
+            //     when no explicit PATH was given. (--init-flake with an
+            //     explicit PATH preserves the legacy flat layout for scripts
+            //     that depend on it.)
+            //   - Never when --nixpkgs / --by-name is in play (those have
+            //     their own canonical placement under nixpkgs).
+            let nixpkgs_layout_active =
+                m.is_present("nixpkgs") || m.is_present("by-name");
+            let use_structured_layout = !nixpkgs_layout_active
+                && (init_project || init_npins || (init_flake && no_path_given));
+
+            // When --init-project is requested without an explicit template,
+            // prompt the user to pick one. We also re-run when the legacy
+            // path (template default + pname provided) didn't trigger
+            // interactive mode.
+            if init_project
+                && m.occurrences_of("TEMPLATE") == 0
+                && !should_use_interactive
+            {
+                match interactive::prompt_template_type(None) {
+                    Ok(t) => {
+                        info.template = t;
+                    }
+                    Err(e) => {
+                        eprintln!("Template selection cancelled: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            // Compute the structured layout up front so every downstream
+            // step (path rewrite, overlay, top-level wrappers, flake) can
+            // reference the same set of paths.
+            let layout: Option<NixDirLayout> = if use_structured_layout {
+                Some(NixDirLayout::new(
+                    std::path::Path::new(""),
+                    &info.pname,
+                    &info.template,
+                ))
+            } else {
+                None
+            };
+
+            // Rewrite the package output path for the structured layout.
+            // For module templates the package_path is unused; we redirect
+            // info.path_to_write to the module file under nix/modules/.
+            if let Some(ref l) = layout {
+                if info.template == Template::module {
+                    if let Some(ref module_path) = l.module_path {
+                        info.path_to_write = module_path.clone();
+                    }
+                } else {
+                    info.path_to_write = l.package_path.clone();
+                }
+            }
+
+            // Legacy --init-npins behaviour (no structured layout — only
+            // possible when --nixpkgs is set, since otherwise we always opt
+            // into the structured layout above): if the package would be
+            // written as `default.nix`, rename to `package.nix` so the
+            // wrapper can own `default.nix`.
+            if init_npins && layout.is_none() {
                 let needs_rename = info
                     .path_to_write
                     .file_name()
@@ -151,71 +230,151 @@ for the npins wrapper."
             let expr = expression::generate_expression(&info);
             let output = info.format(&expr);
 
-            // Handle --init-flake flag
-            let init_flake = m.is_present("init-flake");
-            let flake_content = if init_flake {
-                // Get current directory name for flake description
-                let cwd = std::env::current_dir().expect("Failed to get current directory");
-                let directory_name = cwd
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("CHANGE");
+            // Helper: directory name to use in flake `description` field.
+            let directory_name_owned = std::env::current_dir()
+                .ok()
+                .and_then(|cwd| cwd.file_name().map(|n| n.to_owned()))
+                .and_then(|n| n.to_str().map(|s| s.to_owned()))
+                .unwrap_or_else(|| "CHANGE".to_owned());
+            let directory_name = directory_name_owned.as_str();
 
-                // Get the output filename (not full path)
-                let output_filename = info.path_to_write
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("default.nix");
-
-                Some(expression::generate_flake_nix(&info.template, output_filename, directory_name))
+            // ----- flake.nix payload -----
+            let flake_payload: Option<(std::path::PathBuf, String)> = if init_flake {
+                if let Some(ref l) = layout {
+                    Some((
+                        l.top_flake_nix.clone(),
+                        expression::generate_structured_flake_nix(
+                            &info.template,
+                            &info.pname,
+                            directory_name,
+                        ),
+                    ))
+                } else {
+                    // Legacy: flake.nix sits next to the package expression.
+                    let flake_path = info
+                        .path_to_write
+                        .parent()
+                        .map(|p| p.join("flake.nix"))
+                        .unwrap_or_else(|| std::path::PathBuf::from("flake.nix"));
+                    let output_filename = info
+                        .path_to_write
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("default.nix");
+                    Some((
+                        flake_path,
+                        expression::generate_flake_nix(
+                            &info.template,
+                            output_filename,
+                            directory_name,
+                        ),
+                    ))
+                }
             } else {
                 None
             };
 
-            // Handle --init-npins flag. The wrapper default.nix and the
-            // npins/ directory both live alongside the package file.
+            // ----- overlay.nix payload (structured layout only) -----
+            let overlay_payload: Option<(std::path::PathBuf, String)> = layout
+                .as_ref()
+                .map(|l| {
+                    (
+                        l.overlay_path.clone(),
+                        expression::generate_overlay_nix(&info.template, &info.pname),
+                    )
+                });
+
+            // ----- top-level default.nix payload (structured layout only) -----
+            // Emitted whenever --init-npins or --init-project is in play, so
+            // that non-flake consumers have a working entry point. We skip
+            // it for `--init-flake` alone since flake.nix is the only entry
+            // point the user asked for in that case.
+            let want_top_default = layout.is_some() && (init_npins || init_project);
+            let top_default_payload: Option<(std::path::PathBuf, String)> = if want_top_default {
+                layout.as_ref().map(|l| {
+                    (
+                        l.top_default_nix.clone(),
+                        expression::generate_structured_default_nix(
+                            &info.template,
+                            &info.pname,
+                            init_npins,
+                        ),
+                    )
+                })
+            } else {
+                None
+            };
+
+            // ----- npins payload -----
+            // Two flavours: structured (npins/ at project root, wrapper is
+            // the top-level default.nix above) and legacy (everything next
+            // to the package file, with a dedicated wrapper).
             let npins_payload = if init_npins {
-                let parent = info
-                    .path_to_write
-                    .parent()
-                    .map(|p| p.to_path_buf())
-                    .unwrap_or_else(|| std::path::PathBuf::from(""));
+                if let Some(ref l) = layout {
+                    let npins_dir = l.npins_dir.clone();
+                    let npins_default_path = npins_dir.join("default.nix");
+                    let npins_sources_path = npins_dir.join("sources.json");
+                    Some((
+                        npins_dir,
+                        npins_default_path,
+                        expression::generate_npins_default_nix().to_string(),
+                        npins_sources_path,
+                        expression::generate_npins_sources_json().to_string(),
+                        // For the structured layout the top-level default.nix
+                        // *is* the npins-aware wrapper; pass `None` here to
+                        // signal "no separate wrapper".
+                        None,
+                    ))
+                } else {
+                    let parent = info
+                        .path_to_write
+                        .parent()
+                        .map(|p| p.to_path_buf())
+                        .unwrap_or_else(|| std::path::PathBuf::from(""));
 
-                let npins_dir = parent.join("npins");
-                let npins_default_path = npins_dir.join("default.nix");
-                let npins_sources_path = npins_dir.join("sources.json");
-                let wrapper_path = parent.join("default.nix");
+                    let npins_dir = parent.join("npins");
+                    let npins_default_path = npins_dir.join("default.nix");
+                    let npins_sources_path = npins_dir.join("sources.json");
+                    let wrapper_path = parent.join("default.nix");
 
-                // Wrapper imports the package by its on-disk basename
-                // (which may have been renamed to `package.nix` above).
-                let package_basename = info
-                    .path_to_write
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("package.nix")
-                    .to_string();
+                    let package_basename = info
+                        .path_to_write
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("package.nix")
+                        .to_string();
 
-                let wrapper_content =
-                    expression::generate_npins_wrapper_default_nix(&info.template, &package_basename);
+                    let wrapper_content = expression::generate_npins_wrapper_default_nix(
+                        &info.template,
+                        &package_basename,
+                    );
 
-                Some((
-                    npins_dir,
-                    npins_default_path,
-                    expression::generate_npins_default_nix().to_string(),
-                    npins_sources_path,
-                    expression::generate_npins_sources_json().to_string(),
-                    wrapper_path,
-                    wrapper_content,
-                ))
+                    Some((
+                        npins_dir,
+                        npins_default_path,
+                        expression::generate_npins_default_nix().to_string(),
+                        npins_sources_path,
+                        expression::generate_npins_sources_json().to_string(),
+                        Some((wrapper_path, wrapper_content)),
+                    ))
+                }
             } else {
                 None
             };
 
             if m.is_present("stdout") {
                 println!("{}", output);
-                if let Some(flake) = &flake_content {
-                    println!("\n# ===== flake.nix =====\n");
+                if let Some((flake_path, flake)) = &flake_payload {
+                    println!("\n# ===== {} =====\n", flake_path.display());
                     println!("{}", flake);
+                }
+                if let Some((overlay_path, overlay)) = &overlay_payload {
+                    println!("\n# ===== {} =====\n", overlay_path.display());
+                    println!("{}", overlay);
+                }
+                if let Some((top_path, top_content)) = &top_default_payload {
+                    println!("\n# ===== {} =====\n", top_path.display());
+                    println!("{}", top_content);
                 }
                 if let Some((
                     _npins_dir,
@@ -223,8 +382,7 @@ for the npins wrapper."
                     npins_default_content,
                     npins_sources_path,
                     npins_sources_content,
-                    wrapper_path,
-                    wrapper_content,
+                    legacy_wrapper,
                 )) = &npins_payload
                 {
                     println!(
@@ -237,8 +395,10 @@ for the npins wrapper."
                         npins_sources_path.display()
                     );
                     println!("{}", npins_sources_content);
-                    println!("\n# ===== {} =====\n", wrapper_path.display());
-                    println!("{}", wrapper_content);
+                    if let Some((wrapper_path, wrapper_content)) = legacy_wrapper {
+                        println!("\n# ===== {} =====\n", wrapper_path.display());
+                        println!("{}", wrapper_content);
+                    }
                 }
             } else {
                 let path = &info.path_to_write;
@@ -262,45 +422,64 @@ for the npins wrapper."
                     &path.canonicalize().unwrap().display()
                 );
 
-                // Write flake.nix if --init-flake was provided
-                if let Some(flake) = flake_content {
-                    let flake_path = if let Some(parent) = path.parent() {
-                        parent.join("flake.nix")
-                    } else {
-                        std::path::PathBuf::from("flake.nix")
-                    };
-
-                    std::fs::write(&flake_path, flake)
-                        .unwrap_or_else(|_| panic!("Was unable to write to file: {}", &flake_path.display()));
+                // Helper to write a generated artifact, refusing to clobber
+                // any pre-existing file. Creates parent directories as
+                // needed.
+                fn write_new(path: &std::path::Path, content: &str, label: &str) {
+                    if path.exists() {
+                        eprintln!(
+                            "Refusing to overwrite existing file: {}",
+                            path.display()
+                        );
+                        std::process::exit(1);
+                    }
+                    if let Some(parent) = path.parent() {
+                        if parent.to_str() != Some("") && !parent.exists() {
+                            println!("Creating directory: {}", parent.display());
+                            std::fs::create_dir_all(parent).unwrap_or_else(|_| {
+                                panic!("Was unable to create directory {}", parent.display())
+                            });
+                        }
+                    }
+                    std::fs::write(path, content).unwrap_or_else(|_| {
+                        panic!("Was unable to write to file: {}", path.display())
+                    });
                     println!(
-                        "Generated flake.nix at {}",
-                        &flake_path.canonicalize().unwrap().display()
+                        "Generated {} at {}",
+                        label,
+                        path.canonicalize().unwrap().display()
                     );
                 }
 
-                // Write npins scaffold if --init-npins was provided
+                // Write overlay.nix (structured layout only). Done before
+                // flake/default so the imports referenced by those wrappers
+                // exist on disk in the order a user inspecting progress
+                // would expect.
+                if let Some((overlay_path, overlay_content)) = &overlay_payload {
+                    write_new(overlay_path, overlay_content, "overlay.nix");
+                }
+
+                // Write top-level default.nix (structured layout only).
+                if let Some((top_path, top_content)) = &top_default_payload {
+                    write_new(top_path, top_content, "top-level default.nix");
+                }
+
+                // Write flake.nix if --init-flake was provided.
+                if let Some((flake_path, flake_content)) = &flake_payload {
+                    write_new(flake_path, flake_content, "flake.nix");
+                }
+
+                // Write npins scaffold if --init-npins was provided.
                 if let Some((
                     npins_dir,
                     npins_default_path,
                     npins_default_content,
                     npins_sources_path,
                     npins_sources_content,
-                    wrapper_path,
-                    wrapper_content,
+                    legacy_wrapper,
                 )) = npins_payload
                 {
-                    // Refuse to clobber any of the three target files.
-                    for p in [&npins_default_path, &npins_sources_path, &wrapper_path].iter() {
-                        if p.exists() {
-                            eprintln!(
-                                "Refusing to overwrite existing file: {}",
-                                p.display()
-                            );
-                            std::process::exit(1);
-                        }
-                    }
-
-                    // Ensure npins/ directory exists
+                    // Ensure npins/ directory exists.
                     if npins_dir.to_str() != Some("") && !npins_dir.exists() {
                         println!("Creating directory: {}", npins_dir.display());
                         std::fs::create_dir_all(&npins_dir).unwrap_or_else(|_| {
@@ -308,41 +487,19 @@ for the npins wrapper."
                         });
                     }
 
-                    std::fs::write(&npins_default_path, npins_default_content)
-                        .unwrap_or_else(|_| {
-                            panic!(
-                                "Was unable to write to file: {}",
-                                &npins_default_path.display()
-                            )
-                        });
-                    println!(
-                        "Generated npins lockfile reader at {}",
-                        &npins_default_path.canonicalize().unwrap().display()
+                    write_new(
+                        &npins_default_path,
+                        &npins_default_content,
+                        "npins lockfile reader",
                     );
-
-                    std::fs::write(&npins_sources_path, npins_sources_content)
-                        .unwrap_or_else(|_| {
-                            panic!(
-                                "Was unable to write to file: {}",
-                                &npins_sources_path.display()
-                            )
-                        });
-                    println!(
-                        "Generated empty npins/sources.json at {}",
-                        &npins_sources_path.canonicalize().unwrap().display()
+                    write_new(
+                        &npins_sources_path,
+                        &npins_sources_content,
+                        "empty npins/sources.json",
                     );
-
-                    std::fs::write(&wrapper_path, wrapper_content)
-                        .unwrap_or_else(|_| {
-                            panic!(
-                                "Was unable to write to file: {}",
-                                &wrapper_path.display()
-                            )
-                        });
-                    println!(
-                        "Generated npins wrapper default.nix at {}",
-                        &wrapper_path.canonicalize().unwrap().display()
-                    );
+                    if let Some((wrapper_path, wrapper_content)) = legacy_wrapper {
+                        write_new(&wrapper_path, &wrapper_content, "npins wrapper default.nix");
+                    }
 
                     println!();
                     println!("Next steps:");
