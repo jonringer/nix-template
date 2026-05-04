@@ -22,13 +22,16 @@ expression: flake_nix
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
     in
     {
+      overlays.default = import ./nix/overlay.nix;
+
       packages = forAllSystems (
         system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
+          overlayed = (import nixpkgs { inherit system; }).extend self.overlays.default;
         in
         {
-          default = pkgs.python3Packages.callPackage ./default.nix { };
+          requests = overlayed.python3Packages.requests;
+          default = self.packages.${system}.requests;
         }
       );
     };

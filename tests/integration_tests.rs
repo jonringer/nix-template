@@ -32,8 +32,10 @@ fn test_python_template_basic() {
     insta::assert_snapshot!("python_basic_template", stdout);
 }
 
-/// Test Python template generation WITH --flake-init
-/// This should generate both default.nix and flake.nix to stdout
+/// Test Python template generation WITH --init-flake (no PATH given).
+/// This now produces the structured nix/ layout: package under
+/// nix/pkgs/<pname>/package.nix, an overlay that uses
+/// python3Packages.callPackage, and a flake.nix exposing the package.
 #[test]
 fn test_python_template_with_flake_init() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
@@ -53,31 +55,54 @@ fn test_python_template_with_flake_init() {
     assert!(output.status.success(), "Command failed: {:?}", output);
     let stdout = String::from_utf8(output.stdout).unwrap();
 
-    // Should contain both files separated by the marker
+    // All structured-layout artefacts should appear in stdout, separated by markers.
     assert!(stdout.contains("# ===== flake.nix ====="));
+    assert!(stdout.contains("# ===== nix/overlay.nix ====="));
 
-    // Split the output into package and flake sections
-    let parts: Vec<&str> = stdout.split("# ===== flake.nix =====").collect();
-    assert_eq!(parts.len(), 2, "Expected both default.nix and flake.nix output");
+    // stdout ordering from main.rs is: package → flake → overlay.
+    let after_flake_marker: Vec<&str> =
+        stdout.split("# ===== flake.nix =====").collect();
+    assert_eq!(after_flake_marker.len(), 2, "Expected a flake.nix marker");
+    let package_nix = after_flake_marker[0].trim();
 
-    let package_nix = parts[0].trim();
-    let flake_nix = parts[1].trim();
+    let after_overlay_marker: Vec<&str> =
+        after_flake_marker[1].split("# ===== nix/overlay.nix =====").collect();
+    assert_eq!(after_overlay_marker.len(), 2, "Expected an overlay marker");
+    let flake_nix = after_overlay_marker[0].trim();
+    let overlay_nix = after_overlay_marker[1].trim();
 
     // Verify package part
     assert!(package_nix.contains("buildPythonPackage"));
     assert!(package_nix.contains("fetchPypi"));
 
-    // Verify flake part
+    // Overlay must use python3Packages.callPackage for python templates.
+    assert!(
+        overlay_nix.contains("requests = final.python3Packages.callPackage ./pkgs/requests/package.nix"),
+        "Python overlay should use python3Packages.callPackage; got:\n{}",
+        overlay_nix
+    );
+
+    // Verify flake part — structured flake exposes overlays.default and the
+    // python package via the overlayed pkgs set.
     assert!(flake_nix.contains("description ="));
     assert!(flake_nix.contains("inputs"));
     assert!(flake_nix.contains("nixpkgs.url"));
     assert!(flake_nix.contains("outputs"));
-    assert!(flake_nix.contains("python3Packages.callPackage"),
-            "Python templates should use python3Packages.callPackage");
+    assert!(
+        flake_nix.contains("overlays.default = import ./nix/overlay.nix"),
+        "structured flake should expose overlays.default; got:\n{}",
+        flake_nix
+    );
+    assert!(
+        flake_nix.contains("overlayed.python3Packages.requests"),
+        "Python flake should resolve via python3Packages on overlayed pkgs; got:\n{}",
+        flake_nix
+    );
     assert!(flake_nix.contains("supportedSystems"));
 
-    // Snapshot both parts
+    // Snapshot all three parts
     insta::assert_snapshot!("python_with_flake_package", package_nix);
+    insta::assert_snapshot!("python_with_flake_overlay", overlay_nix);
     insta::assert_snapshot!("python_with_flake_flake", flake_nix);
 }
 
@@ -115,7 +140,9 @@ fn test_python_template_pypi_fetcher_explicit() {
 }
 
 /// Test Python template with GitHub fetcher override
-/// This verifies that we can override the default PyPI fetcher with GitHub
+/// This verifies that we can override the default PyPI fetcher with GitHub.
+/// `--init-flake` (no PATH) now produces the structured nix/ layout, so the
+/// flake's overlay (not the flake itself) is what wires python3Packages.
 #[test]
 fn test_python_template_github_fetcher_override() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
@@ -141,20 +168,44 @@ fn test_python_template_github_fetcher_override() {
     assert!(!stdout.contains("fetchPypi"), "Should not use PyPI fetcher");
     assert!(stdout.contains("buildPythonPackage"));
 
-    // Split and snapshot
-    let parts: Vec<&str> = stdout.split("# ===== flake.nix =====").collect();
-    let package_nix = parts[0].trim();
-    let flake_nix = parts[1].trim();
+    // Structured layout markers must be present.
+    assert!(stdout.contains("# ===== flake.nix ====="));
+    assert!(stdout.contains("# ===== nix/overlay.nix ====="));
 
-    // Still should use python3Packages in flake
-    assert!(flake_nix.contains("python3Packages.callPackage"));
+    // stdout ordering from main.rs is: package → flake → overlay.
+    let after_flake_marker: Vec<&str> =
+        stdout.split("# ===== flake.nix =====").collect();
+    assert_eq!(after_flake_marker.len(), 2, "Expected a flake.nix marker");
+    let package_nix = after_flake_marker[0].trim();
+
+    let after_overlay_marker: Vec<&str> =
+        after_flake_marker[1].split("# ===== nix/overlay.nix =====").collect();
+    assert_eq!(after_overlay_marker.len(), 2, "Expected an overlay marker");
+    let flake_nix = after_overlay_marker[0].trim();
+    let overlay_nix = after_overlay_marker[1].trim();
+
+    // python3Packages.callPackage now lives in the overlay (not the flake).
+    assert!(
+        overlay_nix.contains("python3Packages.callPackage"),
+        "overlay should wire python3Packages.callPackage; got:\n{}",
+        overlay_nix
+    );
+    assert!(
+        flake_nix.contains("overlayed.python3Packages.requests"),
+        "flake should resolve via overlayed python3Packages; got:\n{}",
+        flake_nix
+    );
 
     insta::assert_snapshot!("python_github_override_package", package_nix);
+    insta::assert_snapshot!("python_github_override_overlay", overlay_nix);
     insta::assert_snapshot!("python_github_override_flake", flake_nix);
 }
 
 /// Test Python template file writing (not just stdout)
-/// This verifies that files are created correctly in a directory
+/// `--init-flake` without an explicit PATH now uses the structured nix/
+/// layout, so files land at nix/pkgs/<pname>/package.nix, nix/overlay.nix,
+/// and flake.nix at the top. No top-level default.nix is emitted in this
+/// mode (it's only added by --init-npins / --init-project).
 #[test]
 fn test_python_template_file_writing_with_flake() {
     let temp_dir = TempDir::new().unwrap();
@@ -177,22 +228,45 @@ fn test_python_template_file_writing_with_flake() {
 
     assert!(output.status.success(), "Command failed: {:?}", output);
 
-    // Verify both files were created
-    let default_nix_path = temp_path.join("default.nix");
+    // Verify the structured layout was created.
+    let package_nix_path = temp_path.join("nix/pkgs/requests/package.nix");
+    let overlay_nix_path = temp_path.join("nix/overlay.nix");
     let flake_nix_path = temp_path.join("flake.nix");
+    let top_default_nix_path = temp_path.join("default.nix");
 
-    assert!(default_nix_path.exists(), "default.nix should be created");
+    assert!(
+        package_nix_path.exists(),
+        "nix/pkgs/requests/package.nix should be created"
+    );
+    assert!(overlay_nix_path.exists(), "nix/overlay.nix should be created");
     assert!(flake_nix_path.exists(), "flake.nix should be created");
+    assert!(
+        !top_default_nix_path.exists(),
+        "top-level default.nix should NOT be created for --init-flake alone"
+    );
 
-    // Read and verify contents
-    let default_nix_content = std::fs::read_to_string(&default_nix_path).unwrap();
+    // Read and verify contents.
+    let package_nix_content = std::fs::read_to_string(&package_nix_path).unwrap();
+    let overlay_nix_content = std::fs::read_to_string(&overlay_nix_path).unwrap();
     let mut flake_nix_content = std::fs::read_to_string(&flake_nix_path).unwrap();
 
-    assert!(default_nix_content.contains("buildPythonPackage"));
-    assert!(flake_nix_content.contains("python3Packages.callPackage"));
+    assert!(package_nix_content.contains("buildPythonPackage"));
+    assert!(
+        overlay_nix_content.contains("python3Packages.callPackage"),
+        "overlay should wire python3Packages.callPackage"
+    );
+    assert!(
+        flake_nix_content.contains("overlays.default = import ./nix/overlay.nix"),
+        "flake should expose overlays.default importing the overlay"
+    );
+    assert!(
+        flake_nix_content.contains("overlayed.python3Packages.requests"),
+        "flake should resolve the package via overlayed.python3Packages"
+    );
 
-    // Normalize the temp directory name in the description field for snapshot stability
-    // The description is based on the directory name, which is random for temp dirs
+    // Normalize the temp directory name in the description field for snapshot
+    // stability — the description tracks the directory name which is random
+    // for temp dirs.
     let temp_dir_name = temp_path.file_name().unwrap().to_str().unwrap();
     flake_nix_content = flake_nix_content.replace(
         &format!("description = \"{}\";", temp_dir_name),
@@ -200,12 +274,14 @@ fn test_python_template_file_writing_with_flake() {
     );
 
     // Snapshot the file contents
-    insta::assert_snapshot!("python_file_write_default", default_nix_content);
+    insta::assert_snapshot!("python_file_write_package", package_nix_content);
+    insta::assert_snapshot!("python_file_write_overlay", overlay_nix_content);
     insta::assert_snapshot!("python_file_write_flake", flake_nix_content);
 }
 
-/// Test --init-npins to stdout: should print package, then npins/default.nix,
-/// npins/sources.json, and the wrapper default.nix, separated by markers.
+/// Test --init-npins to stdout: emits the structured nix/ layout —
+/// package.nix under nix/pkgs/<pname>/, an overlay.nix, a top-level
+/// default.nix, plus the npins/ scaffold.
 #[test]
 fn test_init_npins_stdout() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
@@ -225,14 +301,19 @@ fn test_init_npins_stdout() {
     assert!(output.status.success(), "Command failed: {:?}", output);
     let stdout = String::from_utf8(output.stdout).unwrap();
 
-    // Verify all three scaffolded files are emitted with markers
+    // Markers for each artefact in the structured layout.
+    assert!(stdout.contains("# ===== nix/overlay.nix ====="));
+    assert!(stdout.contains("# ===== default.nix ====="));
     assert!(stdout.contains("# ===== npins/default.nix ====="));
     assert!(stdout.contains("# ===== npins/sources.json ====="));
-    assert!(stdout.contains("# ===== default.nix ====="));
 
-    // Wrapper imports the renamed package and pulls pkgs from npins
+    // Top-level default.nix imports the overlay and pulls pkgs from npins.
     assert!(stdout.contains("sources = import ./npins;"));
-    assert!(stdout.contains("pkgs.callPackage ./package.nix { }"));
+    assert!(stdout.contains("(import sources.nixpkgs { }).extend (import ./nix/overlay.nix)"));
+    assert!(stdout.contains("pkgs.hello"));
+
+    // Overlay calls callPackage on the package under nix/pkgs/.
+    assert!(stdout.contains("hello = final.callPackage ./pkgs/hello/package.nix { }"));
 
     // Empty pins lockfile, version 7
     assert!(stdout.contains("\"pins\": {}"));
@@ -243,8 +324,9 @@ fn test_init_npins_stdout() {
     assert!(stdout.contains("Unsupported format version"));
 }
 
-/// Test --init-npins file writing: package gets renamed to package.nix when
-/// it would otherwise collide with the wrapper default.nix.
+/// Test --init-npins file writing: scaffolds the structured nix/ layout
+/// with the package under nix/pkgs/<pname>/package.nix, an overlay, a
+/// top-level default.nix wrapper, and the npins/ directory.
 #[test]
 fn test_init_npins_writes_three_files_and_renames() {
     let temp_dir = TempDir::new().unwrap();
@@ -266,21 +348,30 @@ fn test_init_npins_writes_three_files_and_renames() {
 
     assert!(output.status.success(), "Command failed: {:?}", output);
 
-    // Package was renamed to package.nix (not default.nix)
-    let package_nix = temp_path.join("package.nix");
-    assert!(package_nix.exists(), "package.nix should be created");
-    assert!(!temp_path.join("default.nix").metadata()
-        .map(|m| m.len() > 500).unwrap_or(false),
-        "default.nix should be the wrapper, not the package");
+    // Package lives under nix/pkgs/<pname>/package.nix
+    let package_nix = temp_path.join("nix").join("pkgs").join("hello").join("package.nix");
+    assert!(package_nix.exists(), "nix/pkgs/hello/package.nix should be created");
 
-    // Wrapper default.nix exists
+    // Top-level default.nix wraps the overlay, replacing the legacy npins
+    // wrapper that used to live alongside the package file.
     let wrapper = temp_path.join("default.nix");
-    assert!(wrapper.exists(), "wrapper default.nix should be created");
+    assert!(wrapper.exists(), "top-level default.nix should be created");
     let wrapper_content = std::fs::read_to_string(&wrapper).unwrap();
     assert!(wrapper_content.contains("sources = import ./npins;"));
-    assert!(wrapper_content.contains("pkgs.callPackage ./package.nix { }"));
+    assert!(wrapper_content.contains("(import sources.nixpkgs { }).extend (import ./nix/overlay.nix)"));
+    assert!(wrapper_content.contains("pkgs.hello"));
 
-    // npins/ scaffold exists
+    // Overlay calls callPackage on the new package path.
+    let overlay = temp_path.join("nix").join("overlay.nix");
+    assert!(overlay.exists(), "nix/overlay.nix should be created");
+    let overlay_content = std::fs::read_to_string(&overlay).unwrap();
+    assert!(
+        overlay_content.contains("hello = final.callPackage ./pkgs/hello/package.nix { }"),
+        "overlay should reference nix/pkgs/hello/package.nix; got:\n{}",
+        overlay_content
+    );
+
+    // npins/ scaffold exists at project root.
     let npins_default = temp_path.join("npins").join("default.nix");
     let npins_sources = temp_path.join("npins").join("sources.json");
     assert!(npins_default.exists(), "npins/default.nix should be created");
@@ -298,6 +389,7 @@ fn test_init_npins_writes_three_files_and_renames() {
 
     // Snapshot stable artifacts
     insta::assert_snapshot!("init_npins_wrapper_stdenv", wrapper_content);
+    insta::assert_snapshot!("init_npins_overlay_stdenv", overlay_content);
     insta::assert_snapshot!("init_npins_sources_json", sources_content);
     insta::assert_snapshot!("init_npins_default_nix", npins_default_content);
 }
@@ -326,12 +418,21 @@ fn test_init_npins_python_wrapper() {
 
     let wrapper = std::fs::read_to_string(temp_path.join("default.nix")).unwrap();
     assert!(
-        wrapper.contains("pkgs.python3Packages.callPackage ./package.nix { }"),
-        "Python wrapper should use python3Packages.callPackage; got:\n{}",
+        wrapper.contains("pkgs.python3Packages.requests"),
+        "Python wrapper should resolve via python3Packages; got:\n{}",
         wrapper
     );
 
+    // The overlay should use python3Packages.callPackage.
+    let overlay = std::fs::read_to_string(temp_path.join("nix").join("overlay.nix")).unwrap();
+    assert!(
+        overlay.contains("requests = final.python3Packages.callPackage ./pkgs/requests/package.nix { }"),
+        "Python overlay should use python3Packages.callPackage; got:\n{}",
+        overlay
+    );
+
     insta::assert_snapshot!("init_npins_wrapper_python", wrapper);
+    insta::assert_snapshot!("init_npins_overlay_python", overlay);
 }
 
 /// Test --init-npins combined with --init-flake: both scaffolds coexist.
@@ -357,20 +458,29 @@ fn test_init_npins_with_init_flake() {
 
     assert!(output.status.success(), "Command failed: {:?}", output);
 
-    // All four files should exist
-    assert!(temp_path.join("package.nix").exists(), "package.nix");
-    assert!(temp_path.join("default.nix").exists(), "wrapper default.nix");
+    // Structured layout: package + overlay under nix/, flake/default at root,
+    // npins/ at root.
+    assert!(
+        temp_path.join("nix").join("pkgs").join("hello").join("package.nix").exists(),
+        "nix/pkgs/hello/package.nix should exist"
+    );
+    assert!(temp_path.join("nix").join("overlay.nix").exists(), "nix/overlay.nix");
+    assert!(temp_path.join("default.nix").exists(), "top-level default.nix");
     assert!(temp_path.join("flake.nix").exists(), "flake.nix");
     assert!(temp_path.join("npins").join("default.nix").exists(), "npins/default.nix");
     assert!(temp_path.join("npins").join("sources.json").exists(), "npins/sources.json");
 
-    // Wrapper points at package.nix (renamed because of collision)
+    // Top-level default.nix imports the overlay applied to npins-pinned nixpkgs.
     let wrapper = std::fs::read_to_string(temp_path.join("default.nix")).unwrap();
-    assert!(wrapper.contains("./package.nix"));
+    assert!(wrapper.contains("(import sources.nixpkgs { }).extend (import ./nix/overlay.nix)"));
 
-    // Flake also points at package.nix
+    // Flake exposes the overlay and references the package under nix/pkgs/.
     let flake = std::fs::read_to_string(temp_path.join("flake.nix")).unwrap();
-    assert!(flake.contains("./package.nix"), "flake should reference package.nix; got:\n{}", flake);
+    assert!(
+        flake.contains("overlays.default = import ./nix/overlay.nix"),
+        "flake should expose overlays.default; got:\n{}",
+        flake
+    );
 }
 
 /// Test that --init-npins refuses to clobber pre-existing scaffold files
