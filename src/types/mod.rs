@@ -6,10 +6,12 @@ use regex::{Captures, Regex};
 
 pub mod gh_release_response;
 pub mod gh_repo_response;
+pub mod gitlab_response;
 pub mod pypi;
 
 pub use gh_release_response::*;
 pub use gh_repo_response::*;
+pub use gitlab_response::*;
 pub use pypi::*;
 
 lazy_static! {
@@ -109,6 +111,7 @@ arg_enum! {
 pub enum Repo {
     Pypi(PypiRepo),
     Github(GithubRepo),
+    Gitlab(GitlabRepo),
     Gitea(GiteaRepo),
 }
 
@@ -120,6 +123,17 @@ pub struct PypiRepo {
 #[derive(Debug, PartialEq)]
 pub struct GithubRepo {
     pub owner: String,
+    pub repo: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct GitlabRepo {
+    pub domain: String,
+    /// Full project path including nested groups (e.g., "gitlab-org/frontend/design-system")
+    pub project_path: String,
+    /// Owner (first component of project_path, e.g., "gitlab-org")
+    pub owner: String,
+    /// Repository name (last component of project_path, e.g., "design-system")
     pub repo: String,
 }
 

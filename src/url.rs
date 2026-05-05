@@ -1,5 +1,5 @@
 use crate::types;
-use crate::types::Repo::{Gitea, Github, Pypi};
+use crate::types::Repo::{Gitea, Github, Gitlab, Pypi};
 use crate::types::{Template, FAKE_SRI_HASH};
 
 use anyhow::anyhow;
@@ -21,6 +21,12 @@ lazy_static! {
     static ref PYPI_URL_REGEX: Regex = {
         // e.g. pypi.org/project/requests
         Regex::new("pypi.org/project/([^/]*)/?").unwrap()
+    };
+
+    static ref GITLAB_URL_REGEX: Regex = {
+        // e.g. gitlab.com/gitlab-org/gitlab-foss or gitlab.com/org/subgroup/repo
+        // Matches gitlab.com/ followed by any path (greedy, supports nested groups)
+        Regex::new(r"gitlab\.com/(.+?)(?:\.git)?/?$").unwrap()
     };
 
     /// Hosts that we recognise as Gitea instances. Their REST APIs are
@@ -119,6 +125,31 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> 
         return Ok(Pypi(types::PypiRepo {
             project: captures.get(1).unwrap().as_str().to_owned(),
         }));
+    } else if url.starts_with("gitlab.com") {
+        if !GITLAB_URL_REGEX.is_match(url) {
+            return Err(anyhow!(
+                "Error: please provide a gitlab url of shape 'gitlab.com/<owner>/<repo>' or 'gitlab.com/<group>/<subgroup>/<repo>'"
+            ));
+        }
+
+        let captures = GITLAB_URL_REGEX.captures(url).unwrap();
+        let project_path = captures.get(1).unwrap().as_str().to_owned();
+
+        // Split the project path to extract owner and repo
+        let path_parts: Vec<&str> = project_path.split('/').collect();
+        if path_parts.is_empty() {
+            return Err(anyhow!("Invalid GitLab project path"));
+        }
+
+        let owner = path_parts[0].to_owned();
+        let repo = path_parts[path_parts.len() - 1].to_owned();
+
+        return Ok(Gitlab(types::GitlabRepo {
+            domain: "gitlab.com".to_owned(),
+            project_path,
+            owner,
+            repo,
+        }));
     } else if GITEA_HOSTS.iter().any(|host| url.starts_with(host)) {
         let captures = GITEA_URL_REGEX.captures(url).ok_or_else(|| {
             anyhow!("Error: please provide a gitea url of shape '<domain>/<owner>/<repo>'")
@@ -131,7 +162,7 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> 
         }));
     } else {
         Err(anyhow!(
-            "{} is not a supported url. Only github.com, pypi.org, and known gitea instances ({}) are supported currently",
+            "{} is not a supported url. Only github.com, gitlab.com, pypi.org, and known gitea instances ({}) are supported currently",
             original_url,
             GITEA_HOSTS.join(", "),
         ))
@@ -626,6 +657,9 @@ pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo) {
     match validate_and_parse_url(trimmed_url, url) {
         Ok(Github(repo)) => {
             fill_github_info(&repo, info);
+        }
+        Ok(Gitlab(repo)) => {
+            fill_gitlab_info(&repo, info);
         }
         Ok(Pypi(pypi_repo)) => {
             fill_pypi_info(&pypi_repo, info);
