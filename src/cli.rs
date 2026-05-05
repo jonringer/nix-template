@@ -102,7 +102,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "--init-project 'Scaffold a full project layout: top-level default.nix and nix/{overlay.nix, pkgs/<pname>/package.nix, modules/<pname>/default.nix (when -t module)}. Prompts for the template if none given. Combinable with --init-flake / --init-npins to add a flake.nix or npins/ directory.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
-            "--prefetch-hashes 'For rust/go templates, run nix-build with a fake hash to compute cargoHash/vendorHash. Requires nix to be installed and a known src hash (i.e. used together with --from-url).'",
+            "--skip-vendor-hashes 'Skip automatic computation of cargoHash/vendorHash for rust/go templates. By default, when --from-url is provided, nix-template runs nix-build with a fake hash to compute the real hash. Requires nix to be installed.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
             "--skip-infer-deps 'Skip automatic inference of buildInputs/nativeBuildInputs. By default, when --from-url is provided, nix-template materialises the source: for the rust template it parses Cargo.toml/Cargo.lock to detect well-known *-sys crates; for the go template it scans *.go files for `// #cgo` directives to detect pkg-config tokens and -l libraries.'",
@@ -284,7 +284,11 @@ pub fn validate_and_serialize_matches(
         read_meta_from_url(url, &mut info);
     }
 
-    if matches.is_present("prefetch-hashes") {
+    // Vendor hash prefetching is on by default when --from-url is provided.
+    // Users can disable via --skip-vendor-hashes.
+    let should_prefetch_hashes = matches.is_present("from-url")
+        && !matches.is_present("skip-vendor-hashes");
+    if should_prefetch_hashes {
         if let Some(hash) = prefetch_dependency_hash(&info) {
             match info.template {
                 Template::rust => info.cargo_hash = hash,
@@ -357,7 +361,7 @@ pub fn build_expression_info_from_interactive(
         .and_then(|c| c.nixpkgs_root.as_deref())
         .unwrap_or("");
 
-    let prefetch_hashes = data.prefetch_hashes;
+    let skip_vendor_hashes = data.skip_vendor_hashes;
     let infer_deps = data.infer_deps;
     let mut info = ExpressionInfo {
         pname: data.pname.clone(),
@@ -388,7 +392,8 @@ pub fn build_expression_info_from_interactive(
         read_meta_from_url(&url, &mut info);
     }
 
-    if prefetch_hashes {
+    // Vendor hash prefetching is enabled by default (opt-out via skip flag)
+    if !skip_vendor_hashes {
         if let Some(hash) = prefetch_dependency_hash(&info) {
             match info.template {
                 Template::rust => info.cargo_hash = hash,
