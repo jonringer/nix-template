@@ -149,10 +149,9 @@ fn main() {
             //     when no explicit PATH was given. (--init-flake with an
             //     explicit PATH preserves the legacy flat layout for scripts
             //     that depend on it.)
-            //   - Never when --nixpkgs / --by-name is in play (those have
-            //     their own canonical placement under nixpkgs).
-            let nixpkgs_layout_active =
-                m.is_present("nixpkgs") || m.is_present("by-name");
+            //   - Never when --by-name is in play (it has its own canonical
+            //     placement under nixpkgs).
+            let nixpkgs_layout_active = m.is_present("by-name");
             let use_structured_layout = !nixpkgs_layout_active
                 && (init_project || init_npins || (init_flake && no_path_given));
 
@@ -519,27 +518,9 @@ for the npins wrapper."
                     println!();
                 }
 
-                // print helpful message about line to be included in pkgs/top-level
-                // RFC140 (--by-name) packages are auto-discovered, so we skip
-                // this hint when --by-name is set.
-                if m.is_present("nixpkgs") && !m.is_present("by-name") {
-                    println!("Please add the following line to the appropriate file:");
-                    println!();
-                    match &info.template {
-                        Template::module => println!("  {}", &info.top_level_path.display()),
-                        Template::test => println!(
-                            "  {} = handleTest {} {{ }};",
-                            &info.pname,
-                            &info.top_level_path.display()
-                        ),
-                        _ => println!(
-                            "  {} = callPackage {} {{ }};",
-                            &info.pname,
-                            &info.top_level_path.display()
-                        ),
-                    }
-                    println!();
-                } else if m.is_present("by-name") {
+                // Note: --by-name packages are auto-discovered via RFC140, so no
+                // manual addition to all-packages.nix is needed.
+                if m.is_present("by-name") {
                     println!();
                     println!(
                         "RFC140 layout: '{}' will be auto-discovered from pkgs/by-name; \
