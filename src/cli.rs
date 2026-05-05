@@ -52,8 +52,8 @@ EXAMPLES:
 # generate an expression for this package
 $ nix-template rust --from-url https://github.com/jonringer/nix-template
 
-# generate a python package expressison at pkgs/development/python-modules/requests/default.nix
-$ nix-template python --nixpkgs --pname requests
+# generate a python package expression using RFC140 by-name layout
+$ nix-template python --by-name --pname requests
 
 # generate a shell.nix in $PWD
 $ nix-template mkshell
@@ -71,7 +71,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
                 .default_value("stdenv"),
         )
         .arg(
-            Arg::from_usage("[PATH] 'directory or file to be written. In the case of a directory, a default.nix will be created. When used with --nixpkgs, it will be appended to nixpkgs-root to determine path location.'")
+            Arg::from_usage("[PATH] 'directory or file to be written. In the case of a directory, a default.nix will be created. When used with --by-name, it will be appended to nixpkgs-root to determine path location.'")
                 .default_value("default.nix")
                 .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix")
                 .default_value_if("TEMPLATE", Some("test"), "test.nix"),
@@ -87,7 +87,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             ))
         .arg(Arg::from_usage(
             "--no-meta 'Don't include meta section'",
-            ).conflicts_with("nixpkgs"))
+            ).conflicts_with("by-name"))
         .arg(Arg::from_usage(
             "-d,--documentation-links 'Add comments linking to relevant sections of the Nixpkgs contributor guide.'",
             ).takes_value(false))
@@ -148,10 +148,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "-r,--nixpkgs-root [path] 'Set root of the nixpkgs directory'",
             ).env("NIXPKGS_ROOT"))
         .arg(Arg::from_usage(
-            "-n,--nixpkgs 'Intended be used within nixpkgs, will append pname to file path, and print addition statement'",
-        ).takes_value(false))
-        .arg(Arg::from_usage(
-            "--by-name 'RFC140 layout: write the expression to pkgs/by-name/<shard>/<pname>/package.nix (relative to --nixpkgs-root). The shard is the lowercased first two characters of pname. Implies --nixpkgs and skips printing an all-packages.nix addition line, since by-name packages are auto-discovered.'",
+            "--by-name 'RFC140 layout: write the expression to pkgs/by-name/<shard>/<pname>/package.nix (relative to --nixpkgs-root). The shard is the lowercased first two characters of pname. Packages are auto-discovered, so no all-packages.nix addition line is needed.'",
         ).takes_value(false))
         .arg(
             Arg::from_usage("-f,--fetcher [fetcher] 'Fetcher to use'")
@@ -230,9 +227,9 @@ pub fn validate_and_serialize_matches(
     let include_documentation_links: bool = matches.is_present("documentation-links");
     let include_meta: bool = !matches.is_present("no-meta");
 
-    let nixpkgs_layout = matches.is_present("nixpkgs") || matches.is_present("by-name");
+    let nixpkgs_layout = matches.is_present("by-name");
     assert(!(nixpkgs_layout && matches.value_of("pname") == Some("CHANGE") && matches.value_of("from-url") == None),
-        "'-p,--pname' or '-u,--from-url' is required when using the -n,--nixpkgs or --by-name flag");
+        "'-p,--pname' or '-u,--from-url' is required when using the --by-name flag");
 
     if matches.is_present("by-name") {
         match arg_to_type::<Template>(matches.value_of("TEMPLATE")) {
@@ -453,7 +450,7 @@ mod tests {
             "python",
             "-r",
             "/tmp",
-            "-n",
+            "--by-name",
             "-p",
             "requests",
         ]);
@@ -467,16 +464,16 @@ mod tests {
         assert_eq!(m.value_of("nixpkgs-root"), Some("/tmp"));
         assert_eq!(m.is_present("stdout"), false);
         assert_eq!(m.occurrences_of("PATH"), 0);
-        assert_eq!(m.is_present("nixpkgs"), true);
-        assert!(m.occurrences_of("nixpkgs") >= 1);
+        assert_eq!(m.is_present("by-name"), true);
+        assert!(m.occurrences_of("by-name") >= 1);
         assert_eq!(m.occurrences_of("from-url"), 0);
     }
 
     #[test]
     fn test_url() {
-        let m = build_cli().get_matches_from(vec!["nix-template", "python", "-u", "https://pypi.org/project/requests/", "-n"]);
+        let m = build_cli().get_matches_from(vec!["nix-template", "python", "-u", "https://pypi.org/project/requests/", "--by-name"]);
         assert_eq!(m.is_present("stdout"), false);
-        assert_eq!(m.is_present("nixpkgs"), true);
+        assert_eq!(m.is_present("by-name"), true);
         assert_eq!(m.occurrences_of("from-url"), 1);
     }
 
@@ -487,7 +484,7 @@ mod tests {
         assert_eq!(m.value_of("TEMPLATE"), Some("mkshell"));
         assert_eq!(m.value_of("PATH"), Some("shell.nix"));
         assert_eq!(m.value_of("pname"), Some("CHANGE"));
-        assert_eq!(m.is_present("nixpkgs"), false);
+        assert_eq!(m.is_present("by-name"), false);
         assert_eq!(m.occurrences_of("from-url"), 0);
     }
 
@@ -578,10 +575,10 @@ mod tests {
 
     #[test]
     #[serial] // touching global env, ensure serial runs
-    fn test_nixpkgs() {
+    fn test_nixpkgs_root_env() {
         use std::env::{remove_var, set_var};
         set_var("NIXPKGS_ROOT", "/testdir/");
-        let m = build_cli().get_matches_from(vec!["nix-template", "-n"]);
+        let m = build_cli().get_matches_from(vec!["nix-template", "--by-name", "-p", "test"]);
         assert_eq!(m.value_of("nixpkgs-root"), Some("/testdir/"));
         remove_var("NIXPKGS_ROOT");
     }
