@@ -112,13 +112,12 @@ pub fn nix_file_paths(
     if matches.is_present("nixpkgs") {
 
         let mut radix: PathBuf;
-        let python_application = matches.is_present("python-application");
         if matches.occurrences_of("PATH") == 0 {
             // default to nixpkgs path
-            if *template == Template::python && python_application {
+            if *template == Template::python_application {
                 eprintln!("No [PATH] provided, defaulting to \"pkgs/applications/misc/\"");
                 radix = PathBuf::from("applications/misc");
-            } else if *template == Template::python {
+            } else if *template == Template::python || *template == Template::python_package {
                 eprintln!("No [PATH] provided, defaulting to \"pkgs/development/python-modules/\"");
                 radix = PathBuf::from("development/python-modules/");
             } else if *template == Template::test {

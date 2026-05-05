@@ -105,9 +105,6 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "--prefetch-hashes 'For rust/go templates, run nix-build with a fake hash to compute cargoHash/vendorHash. Requires nix to be installed and a known src hash (i.e. used together with --from-url).'",
             ).takes_value(false))
         .arg(Arg::from_usage(
-            "--python-application 'Use buildPythonApplication instead of buildPythonPackage when generating a python template. Also defaults the package path to pkgs/applications/misc/ under --nixpkgs.'",
-            ).takes_value(false))
-        .arg(Arg::from_usage(
             "--no-infer-deps 'Disable automatic inference of buildInputs/nativeBuildInputs. By default, when --from-url is provided, nix-template materialises the source: for the rust template it parses Cargo.toml/Cargo.lock to detect well-known *-sys crates; for the go template it scans *.go files for `// #cgo` directives to detect pkg-config tokens and -l libraries.'",
             ).takes_value(false))
         .arg(
@@ -156,7 +153,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
                 .possible_values(&Fetcher::variants())
                 .case_insensitive(true)
                 .default_value("github")
-                .default_value_if("TEMPLATE", Some("python"), "pypi"),
+                .default_value_if("TEMPLATE", Some("python"), "pypi")
+                .default_value_if("TEMPLATE", Some("python-package"), "pypi")
+                .default_value_if("TEMPLATE", Some("python-application"), "pypi"),
         )
         .subcommand(
             SubCommand::with_name("completions")
@@ -277,7 +276,6 @@ pub fn validate_and_serialize_matches(
         cargo_hash: FAKE_SRI_HASH.to_owned(),
         vendor_hash: FAKE_SRI_HASH.to_owned(),
         domain: "CHANGE".to_owned(),
-        python_application: matches.is_present("python-application"),
         build_inputs: Vec::new(),
         native_build_inputs: Vec::new(),
     };
@@ -360,7 +358,6 @@ pub fn build_expression_info_from_interactive(
         .unwrap_or("");
 
     let prefetch_hashes = data.prefetch_hashes;
-    let python_application = data.python_application;
     let infer_deps = data.infer_deps;
     let mut info = ExpressionInfo {
         pname: data.pname.clone(),
@@ -382,7 +379,6 @@ pub fn build_expression_info_from_interactive(
         cargo_hash: FAKE_SRI_HASH.to_owned(),
         vendor_hash: FAKE_SRI_HASH.to_owned(),
         domain: "CHANGE".to_owned(),
-        python_application,
         build_inputs: Vec::new(),
         native_build_inputs: Vec::new(),
     };
