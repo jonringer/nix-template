@@ -98,6 +98,67 @@ fn to_sri(hash: &str) -> String {
      .to_owned()
 }
 
+/// Heuristic detection of prerelease tags for platforms that don't have
+/// a dedicated prerelease field (e.g., GitLab).
+///
+/// Detects:
+/// - Semver prereleases: 1.0.0-rc1, 1.0.0-alpha.1, etc. (contains - but not at end)
+/// - Common prerelease patterns: -alpha, -beta, -rc, -pre (case-insensitive)
+fn is_prerelease_tag(tag: &str) -> bool {
+    // Check for semver prerelease format (version-prerelease+build)
+    // e.g., "1.0.0-rc1" or "v2.0.0-alpha.1"
+    if tag.contains('-') && !tag.ends_with('-') {
+        let lowercase = tag.to_lowercase();
+        // Only consider it a prerelease if it actually contains prerelease keywords
+        // This avoids false positives for tags like "foo-bar-1.0"
+        if lowercase.contains("alpha")
+            || lowercase.contains("beta")
+            || lowercase.contains("-rc")
+            || lowercase.contains(".rc")
+            || lowercase.contains("pre")
+            || lowercase.contains("dev")
+            || lowercase.contains("snapshot")
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Detect the forge platform (Gitea or GitLab) by probing version endpoints.
+/// Returns Some("gitea") or Some("gitlab") if detected, None otherwise.
+fn detect_forge_platform(domain: &str) -> Option<&'static str> {
+    let client = Client::new();
+
+    // Try Gitea first (API v1)
+    let gitea_url = format!("https://{}/api/v1/version", domain);
+    if let Ok(response) = client
+        .get(&gitea_url)
+        .header("User-Agent", "nix-template")
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+    {
+        if response.status().is_success() {
+            return Some("gitea");
+        }
+    }
+
+    // Try GitLab (API v4)
+    let gitlab_url = format!("https://{}/api/v4/version", domain);
+    if let Ok(response) = client
+        .get(&gitlab_url)
+        .header("User-Agent", "nix-template")
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+    {
+        if response.status().is_success() {
+            return Some("gitlab");
+        }
+    }
+
+    None
+}
+
 // This will just crazy the program, so no need to return a value
 fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> {
     if url.starts_with("github.com") {
@@ -161,11 +222,43 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> 
             repo: captures.name("repo").unwrap().as_str().to_owned(),
         }));
     } else {
-        Err(anyhow!(
-            "{} is not a supported url. Only github.com, gitlab.com, pypi.org, and known gitea instances ({}) are supported currently",
-            original_url,
-            GITEA_HOSTS.join(", "),
-        ))
+        // Try to auto-detect the platform for unknown domains
+        let captures = GITEA_URL_REGEX.captures(url).ok_or_else(|| {
+            anyhow!("Error: please provide a url of shape '<domain>/<owner>/<repo>'")
+        })?;
+
+        let domain = captures.name("domain").unwrap().as_str();
+        let owner = captures.name("owner").unwrap().as_str().to_owned();
+        let repo = captures.name("repo").unwrap().as_str().to_owned();
+
+        eprintln!("Detecting platform for {}...", domain);
+
+        match detect_forge_platform(domain) {
+            Some("gitea") => {
+                eprintln!("Detected Gitea instance at {}", domain);
+                Ok(Gitea(types::GiteaRepo {
+                    domain: domain.to_owned(),
+                    owner,
+                    repo,
+                }))
+            }
+            Some("gitlab") => {
+                eprintln!("Detected GitLab instance at {}", domain);
+                // For detected GitLab instances, construct the project_path
+                let project_path = format!("{}/{}", owner, repo);
+                Ok(Gitlab(types::GitlabRepo {
+                    domain: domain.to_owned(),
+                    project_path: project_path.clone(),
+                    owner,
+                    repo,
+                }))
+            }
+            _ => Err(anyhow!(
+                "{} is not a recognized forge platform. Could not detect Gitea or GitLab API at {}. Only github.com, gitlab.com, pypi.org, and self-hosted Gitea/GitLab instances are supported.",
+                original_url,
+                domain
+            ))
+        }
     }
 }
 
@@ -312,6 +405,280 @@ pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionIn
     }
 }
 
+/// Populate `info` with metadata from a GitLab repository.
+///
+/// Uses GitLab's API v4 to fetch release and project information.
+/// Supports nested groups (e.g., gitlab.com/org/subgroup/repo).
+/// The project_path is URL-encoded for API calls.
+pub fn fill_gitlab_info(repo: &types::GitlabRepo, info: &mut types::ExpressionInfo, include_prereleases: bool) {
+    if info.pname == "CHANGE" {
+        info.pname = repo.repo.to_string();
+    }
+    info.fetcher = types::Fetcher::gitlab;
+    if info.owner == "CHANGE" {
+        info.owner = repo.owner.clone();
+    }
+
+    let request_client = Client::new();
+
+    // URL-encode the project path for API calls
+    let project_path_encoded = urlencoding::encode(&repo.project_path);
+
+    eprintln!("Determining latest release for {}", &repo.project_path);
+
+    // Try the /permalink/latest endpoint first (GitLab 15.4+)
+    let latest_url = format!(
+        "https://{}/api/v4/projects/{}/releases/permalink/latest",
+        repo.domain, project_path_encoded
+    );
+
+    let mut latest_request = request_client
+        .get(&latest_url)
+        .header("User-Agent", "nix-template")
+        .header("Accept", "application/json");
+
+    if let Ok(token) = std::env::var("GITLAB_TOKEN") {
+        latest_request = latest_request.header("PRIVATE-TOKEN", token);
+    }
+
+    // Try latest endpoint first, fall back to list if not available
+    let release_result = get_json(latest_request);
+
+    let release_body = match release_result {
+        Ok(body) => Some(body),
+        Err(_) => {
+            // Fallback: fetch all releases and find latest
+            eprintln!("Latest release endpoint not available, fetching all releases...");
+            let list_url = format!(
+                "https://{}/api/v4/projects/{}/releases",
+                repo.domain, project_path_encoded
+            );
+
+            let mut list_request = request_client
+                .get(&list_url)
+                .header("User-Agent", "nix-template")
+                .header("Accept", "application/json");
+
+            if let Ok(token) = std::env::var("GITLAB_TOKEN") {
+                list_request = list_request.header("PRIVATE-TOKEN", token);
+            }
+
+            match get_json(list_request) {
+                Ok(body) => Some(body),
+                Err(e) => {
+                    eprintln!("Warning: Could not fetch GitLab releases: {}", e);
+                    None
+                }
+            }
+        }
+    };
+
+    if let Some(body) = release_body {
+        // Parse as list even if we got single release from /latest (wrap in array if needed)
+        let releases_result: Result<types::GitlabReleaseResponse, _> = serde_json::from_str(&body);
+
+        let mut releases = match releases_result {
+            Ok(r) => r,
+            Err(_) => {
+                // Maybe it's a single release object from /latest endpoint
+                let single: Result<types::GitlabReleaseElement, _> = serde_json::from_str(&body);
+                match single {
+                    Ok(r) => vec![r],
+                    Err(e) => {
+                        eprintln!("Warning: Could not parse GitLab release data: {}", e);
+                        vec![]
+                    }
+                }
+            }
+        };
+
+        if !releases.is_empty() {
+            // Sort by released_at timestamp (most recent first)
+            releases.sort_by(|a, b| b.released_at.cmp(&a.released_at));
+
+            // Filter out prereleases using heuristic (unless --include-prereleases is set)
+            if !include_prereleases {
+                releases = releases
+                    .into_iter()
+                    .filter(|r| !is_prerelease_tag(&r.tag_name))
+                    .collect();
+            }
+
+            if let Some(latest) = releases.first() {
+                let parsed_version = VERSION_REGEX.captures(&latest.tag_name).unwrap();
+                info.version = parsed_version.get(2).unwrap().as_str().to_owned();
+                info.tag_prefix = parsed_version.get(1).unwrap().as_str().to_owned();
+
+                eprintln!("Determining sha256 for {}", &repo.repo);
+
+                // GitLab archive URL format: /-/archive/{tag}/{repo}-{tag}.tar.gz
+                let archive_url = format!(
+                    "https://{}/{}/-/archive/{}{}/{}-{}{}.tar.gz",
+                    &repo.domain,
+                    &repo.project_path,
+                    &info.tag_prefix,
+                    &info.version,
+                    &repo.repo,
+                    &info.tag_prefix,
+                    &info.version
+                );
+
+                let sha256_cmd = Command::new("nix-prefetch-url")
+                    .args(&["--unpack", "--type", "sha256"])
+                    .arg(&archive_url)
+                    .output();
+
+                match sha256_cmd {
+                    Ok(output) => {
+                        if output.status.success() {
+                            info.src_sha = to_sri(
+                                String::from_utf8_lossy(&output.stdout)
+                                    .to_string()
+                                    .trim(),
+                            );
+                        } else {
+                            eprintln!(
+                                "Warning: nix-prefetch-url failed: {}",
+                                String::from_utf8_lossy(&output.stderr)
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Could not run nix-prefetch-url: {}", e);
+                    }
+                }
+            }
+        } else {
+            // No releases found, fallback to tags
+            eprintln!("No releases found, trying tags API...");
+            let tags_url = format!(
+                "https://{}/api/v4/projects/{}/repository/tags",
+                repo.domain, project_path_encoded
+            );
+
+            let mut tags_request = request_client
+                .get(&tags_url)
+                .header("User-Agent", "nix-template")
+                .header("Accept", "application/json");
+
+            if let Ok(token) = std::env::var("GITLAB_TOKEN") {
+                tags_request = tags_request.header("PRIVATE-TOKEN", token);
+            }
+
+            match get_json(tags_request) {
+                Ok(tags_body) => {
+                    let tags_result: Result<types::GitlabTagsResponse, _> = serde_json::from_str(&tags_body);
+                    if let Ok(mut tags) = tags_result {
+                        if !tags.is_empty() {
+                            // Sort by tag name using version comparison
+                            tags.sort_by(|a, b| {
+                                VersionCompare::compare(&b.name, &a.name)
+                                    .unwrap()
+                                    .ord()
+                                    .unwrap()
+                            });
+
+                            // Filter out prereleases (unless --include-prereleases is set)
+                            if !include_prereleases {
+                                tags = tags
+                                    .into_iter()
+                                    .filter(|t| !is_prerelease_tag(&t.name))
+                                    .collect();
+                            }
+
+                            if let Some(latest_tag) = tags.first() {
+                                if let Some(captures) = VERSION_REGEX.captures(&latest_tag.name) {
+                                    info.version = captures.get(2).unwrap().as_str().to_owned();
+                                    info.tag_prefix = captures.get(1).unwrap().as_str().to_owned();
+
+                                    eprintln!("Determining sha256 for {}", &repo.repo);
+
+                                    let archive_url = format!(
+                                        "https://{}/{}/-/archive/{}{}/{}-{}{}.tar.gz",
+                                        &repo.domain,
+                                        &repo.project_path,
+                                        &info.tag_prefix,
+                                        &info.version,
+                                        &repo.repo,
+                                        &info.tag_prefix,
+                                        &info.version
+                                    );
+
+                                    let sha256_cmd = Command::new("nix-prefetch-url")
+                                        .args(&["--unpack", "--type", "sha256"])
+                                        .arg(&archive_url)
+                                        .output();
+
+                                    match sha256_cmd {
+                                        Ok(output) => {
+                                            if output.status.success() {
+                                                info.src_sha = to_sri(
+                                                    String::from_utf8_lossy(&output.stdout)
+                                                        .to_string()
+                                                        .trim(),
+                                                );
+                                            } else {
+                                                eprintln!(
+                                                    "Warning: nix-prefetch-url failed: {}",
+                                                    String::from_utf8_lossy(&output.stderr)
+                                                );
+                                            }
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Warning: Could not run nix-prefetch-url: {}", e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: Could not fetch GitLab tags: {}", e);
+                }
+            }
+        }
+    }
+
+    // Fetch project metadata for description and license
+    let project_url = format!(
+        "https://{}/api/v4/projects/{}",
+        repo.domain, project_path_encoded
+    );
+
+    let mut project_request = request_client
+        .get(&project_url)
+        .header("User-Agent", "nix-template")
+        .header("Accept", "application/json");
+
+    if let Ok(token) = std::env::var("GITLAB_TOKEN") {
+        project_request = project_request.header("PRIVATE-TOKEN", token);
+    }
+
+    match get_json(project_request) {
+        Ok(body) => {
+            let project: Result<types::GitlabProjectResponse, _> = serde_json::from_str(&body);
+            if let Ok(proj) = project {
+                if let Some(desc) = proj.description {
+                    info.description = desc;
+                }
+                info.homepage = proj.web_url;
+
+                if let Some(license) = proj.license {
+                    info.license = GITHUB_TO_NIXPKGS_LICENSE
+                        .get(license.key.as_str())
+                        .unwrap_or(&"CHANGE")
+                        .to_string();
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("Warning: Could not fetch GitLab project metadata: {}", e);
+            info.homepage = format!("https://{}/{}", repo.domain, repo.project_path);
+        }
+    }
+}
+
 /// Populate `info` with metadata from a Gitea repository.
 ///
 /// Gitea's REST API closely mirrors GitHub's: `/api/v1/repos/<owner>/<repo>`
@@ -339,10 +706,15 @@ pub fn fill_gitea_info(repo: &types::GiteaRepo, info: &mut types::ExpressionInfo
         "https://{}/api/v1/repos/{}/{}/releases",
         repo.domain, repo.owner, repo.repo
     );
-    let releases_request = request_client
+    let mut releases_request = request_client
         .get(&releases_url)
         .header("User-Agent", "reqwest")
         .header("Accept", "application/json");
+
+    // Add GITEA_TOKEN if available (using Authorization header)
+    if let Ok(token) = std::env::var("GITEA_TOKEN") {
+        releases_request = releases_request.header("Authorization", format!("token {}", token));
+    }
 
     match get_json(releases_request) {
         Ok(body) => {
@@ -649,7 +1021,7 @@ fn tempfile_dir() -> Option<std::path::PathBuf> {
     Some(dir)
 }
 
-pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo) {
+pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo, include_prereleases: bool) {
     let trimmed_url = url
         .trim_start_matches("http://")
         .trim_start_matches("https://");
@@ -659,7 +1031,7 @@ pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo) {
             fill_github_info(&repo, info);
         }
         Ok(Gitlab(repo)) => {
-            fill_gitlab_info(&repo, info);
+            fill_gitlab_info(&repo, info, include_prereleases);
         }
         Ok(Pypi(pypi_repo)) => {
             fill_pypi_info(&pypi_repo, info);

@@ -44,10 +44,10 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
         Fetcher::gitlab => (
             "fetchFromGitLab",
             "  @doc:fetcher@src = fetchFromGitLab {
-    owner = \"CHANGE\";
+    owner = \"@owner@\";
     repo = pname;
-    rev = \"CHANGE\";
-    sha256 = \"0000000000000000000000000000000000000000000000000000\";
+    rev = @rev@;
+    sha256 = \"@src_sha@\";
   };",
         ),
         Fetcher::gitea => (
