@@ -8,12 +8,14 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             "stdenvNoCC.mkDerivation",
             Some("stdenvNoCCMkDerivation"),
         ),
-        // For Python, switch between the library and application builders
-        // depending on `info.python_application`.
-        Template::python if info.python_application => {
+        // Python library packages use buildPythonPackage
+        Template::python | Template::python_package => {
+            ("buildPythonPackage", "buildPythonPackage", None)
+        }
+        // Python applications use buildPythonApplication
+        Template::python_application => {
             ("buildPythonApplication", "buildPythonApplication", None)
         }
-        Template::python => ("buildPythonPackage", "buildPythonPackage", None),
         Template::mkshell => ("pkgs ? import <nixpkgs> {}", "with pkgs;\n\nmkShell", None),
         Template::qt => ("mkDerivation", "mkDerivation", None),
         Template::go => ("buildGoModule", "buildGoModule", None),
@@ -84,7 +86,9 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
 
 fn addtional_pkg_attr_headers(template: &Template) -> &'static str {
     match template {
-        Template::python => "\n  @doc:pythonFormat@format = \"setuptools\";",
+        Template::python | Template::python_package | Template::python_application => {
+            "\n  @doc:pythonFormat@format = \"setuptools\";"
+        }
         _ => "",
     }
 }
@@ -93,9 +97,10 @@ fn build_inputs(info: &ExpressionInfo) -> String {
     match info.template {
         // Python applications don't carry a Python-import smoke test the way
         // libraries do; their entry points are exercised at runtime.
-        Template::python if info.python_application =>
+        Template::python_application =>
             "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];".to_owned(),
-        Template::python => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
+        // Python packages (libraries) include pythonImportsCheck for smoke testing
+        Template::python | Template::python_package => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
 
   @doc:pythonImportsCheck@pythonImportsCheck = [ \"@pname-import-check@\" ];".to_owned(),
         Template::rust => {
@@ -317,7 +322,6 @@ mod tests {
             cargo_hash: "sha256-cargo".to_owned(),
             vendor_hash: "sha256-vendor".to_owned(),
             domain: "".to_owned(),
-            python_application: false,
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),
         }
@@ -357,7 +361,6 @@ mod tests {
             cargo_hash: "".to_owned(),
             vendor_hash: "".to_owned(),
             domain: "".to_owned(),
-            python_application: false,
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),
         }
@@ -615,10 +618,11 @@ final: prev: {
         .to_string();
     }
 
-    let call_package = if *template == Template::python {
-        "final.python3Packages.callPackage"
-    } else {
-        "final.callPackage"
+    let call_package = match template {
+        Template::python | Template::python_package | Template::python_application => {
+            "final.python3Packages.callPackage"
+        }
+        _ => "final.callPackage",
     };
 
     format!(
@@ -718,10 +722,11 @@ pub fn generate_structured_flake_nix(template: &Template, pname: &str, directory
         );
     }
 
-    let attr_path = if *template == Template::python {
-        format!("overlayed.python3Packages.{}", pname)
-    } else {
-        format!("overlayed.{}", pname)
+    let attr_path = match template {
+        Template::python | Template::python_package | Template::python_application => {
+            format!("overlayed.python3Packages.{}", pname)
+        }
+        _ => format!("overlayed.{}", pname),
     };
 
     format!(

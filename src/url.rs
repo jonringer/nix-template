@@ -524,7 +524,6 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         cargo_hash: FAKE_SRI_HASH.to_owned(),
         vendor_hash: FAKE_SRI_HASH.to_owned(),
         domain: info.domain.clone(),
-        python_application: info.python_application,
         // Probe expressions don't need to render the inferred deps;
         // we want a minimal expression that just exercises src + cargo.
         build_inputs: Vec::new(),

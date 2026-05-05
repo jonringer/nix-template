@@ -169,9 +169,10 @@ pub struct UrlMetadata {
     pub homepage: String,
     pub fetcher: Fetcher,
     pub owner: Option<String>,
-    /// Heuristic flag set when PyPI metadata suggests this is an end-user
-    /// application (e.g. classifiers mention `Environment ::`).
-    pub is_python_application: bool,
+    /// Suggested Python template variant when PyPI metadata indicates this is
+    /// an end-user application (e.g. classifiers mention `Environment ::`).
+    /// When None, no suggestion is made.
+    pub suggested_python_template: Option<Template>,
 }
 
 impl Default for UrlMetadata {
@@ -183,7 +184,7 @@ impl Default for UrlMetadata {
             homepage: "".to_string(),
             fetcher: Fetcher::github,
             owner: None,
-            is_python_application: false,
+            suggested_python_template: None,
         }
     }
 }
@@ -354,7 +355,9 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
     let options = vec![
         ("stdenv", "Standard environment derivation"),
         ("stdenvNoCC", "Standard environment without a C compiler (fonts, data, scripts)"),
-        ("python", "Python package with buildPythonPackage"),
+        ("python", "Python package (legacy, use python-package or python-application)"),
+        ("python-package", "Python library with buildPythonPackage"),
+        ("python-application", "Python application with buildPythonApplication"),
         ("rust", "Rust package with rustPlatform.buildRustPackage"),
         ("go", "Go package with buildGoModule"),
         ("qt", "Qt application with mkDerivation"),
@@ -365,13 +368,15 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
 
     let display_options: Vec<String> = options
         .iter()
-        .map(|(name, desc)| format!("{:<10} - {}", name, desc))
+        .map(|(name, desc)| format!("{:<20} - {}", name, desc))
         .collect();
 
     let default_idx = if let Some(template) = default {
         options.iter().position(|(name, _)| {
             let template_str = format!("{:?}", template);
-            *name == template_str.as_str()
+            // Handle the snake_case to kebab-case mapping
+            let kebab_name = template_str.replace('_', "-");
+            *name == template_str.as_str() || *name == kebab_name.as_str()
         })
     } else {
         Some(0) // Default to stdenv
@@ -389,6 +394,8 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
         "stdenv" => Template::stdenv,
         "stdenvNoCC" => Template::stdenvNoCC,
         "python" => Template::python,
+        "python-package" => Template::python_package,
+        "python-application" => Template::python_application,
         "rust" => Template::rust,
         "go" => Template::go,
         "qt" => Template::qt,
@@ -427,7 +434,7 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 homepage,
                 fetcher: Fetcher::github,
                 owner: Some(gh_repo.owner.clone()),
-                is_python_application: false,
+                suggested_python_template: None,
             })
         }
         Repo::Pypi(pypi_repo) => {
@@ -440,8 +447,12 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 .unwrap_or(&"CHANGE")
                 .to_string();
 
-            let is_python_application =
-                classifiers_suggest_application(&pypi_response.info.classifiers);
+            let suggested_python_template =
+                if classifiers_suggest_application(&pypi_response.info.classifiers) {
+                    Some(Template::python_application)
+                } else {
+                    Some(Template::python_package)
+                };
 
             Ok(UrlMetadata {
                 pname: pypi_repo.project.clone(),
@@ -450,7 +461,7 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 homepage: pypi_response.info.home_page.unwrap_or("CHANGE".to_string()),
                 fetcher: Fetcher::pypi,
                 owner: None,
-                is_python_application,
+                suggested_python_template,
             })
         }
         Repo::Gitea(gitea_repo) => {
@@ -473,7 +484,7 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 homepage,
                 fetcher: Fetcher::gitea,
                 owner: Some(gitea_repo.owner.clone()),
-                is_python_application: false,
+                suggested_python_template: None,
             })
         }
     }
@@ -906,25 +917,6 @@ pub fn run_interactive_mode(
         false
     };
 
-    // For the python template, ask whether this is an end-user application
-    // (uses `buildPythonApplication`) rather than a library
-    // (uses `buildPythonPackage`). Default is auto-detected from PyPI
-    // classifiers when available.
-    let python_application = if template == Template::python {
-        let default = metadata.is_python_application;
-        let help = if default {
-            "PyPI classifiers suggest an end-user program; press Enter to accept"
-        } else {
-            "Choose 'yes' for end-user programs, 'no' for libraries imported by other packages"
-        };
-        Confirm::new("Is this a Python application (uses buildPythonApplication)?")
-            .with_default(default)
-            .with_help_message(help)
-            .prompt()?
-    } else {
-        false
-    };
-
     Ok(InteractiveData {
         template,
         pname,
@@ -939,7 +931,6 @@ pub fn run_interactive_mode(
         include_documentation_links: include_docs,
         include_meta,
         prefetch_hashes,
-        python_application,
         infer_deps,
     })
 }
@@ -962,9 +953,6 @@ pub struct InteractiveData {
     /// Whether to prefetch `cargoHash` (rust) / `vendorHash` (go) by running
     /// nix-build against a probe expression with `lib.fakeHash`.
     pub prefetch_hashes: bool,
-    /// When the python template is selected, switches the builder from
-    /// `buildPythonPackage` to `buildPythonApplication`.
-    pub python_application: bool,
     /// When the rust template is selected, infer system dependencies by
     /// inspecting the project's Cargo.toml.
     pub infer_deps: bool,

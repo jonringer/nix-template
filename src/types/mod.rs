@@ -81,6 +81,8 @@ arg_enum! {
         stdenv,
         stdenvNoCC,
         python,
+        python_package,
+        python_application,
         module,
         mkshell,
         go,
@@ -155,10 +157,6 @@ pub struct ExpressionInfo {
     /// Domain of the Gitea instance (used by the `gitea` fetcher), e.g.
     /// "codeberg.org" or "gitea.com". Empty for non-Gitea fetchers.
     pub domain: String,
-    /// When the `python` template is used, switches the builder from
-    /// `buildPythonPackage` (libraries) to `buildPythonApplication`
-    /// (end-user programs). Has no effect for non-Python templates.
-    pub python_application: bool,
     /// Inferred system libraries that need to be linked at build time
     /// (rendered into `buildInputs` for the `rust` template).
     pub build_inputs: Vec<String>,
