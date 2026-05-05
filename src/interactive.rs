@@ -888,15 +888,16 @@ pub fn run_interactive_mode(
         .with_default(true)
         .prompt()?;
 
-    // Offer hash prefetching for Rust/Go templates when we have a real source.
-    let prefetch_hashes = if matches!(template, Template::rust | Template::go)
+    // Hash prefetching is enabled by default for Rust/Go templates when we have a real source.
+    // Ask if the user wants to skip it (opt-out behavior).
+    let skip_vendor_hashes = if matches!(template, Template::rust | Template::go)
         && url_with_metadata.is_some()
     {
-        Confirm::new("Prefetch cargoHash/vendorHash by running nix-build? (slow)")
+        Confirm::new("Skip automatic cargoHash/vendorHash computation? (runs nix-build by default)")
             .with_default(false)
             .prompt()?
     } else {
-        false
+        true // Skip if not rust/go or no URL
     };
 
     // Offer dependency inference for Rust and Go templates. For Rust we
@@ -930,7 +931,7 @@ pub fn run_interactive_mode(
         url: url_with_metadata.map(|(url, _)| url),
         include_documentation_links: include_docs,
         include_meta,
-        prefetch_hashes,
+        skip_vendor_hashes,
         infer_deps,
     })
 }
@@ -950,9 +951,10 @@ pub struct InteractiveData {
     pub url: Option<String>,
     pub include_documentation_links: bool,
     pub include_meta: bool,
-    /// Whether to prefetch `cargoHash` (rust) / `vendorHash` (go) by running
-    /// nix-build against a probe expression with `lib.fakeHash`.
-    pub prefetch_hashes: bool,
+    /// Whether to skip automatic computation of `cargoHash` (rust) / `vendorHash` (go).
+    /// When false (default), nix-template runs nix-build against a probe expression
+    /// with `lib.fakeHash` to compute the real hash.
+    pub skip_vendor_hashes: bool,
     /// When the rust template is selected, infer system dependencies by
     /// inspecting the project's Cargo.toml.
     pub infer_deps: bool,
