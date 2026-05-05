@@ -487,6 +487,29 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 suggested_python_template: None,
             })
         }
+        Repo::Gitlab(gitlab_repo) => {
+            // For interactive metadata extraction we don't perform the
+            // network call here; full metadata is filled later via
+            // `read_meta_from_url`. We surface only what we need to
+            // pre-populate the prompts.
+            eprintln!(
+                "Detected GitLab URL ({}/{}), full metadata will be fetched later.",
+                gitlab_repo.domain, gitlab_repo.project_path
+            );
+            let homepage = format!(
+                "https://{}/{}",
+                gitlab_repo.domain, gitlab_repo.project_path
+            );
+            Ok(UrlMetadata {
+                pname: gitlab_repo.repo.clone(),
+                license: "CHANGE".to_string(),
+                description: "CHANGE".to_string(),
+                homepage,
+                fetcher: Fetcher::gitlab,
+                owner: Some(gitlab_repo.owner.clone()),
+                suggested_python_template: None,
+            })
+        }
     }
 }
 
@@ -642,6 +665,10 @@ pub fn prompt_version(url: Option<&str>, default: &str) -> Result<String> {
                 }
                 Repo::Gitea(_) => {
                     // Version fetching for Gitea is handled later by
+                    // `read_meta_from_url`; skip prompt-time enumeration.
+                }
+                Repo::Gitlab(_) => {
+                    // Version fetching for GitLab is handled later by
                     // `read_meta_from_url`; skip prompt-time enumeration.
                 }
             }
@@ -918,6 +945,15 @@ pub fn run_interactive_mode(
         false
     };
 
+    // Ask about including prereleases if URL was provided
+    let include_prereleases = if url_with_metadata.is_some() {
+        Confirm::new("Include prerelease versions (alpha, beta, rc)?")
+            .with_default(false)
+            .prompt()?
+    } else {
+        false
+    };
+
     Ok(InteractiveData {
         template,
         pname,
@@ -933,6 +969,7 @@ pub fn run_interactive_mode(
         include_meta,
         skip_vendor_hashes,
         infer_deps,
+        include_prereleases,
     })
 }
 
@@ -958,4 +995,6 @@ pub struct InteractiveData {
     /// When the rust template is selected, infer system dependencies by
     /// inspecting the project's Cargo.toml.
     pub infer_deps: bool,
+    /// Whether to include prerelease versions when fetching from GitLab or other forges.
+    pub include_prereleases: bool,
 }

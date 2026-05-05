@@ -43,7 +43,9 @@ pub fn build_cli() -> App<'static, 'static> {
         .after_help(
             "ENV VARS:
 
-    GITHUB_TOKEN\tToken used during github api calls.
+    GITHUB_TOKEN\tToken used during GitHub API calls.
+    GITLAB_TOKEN\tToken used during GitLab API calls (uses PRIVATE-TOKEN header).
+    GITEA_TOKEN\t\tToken used during Gitea API calls (uses Authorization header).
 
 EXAMPLES:
 
@@ -103,6 +105,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             ).takes_value(false))
         .arg(Arg::from_usage(
             "--skip-vendor-hashes 'Skip automatic computation of cargoHash/vendorHash for rust/go templates. By default, when --from-url is provided, nix-template runs nix-build with a fake hash to compute the real hash. Requires nix to be installed.'",
+            ).takes_value(false))
+        .arg(Arg::from_usage(
+            "--include-prereleases 'Include prerelease versions when fetching from GitLab or other forges. By default, nix-template filters out versions with -alpha, -beta, -rc, etc.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
             "--skip-infer-deps 'Skip automatic inference of buildInputs/nativeBuildInputs. By default, when --from-url is provided, nix-template materialises the source: for the rust template it parses Cargo.toml/Cargo.lock to detect well-known *-sys crates; for the go template it scans *.go files for `// #cgo` directives to detect pkg-config tokens and -l libraries.'",
@@ -281,7 +286,8 @@ pub fn validate_and_serialize_matches(
     };
 
     if let Some(url) = matches.value_of("from-url") {
-        read_meta_from_url(url, &mut info);
+        let include_prereleases = matches.is_present("include-prereleases");
+        read_meta_from_url(url, &mut info, include_prereleases);
     }
 
     // Vendor hash prefetching is on by default when --from-url is provided.
@@ -389,7 +395,7 @@ pub fn build_expression_info_from_interactive(
 
     // If URL was provided, fetch metadata
     if let Some(url) = data.url {
-        read_meta_from_url(&url, &mut info);
+        read_meta_from_url(&url, &mut info, data.include_prereleases);
     }
 
     // Vendor hash prefetching is enabled by default (opt-out via skip flag)
