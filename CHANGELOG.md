@@ -6,7 +6,6 @@
   - Removed Qt template (deprecated, use stdenv.mkDerivation with wrapQtAppsHook instead)
   - Removed legacy `python` template (use `python_package` or `python_application` instead)
   - Removed `--nixpkgs` flag (obsolete), replaced by `--by-name`
-  - Removed `--init-project` flag (use `--init-flake` or `--init-npins` instead for project scaffolding)
   - All templates now use `finalAttrs` pattern instead of `rec` for better override composition
 
 - Additions:
@@ -22,7 +21,7 @@
   - CLI Flags:
     - Added `--by-name` flag for RFC 140 support (pkgs/by-name directory structure)
     - Added `--binputs` and `--nbinputs` flags to manually specify buildInputs and nativeBuildInputs
-    - Added `--init-npins` flag to initialize npins-based projects (alternative to flakes)
+    - Added `--init-npins` flag to initialize npins-based (v0.4.0) projects (alternative to flakes)
     - Added `--skip-vendor-hash` flag to skip automatic vendor hash prefetching
     - Added `--skip-infer-deps` flag to skip automatic dependency inference
   - Fetcher Support:
