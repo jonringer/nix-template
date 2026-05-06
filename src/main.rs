@@ -2,13 +2,11 @@
 extern crate lazy_static;
 
 mod cli;
+mod deps;
 mod detect;
 mod expression;
 mod file_path;
-mod go_deps;
 mod interactive;
-mod ruby_deps;
-mod rust_deps;
 mod source;
 mod types;
 mod url;

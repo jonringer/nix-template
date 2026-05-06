@@ -1,11 +1,11 @@
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use std::io::IsTerminal;
 
+use crate::deps::go::infer_go_dependencies;
+use crate::deps::ruby;
+use crate::deps::rust::infer_rust_dependencies;
 use crate::file_path::nix_file_paths;
 use crate::interactive::InteractiveData;
-use crate::go_deps::infer_go_dependencies;
-use crate::ruby_deps;
-use crate::rust_deps::infer_rust_dependencies;
 use crate::types::{ExpressionInfo, Fetcher, Template, UserConfig, FAKE_SRI_HASH};
 use crate::url::{infer_dotnet_project_file, prefetch_dependency_hash, read_meta_from_url};
 
@@ -379,7 +379,7 @@ pub fn validate_and_serialize_matches(
                 }
             }
             Template::ruby => {
-                ruby_deps::infer_dependencies(&mut info);
+                ruby::infer_dependencies(&mut info);
             }
             Template::dotnet => {
                 if let Some(project_file) = infer_dotnet_project_file(&info) {
@@ -491,7 +491,7 @@ pub fn build_expression_info_from_interactive(
                 }
             }
             Template::ruby => {
-                ruby_deps::infer_dependencies(&mut info);
+                ruby::infer_dependencies(&mut info);
             }
             Template::dotnet => {
                 if let Some(project_file) = infer_dotnet_project_file(&info) {
