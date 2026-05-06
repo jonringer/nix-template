@@ -207,7 +207,10 @@ impl ExpressionInfo {
             if inputs.is_empty() {
                 "".to_owned()
             } else {
-                let body = inputs.join("\n    ");
+                // Deduplicate and sort inputs
+                let unique: std::collections::BTreeSet<_> = inputs.iter().collect();
+                let sorted: Vec<&String> = unique.into_iter().collect();
+                let body = sorted.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n    ");
                 format!("\n    {}\n ", body)
             }
         }
