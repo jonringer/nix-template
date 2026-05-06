@@ -1,32 +1,64 @@
 # Changelog
 
-## v0.4.2 (Unreleased)
+## v1.0.0 (Unreleased)
 
 - Breaking Changes:
   - Removed Qt template (deprecated, use stdenv.mkDerivation with wrapQtAppsHook instead)
   - Removed legacy `python` template (use `python_package` or `python_application` instead)
+  - Removed `--nixpkgs` flag (obsolete), replaced by `--by-name`
   - All templates now use `finalAttrs` pattern instead of `rec` for better override composition
 
 - Additions:
-  - Modern `finalAttrs` pattern is now default for all package templates (stdenv, Python, Rust, Go, npm, pnpm, dotnet)
-  - Self-references now use `finalAttrs.pname` and `finalAttrs.version`
-  - PyPI fetcher uses `inherit (finalAttrs) pname version;` syntax
-  - Added `npm` template for Node.js packages using buildNpmPackage
-  - Added `pnpm` template for pnpm-based packages using fetchPnpmDeps with stdenv.mkDerivation
-  - Added `dotnet` template for .NET packages using buildDotnetModule
-  - Added `ruby` template for Ruby applications using bundlerApp
-  - Dependency hash prefetching now supports npm and pnpm templates (requires package-lock.json/pnpm-lock.yaml in repository)
-  - Dependency inference for ruby template from Gemfile.lock (maps common gems like nokogiri, pg, mysql2 to their nixpkgs dependencies)
-  - Build system dependency inference for stdenv/stdenvNoCC templates:
+  - Templates:
+    - Added `python_package` template (for Python libraries using buildPythonPackage)
+    - Added `python_application` template (for Python applications using buildPythonApplication)
+    - Added `stdenvNoCC` template (for packages that don't need a compiler)
+    - Added `npm` template for Node.js packages using buildNpmPackage
+    - Added `pnpm` template for pnpm-based packages using fetchPnpmDeps with stdenv.mkDerivation
+    - Added `dotnet` template for .NET packages using buildDotnetModule
+    - Added `ruby` template for Ruby applications using bundlerApp
+    - Added `auto` template type for automatic project type detection
+  - CLI Flags:
+    - Added `--by-name` flag for RFC 140 support (pkgs/by-name directory structure)
+    - Added `--binputs` and `--nbinputs` flags to manually specify buildInputs and nativeBuildInputs
+    - Added `--init-npins` flag to initialize npins-based projects (alternative to flakes)
+    - Added `--skip-vendor-hash` flag to skip automatic vendor hash prefetching
+    - Added `--skip-infer-deps` flag to skip automatic dependency inference
+  - Fetcher Support:
+    - Added GitLab fetcher support with `--from-url`
+    - Added Gitea fetcher support with `--from-url`
+  - Dependency Inference:
+    - Rust: Infers dependencies from Cargo.toml and scans Cargo.lock for crates with native dependencies
+    - Go: Infers build inputs from CGO directives in Go source files
+    - Ruby: Maps common gems (nokogiri, pg, mysql2, etc.) from Gemfile.lock to nixpkgs dependencies
+    - CMake: Parses find_package() and find_dependency() calls for common dependencies (OpenSSL, ZLIB, Qt, Boost, etc.)
+    - Meson: Parses dependency() calls for common dependencies (zlib, openssl, gtk, glib, etc.)
+    - Autotools: Detects PKG_CHECK_MODULES in configure.ac and adds pkg-config to nativeBuildInputs
+  - Build System Detection:
     - Auto-detects CMakeLists.txt and adds cmake to nativeBuildInputs
     - Auto-detects meson.build and adds meson + ninja to nativeBuildInputs
-    - Parses find_package() and find_dependency() in CMake files for common dependencies (OpenSSL, ZLIB, Qt, Boost, etc.)
-    - Parses dependency() calls in Meson files for common dependencies (zlib, openssl, gtk, glib, etc.)
-    - Detects PKG_CHECK_MODULES in configure.ac and adds pkg-config to nativeBuildInputs
-  - Auto-detection now recognizes npm and pnpm projects (via pnpm-lock.yaml, package-lock.json, or package.json)
-  - Auto-detection now recognizes .NET projects (via *.csproj, *.fsproj, or *.sln files)
-  - Auto-detection now recognizes Ruby projects (via Gemfile.lock or Gemfile)
-  - Project file inference for dotnet template when using --from-url (automatically detects .csproj, .fsproj, or .sln)
+  - Auto-detection:
+    - Automatic project type detection from source code with `auto` template or `--init-project`
+    - Recognizes Rust projects (via Cargo.toml)
+    - Recognizes Go projects (via go.mod)
+    - Recognizes npm projects (via package-lock.json or package.json)
+    - Recognizes pnpm projects (via pnpm-lock.yaml)
+    - Recognizes .NET projects (via *.csproj, *.fsproj, or *.sln files)
+    - Recognizes Ruby projects (via Gemfile.lock or Gemfile)
+    - Project file inference for dotnet template when using --from-url (automatically detects .csproj, .fsproj, or .sln)
+  - Project Structure:
+    - Normalized `nix/` directory structure for both flake and npins-based projects
+    - Organized layout for packages, overlays, and modules
+  - Dependency Hash Prefetching:
+    - Automatically prefetches vendor hashes for Rust (Cargo.lock), Go (go.sum), npm (package-lock.json), and pnpm (pnpm-lock.yaml)
+    - Can be disabled with `--skip-vendor-hash` flag
+  - UI Improvements:
+    - Fuzzy search and tab completion for interactive prompts
+  - Pattern Improvements:
+    - Modern `finalAttrs` pattern is now default for all package templates (stdenv, Python, Ruby, Rust, Go, npm, pnpm, dotnet)
+
+- Fixes:
+  - PyPI fetcher now gracefully handles missing metadata
 
 ## v0.4.1
 
