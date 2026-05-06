@@ -80,7 +80,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
         ),
         Fetcher::pypi => (
             "fetchPypi",
-            "  @doc:fetcher@src = fetchPypi {
+            "  @doc:fetcherPypi@src = fetchPypi {
     pname = \"@pname@\";
     inherit (finalAttrs) version;
     sha256 = \"@src_sha@\";
