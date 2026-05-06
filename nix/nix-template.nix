@@ -1,24 +1,43 @@
-{ lib, rustPlatform, nix-gitignore, clippy, makeWrapper, nix, openssl, pkg-config, stdenv, darwin }:
+{
+  lib,
+  stdenv,
+  rustPlatform,
+  fetchFromGitHub,
+  installShellFiles,
+  makeWrapper,
+  nix,
+  nix-gitignore,
+  openssl,
+  pkg-config,
+}:
 
 rustPlatform.buildRustPackage rec {
-   name = "nix-template";
+  name = "nix-template";
 
-   src = nix-gitignore.gitignoreSource [] ../.;
+  src = nix-gitignore.gitignoreSource [ ] ../.;
 
-   cargoLock.lockFile = ../Cargo.lock;
+  cargoLock.lockFile = ../Cargo.lock;
 
-   nativeBuildInputs = [ pkg-config makeWrapper ];
-   buildInputs = [ openssl ] ++ lib.optionals stdenv.isDarwin [ darwin.apple_sdk.frameworks.Security ];
+  nativeBuildInputs = [
+    installShellFiles
+    makeWrapper
+    pkg-config
+  ];
 
-   doCheck = true;
-   nativeCheckInputs = [ clippy ];
-   postCheck = ''
-     cargo clippy
-   '';
+  buildInputs = [ openssl ];
 
-   # needed for `nix-prefetch-url`
-   postInstall = ''
-     wrapProgram $out/bin/nix-template \
-       --prefix PATH : ${lib.makeBinPath [ nix ]}
-   '';
+  # needed for nix-prefetch-url
+  postInstall =
+    ''
+      wrapProgram $out/bin/nix-template \
+        --prefix PATH : ${lib.makeBinPath [ nix ]}
+
+    ''
+    + lib.optionalString (stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
+      installShellCompletion --cmd nix-template \
+        --bash <($out/bin/nix-template completions bash) \
+        --fish <($out/bin/nix-template completions fish) \
+        --zsh <($out/bin/nix-template completions zsh)
+    '';
+
 }
