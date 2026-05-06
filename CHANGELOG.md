@@ -13,6 +13,7 @@
   - PyPI fetcher uses `inherit (finalAttrs) pname version;` syntax
   - Added `npm` template for Node.js packages using buildNpmPackage
   - Added `pnpm` template for pnpm-based packages using fetchPnpmDeps with stdenv.mkDerivation
+  - Dependency hash prefetching now supports npm and pnpm templates (requires package-lock.json/pnpm-lock.yaml in repository)
 
 ## v0.4.1
 

@@ -342,7 +342,7 @@ pub fn validate_and_serialize_matches(
         info.template = Template::stdenv;
     }
 
-    // Vendor hash prefetching is on by default when --from-url is provided.
+    // Dependency hash prefetching is on by default when --from-url is provided.
     // Users can disable via --skip-vendor-hashes.
     let should_prefetch_hashes = matches.is_present("from-url")
         && !matches.is_present("skip-vendor-hashes");
@@ -351,6 +351,8 @@ pub fn validate_and_serialize_matches(
             match info.template {
                 Template::rust => info.cargo_hash = hash,
                 Template::go => info.vendor_hash = hash,
+                Template::npm => info.npm_deps_hash = hash,
+                Template::pnpm => info.pnpm_deps_hash = hash,
                 _ => {}
             }
         }

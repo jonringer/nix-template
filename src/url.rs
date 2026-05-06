@@ -889,9 +889,9 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
 pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> {
     use std::io::Write;
 
-    // Only Rust and Go packages need this dance.
+    // Only Rust, Go, npm, and pnpm packages need dependency hash prefetching.
     match info.template {
-        Template::rust | Template::go => (),
+        Template::rust | Template::go | Template::npm | Template::pnpm => (),
         _ => return None,
     }
 
@@ -903,7 +903,7 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         return None;
     }
 
-    // Render the expression with a fake cargoHash/vendorHash so that nix
+    // Render the expression with a fake dependency hash so that nix
     // is forced to fetch the dependencies and emit a "got:" line.
     let probe_info = types::ExpressionInfo {
         pname: info.pname.clone(),
@@ -964,6 +964,8 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
     let kind = match info.template {
         Template::rust => "cargoHash",
         Template::go => "vendorHash",
+        Template::npm => "npmDepsHash",
+        Template::pnpm => "pnpmDeps hash",
         _ => unreachable!(),
     };
     eprintln!("Prefetching {} for {} (this may take a while)...", kind, &info.pname);
