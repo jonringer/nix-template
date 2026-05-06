@@ -15,13 +15,13 @@ pub fn by_name_shard(pname: &str) -> String {
 }
 
 /// Paths produced by the standardized `nix/` project layout used by
-/// `--init-flake` (when opted into), `--init-npins`, and `--init-project`.
+/// `--init-flake` (when no explicit PATH is given) and `--init-npins`.
 ///
 /// Layout (relative to the project root, which is `base_dir`):
 /// ```text
 /// <base_dir>/
 /// ├── flake.nix              (only when --init-flake)
-/// ├── default.nix            (only when --init-npins or --init-project)
+/// ├── default.nix            (only when --init-npins)
 /// ├── npins/                 (only when --init-npins)
 /// └── nix/
 ///     ├── overlay.nix
