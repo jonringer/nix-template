@@ -89,6 +89,8 @@ arg_enum! {
         mkshell,
         go,
         rust,
+        npm,
+        pnpm,
         test,
     }
 }
@@ -167,6 +169,12 @@ pub struct ExpressionInfo {
     /// SRI hash of the Go module vendor tree (used for `go` template).
     /// Defaults to `lib.fakeHash` when unknown.
     pub vendor_hash: String,
+    /// SRI hash of the npm dependencies (used for `npm` template).
+    /// Defaults to `lib.fakeHash` when unknown.
+    pub npm_deps_hash: String,
+    /// SRI hash of the pnpm dependencies (used for `pnpm` template).
+    /// Defaults to `lib.fakeHash` when unknown.
+    pub pnpm_deps_hash: String,
     /// Domain of the Gitea instance (used by the `gitea` fetcher), e.g.
     /// "codeberg.org" or "gitea.com". Empty for non-Gitea fetchers.
     pub domain: String,
@@ -208,6 +216,8 @@ impl ExpressionInfo {
             .replace("@src_sha@", &self.src_sha)
             .replace("@cargo_hash@", &self.cargo_hash)
             .replace("@vendor_hash@", &self.vendor_hash)
+            .replace("@npm_deps_hash@", &self.npm_deps_hash)
+            .replace("@pnpm_deps_hash@", &self.pnpm_deps_hash)
             .replace("@domain@", &self.domain)
             .replace("@description@", &self.description)
             .replace("@homepage@", &self.homepage)

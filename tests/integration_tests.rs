@@ -526,3 +526,60 @@ fn test_init_npins_refuses_overwrite() {
         std::fs::read_to_string(temp_path.join("npins").join("default.nix")).unwrap();
     assert_eq!(preserved, "# pre-existing npins reader\n");
 }
+
+#[test]
+fn test_npm_template_basic() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "npm",
+            "-p", "example",
+            "-v", "1.0.0",
+            "-l", "mit",
+            "--maintainer", "",
+            "-s",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's an npm package derivation
+    assert!(stdout.contains("buildNpmPackage"));
+    assert!(stdout.contains("npmDepsHash"));
+    assert!(stdout.contains("finalAttrs"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("npm_basic_template", stdout);
+}
+
+#[test]
+fn test_pnpm_template_basic() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "pnpm",
+            "-p", "example",
+            "-v", "1.0.0",
+            "-l", "mit",
+            "--maintainer", "",
+            "-s",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's a pnpm package derivation
+    assert!(stdout.contains("stdenv.mkDerivation"));
+    assert!(stdout.contains("fetchPnpmDeps"));
+    assert!(stdout.contains("pnpmConfigHook"));
+    assert!(stdout.contains("nodejs"));
+    assert!(stdout.contains("pnpm_10"));
+    assert!(stdout.contains("finalAttrs"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("pnpm_basic_template", stdout);
+}
