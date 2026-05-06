@@ -2,6 +2,7 @@ use crate::types::{ExpressionInfo, Fetcher, Template};
 
 fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
     let (input, derivation, documentation_key): (&str, &str, Option<&str>) = match info.template {
+        Template::auto => unreachable!("'auto' template should be resolved before expression generation"),
         Template::stdenv => ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation")),
         Template::stdenvNoCC => (
             "stdenvNoCC",
@@ -167,6 +168,7 @@ fn meta() -> &'static str {
 
 pub fn generate_expression(info: &ExpressionInfo) -> String {
     match &info.template {
+        Template::auto => unreachable!("'auto' template should be resolved before expression generation"),
         Template::module   => r#"@doc:nixosModules@{ pkgs, lib, config, ... }:
 
 with lib;
