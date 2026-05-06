@@ -4,6 +4,7 @@ use std::io::IsTerminal;
 use crate::file_path::nix_file_paths;
 use crate::interactive::InteractiveData;
 use crate::go_deps::infer_go_dependencies;
+use crate::ruby_deps;
 use crate::rust_deps::infer_rust_dependencies;
 use crate::types::{ExpressionInfo, Fetcher, Template, UserConfig, FAKE_SRI_HASH};
 use crate::url::{infer_dotnet_project_file, prefetch_dependency_hash, read_meta_from_url};
@@ -359,7 +360,7 @@ pub fn validate_and_serialize_matches(
         }
     }
 
-    // Inference is on by default for the rust and go templates whenever we
+    // Inference is on by default for the rust, go, and ruby templates whenever we
     // have a real source to inspect. Users can disable via `--skip-infer-deps`.
     let infer_enabled = matches.is_present("from-url")
         && !matches.is_present("skip-infer-deps");
@@ -376,6 +377,9 @@ pub fn validate_and_serialize_matches(
                     info.build_inputs = build;
                     info.native_build_inputs = native;
                 }
+            }
+            Template::ruby => {
+                ruby_deps::infer_dependencies(&mut info);
             }
             Template::dotnet => {
                 if let Some(project_file) = infer_dotnet_project_file(&info) {
@@ -485,6 +489,9 @@ pub fn build_expression_info_from_interactive(
                     info.build_inputs = build;
                     info.native_build_inputs = native;
                 }
+            }
+            Template::ruby => {
+                ruby_deps::infer_dependencies(&mut info);
             }
             Template::dotnet => {
                 if let Some(project_file) = infer_dotnet_project_file(&info) {

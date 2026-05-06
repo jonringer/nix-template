@@ -670,3 +670,64 @@ fn test_ruby_template_basic() {
     // Snapshot the output
     insta::assert_snapshot!("ruby_basic_template", stdout);
 }
+
+#[test]
+fn test_ruby_template_with_dependency_inference() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a Gemfile.lock with known gems that have native dependencies
+    let gemfile_lock = temp_dir.path().join("Gemfile.lock");
+    fs::write(
+        &gemfile_lock,
+        r#"GEM
+  remote: https://rubygems.org/
+  specs:
+    nokogiri (1.13.10)
+      mini_portile2 (~> 2.8.0)
+    pg (1.4.5)
+    mini_portile2 (2.8.1)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  nokogiri
+  pg
+
+BUNDLED WITH
+   2.3.0
+"#,
+    )
+    .unwrap();
+
+    let output_path = temp_dir.path().join("default.nix");
+
+    let output = Command::cargo_bin("nix-template").unwrap()
+        .current_dir(temp_dir.path())
+        .args(&[
+            "ruby",
+            "--pname",
+            "example",
+            "--maintainer",
+            "me",
+            output_path.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(
+        output.status.success(),
+        "Command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Read the generated file
+    let content = fs::read_to_string(&output_path).expect("Failed to read output file");
+
+    // Without --from-url, dependencies should NOT be inferred
+    // (inference only happens with --from-url flag)
+    assert!(!content.contains("buildInputs"));
+    assert!(!content.contains("nativeBuildInputs"));
+    assert!(!content.contains("libxml2"));
+    assert!(!content.contains("postgresql"));
+}
