@@ -10,6 +10,7 @@
 use crate::types::ExpressionInfo;
 use log::debug;
 use std::collections::BTreeSet;
+use std::path::Path;
 
 const LOG_TARGET: &str = "nix-template::ruby_deps";
 
@@ -112,8 +113,10 @@ pub fn parse_gemfile_lock(gemfile_lock: &str) -> Vec<String> {
 /// Returns `true` if we successfully found and parsed a lockfile; `false`
 /// otherwise. Even when returning `true`, the inferred lists may be empty
 /// if no mappable gems were found.
-pub fn infer_dependencies(info: &mut ExpressionInfo) -> bool {
-    let gemfile_lock_path = info.top_level_path.join("Gemfile.lock");
+/// Core inference logic that works with any source path.
+/// Returns (build_inputs, native_build_inputs) if Gemfile.lock is found.
+fn infer_from_source_path(source_path: &Path) -> Option<(Vec<String>, Vec<String>)> {
+    let gemfile_lock_path = source_path.join("Gemfile.lock");
 
     if !gemfile_lock_path.exists() {
         debug!(
@@ -121,7 +124,7 @@ pub fn infer_dependencies(info: &mut ExpressionInfo) -> bool {
             "No Gemfile.lock at {:?}; skipping dependency inference",
             gemfile_lock_path
         );
-        return false;
+        return None;
     }
 
     let lockfile_content = match std::fs::read_to_string(&gemfile_lock_path) {
@@ -133,7 +136,7 @@ pub fn infer_dependencies(info: &mut ExpressionInfo) -> bool {
                 gemfile_lock_path,
                 e
             );
-            return false;
+            return None;
         }
     };
 
@@ -155,17 +158,41 @@ pub fn infer_dependencies(info: &mut ExpressionInfo) -> bool {
         }
     }
 
-    info.build_inputs.extend(build_inputs);
-    info.native_build_inputs.extend(native_build_inputs);
+    Some((
+        build_inputs.into_iter().collect(),
+        native_build_inputs.into_iter().collect(),
+    ))
+}
 
-    debug!(
-        target: LOG_TARGET,
-        "Inferred buildInputs={:?}, nativeBuildInputs={:?}",
-        info.build_inputs,
-        info.native_build_inputs
-    );
+/// Infer Ruby gem dependencies from a local source path.
+/// Used during local project initialization (--init-flake/--init-npins).
+pub fn infer_ruby_dependencies_from_path(
+    source_path: &Path,
+) -> Option<(Vec<String>, Vec<String>)> {
+    eprintln!("Scanning local Gemfile.lock for dependencies...");
+    infer_from_source_path(source_path)
+}
 
-    true
+/// Infer Ruby gem dependencies from an already-materialized source in ExpressionInfo.
+/// This is the original function used when inferring from remote sources.
+pub fn infer_dependencies(info: &mut ExpressionInfo) -> bool {
+    if let Some((build_inputs, native_build_inputs)) =
+        infer_from_source_path(&info.top_level_path)
+    {
+        info.build_inputs.extend(build_inputs);
+        info.native_build_inputs.extend(native_build_inputs);
+
+        debug!(
+            target: LOG_TARGET,
+            "Inferred buildInputs={:?}, nativeBuildInputs={:?}",
+            info.build_inputs,
+            info.native_build_inputs
+        );
+
+        true
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]

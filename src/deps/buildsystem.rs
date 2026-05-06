@@ -10,6 +10,7 @@ use crate::types::ExpressionInfo;
 use log::debug;
 use regex::Regex;
 use std::collections::BTreeSet;
+use std::path::Path;
 
 const LOG_TARGET: &str = "nix-template::buildsystem";
 
@@ -192,10 +193,12 @@ pub fn has_pkg_check_modules(content: &str) -> bool {
 /// 4. Maps to nixpkgs equivalents
 ///
 /// Returns true if a build system was detected.
-pub fn infer_buildsystem_dependencies(info: &mut ExpressionInfo) -> bool {
-    let cmake_file = info.top_level_path.join("CMakeLists.txt");
-    let meson_file = info.top_level_path.join("meson.build");
-    let configure_ac = info.top_level_path.join("configure.ac");
+/// Core inference logic that works with any source path.
+/// Returns (build_inputs, native_build_inputs) if any build system files are detected.
+fn infer_from_source_path(source_path: &Path) -> Option<(Vec<String>, Vec<String>)> {
+    let cmake_file = source_path.join("CMakeLists.txt");
+    let meson_file = source_path.join("meson.build");
+    let configure_ac = source_path.join("configure.ac");
 
     let mut detected = false;
     let mut build_inputs: BTreeSet<String> = BTreeSet::new();
@@ -262,18 +265,45 @@ pub fn infer_buildsystem_dependencies(info: &mut ExpressionInfo) -> bool {
         }
     }
 
-    // Merge inferred dependencies into ExpressionInfo
-    info.build_inputs.extend(build_inputs);
-    info.native_build_inputs.extend(native_build_inputs);
+    if detected {
+        Some((
+            build_inputs.into_iter().collect(),
+            native_build_inputs.into_iter().collect(),
+        ))
+    } else {
+        None
+    }
+}
 
-    debug!(
-        target: LOG_TARGET,
-        "Build system inference complete: buildInputs={:?}, nativeBuildInputs={:?}",
-        info.build_inputs,
-        info.native_build_inputs
-    );
+/// Infer build system dependencies from a local source path.
+/// Used during local project initialization (--init-flake/--init-npins).
+pub fn infer_buildsystem_dependencies_from_path(
+    source_path: &Path,
+) -> Option<(Vec<String>, Vec<String>)> {
+    eprintln!("Scanning for build system files (CMakeLists.txt, meson.build, configure.ac)...");
+    infer_from_source_path(source_path)
+}
 
-    detected
+/// Infer build system dependencies from an already-materialized source in ExpressionInfo.
+/// This is the original function used when inferring from remote sources.
+pub fn infer_buildsystem_dependencies(info: &mut ExpressionInfo) -> bool {
+    if let Some((build_inputs, native_build_inputs)) =
+        infer_from_source_path(&info.top_level_path)
+    {
+        info.build_inputs.extend(build_inputs);
+        info.native_build_inputs.extend(native_build_inputs);
+
+        debug!(
+            target: LOG_TARGET,
+            "Build system inference complete: buildInputs={:?}, nativeBuildInputs={:?}",
+            info.build_inputs,
+            info.native_build_inputs
+        );
+
+        true
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]

@@ -159,7 +159,8 @@ fn main() {
                 }
 
                 // Infer dependencies for the detected template (if any)
-                let deps = if let Some(candidate) = candidates.first() {
+                // We try both template-specific inference AND build system inference
+                let mut deps = if let Some(candidate) = candidates.first() {
                     match candidate.template {
                         crate::types::Template::rust => {
                             crate::deps::rust::infer_rust_dependencies_from_path(&cwd)
@@ -169,11 +170,24 @@ fn main() {
                             crate::deps::go::infer_go_dependencies_from_path(&cwd)
                                 .unwrap_or_else(|| (Vec::new(), Vec::new()))
                         }
+                        crate::types::Template::ruby => {
+                            crate::deps::ruby::infer_ruby_dependencies_from_path(&cwd)
+                                .unwrap_or_else(|| (Vec::new(), Vec::new()))
+                        }
                         _ => (Vec::new(), Vec::new()),
                     }
                 } else {
                     (Vec::new(), Vec::new())
                 };
+
+                // Always try build system inference (cmake, meson, autotools)
+                // This works for any template type
+                if let Some((build_inputs, native_build_inputs)) =
+                    crate::deps::buildsystem::infer_buildsystem_dependencies_from_path(&cwd)
+                {
+                    deps.0.extend(build_inputs);
+                    deps.1.extend(native_build_inputs);
+                }
 
                 (candidates, deps)
             } else {

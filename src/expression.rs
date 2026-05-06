@@ -481,16 +481,15 @@ mod tests {
         );
 
         // It should still appear in BOTH list bodies, however. The list
-        // bodies preserve the user's insertion order rather than being
-        // sorted, so match against the as-given sequences.
+        // bodies are deduplicated and sorted alphabetically.
         let body = &out[header_end..];
         assert!(
-            body.contains("nativeBuildInputs = [\n    protobuf\n    pkg-config\n  ];"),
+            body.contains("nativeBuildInputs = [\n    pkg-config\n    protobuf\n  ];"),
             "missing dedup'd nativeBuildInputs body in:\n{}",
             body
         );
         assert!(
-            body.contains("buildInputs = [\n    protobuf\n    openssl\n  ];"),
+            body.contains("buildInputs = [\n    openssl\n    protobuf\n  ];"),
             "missing buildInputs body in:\n{}",
             body
         );
