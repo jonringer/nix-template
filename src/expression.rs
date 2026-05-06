@@ -85,6 +85,10 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
     sha256 = \"@src_sha@\";
   };",
         ),
+        Fetcher::local => (
+            "",
+            "  @doc:fetcher@src = ./..;",
+        ),
     }
 }
 
@@ -319,7 +323,11 @@ mkShell rec {
             let (f_input, f_block) = fetch_block(&info.fetcher);
             let addtional_pkg_attr_headers = addtional_pkg_attr_headers(&info.template);
 
-            let mut inputs = vec!(String::from("lib"), dh_input, f_input.to_string());
+            let mut inputs = vec!(String::from("lib"), dh_input);
+            // Only add fetcher input if it's not empty (local fetcher has no input)
+            if !f_input.is_empty() {
+                inputs.push(f_input.to_string());
+            }
             inputs.extend(info.propagated_build_inputs.iter().map(|s| s.to_owned()));
 
             // pnpm template needs special inputs for fetchPnpmDeps and pnpm setup
@@ -685,7 +693,7 @@ pub fn generate_flake_nix(template: &Template, output_file: &str, directory_name
 ///
 /// The list is rendered explicitly so users can see — and edit — which
 /// packages are exposed. New packages are added by appending another
-/// `final.callPackage ./pkgs/<name>/package.nix { };` line.
+/// `final.callPackage ./package.nix { };` line.
 pub fn generate_overlay_nix(template: &Template, pname: &str) -> String {
     if *template == Template::module {
         // Module-only projects don't have a package to expose. Emit an
@@ -696,7 +704,7 @@ pub fn generate_overlay_nix(template: &Template, pname: &str) -> String {
 # flake.nix, or release.nix. Add packages by appending callPackage lines
 # below.
 final: prev: {
-  # myPackage = final.callPackage ./pkgs/myPackage/package.nix { };
+  # myPackage = final.callPackage ./package.nix { };
 }
 "#
         .to_string();
@@ -716,7 +724,7 @@ final: prev: {
 # flake.nix, or release.nix. Add packages by appending callPackage lines
 # below.
 final: prev: {{
-  {pname} = {call_package} ./pkgs/{pname}/package.nix {{ }};
+  {pname} = {call_package} ./package.nix {{ }};
 }}
 "#,
         pname = pname,

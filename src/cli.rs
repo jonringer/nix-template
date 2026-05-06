@@ -101,11 +101,13 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "-s,--stdout 'Write expression to stdout, instead of PATH'",
             ))
         .arg(Arg::from_usage(
-            "--init-flake 'Generate a flake.nix alongside the package expression'",
-            ).takes_value(false))
+            "--init-flake 'Initialize current directory as a Nix flake project. Auto-detects project type and infers dependencies from local files. Cannot be used with --from-url.'",
+            ).takes_value(false)
+            .conflicts_with("from-url"))
         .arg(Arg::from_usage(
-            "--init-npins 'Generate an npins/ scaffold (npins/default.nix + empty npins/sources.json) and a wrapper default.nix at the project root. The package is placed under nix/pkgs/<pname>/package.nix and an overlay is generated at nix/overlay.nix. Combinable with --init-flake. See https://github.com/andir/npins for the dependency manager itself.'",
-            ).takes_value(false))
+            "--init-npins 'Initialize current directory with npins dependency management. Auto-detects project type and infers dependencies from local files. Generates npins/ scaffold and wrapper default.nix. Combinable with --init-flake. Cannot be used with --from-url. See https://github.com/andir/npins'",
+            ).takes_value(false)
+            .conflicts_with("from-url"))
         .arg(Arg::from_usage(
             "--skip-vendor-hashes 'Skip automatic computation of cargoHash/vendorHash for rust/go templates. By default, when --from-url is provided, nix-template runs nix-build with a fake hash to compute the real hash. Requires nix to be installed.'",
             ).takes_value(false))
@@ -479,7 +481,11 @@ pub fn build_expression_info_from_interactive(
         }
     }
 
-    if infer_deps {
+    // Use pre-inferred dependencies if available (from init mode), otherwise infer them
+    if let Some((build, native)) = data.preinferred_deps {
+        info.build_inputs = build;
+        info.native_build_inputs = native;
+    } else if infer_deps {
         match info.template {
             Template::rust => {
                 if let Some((build, native)) = infer_rust_dependencies(&info) {

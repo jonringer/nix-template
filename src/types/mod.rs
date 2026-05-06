@@ -107,6 +107,7 @@ arg_enum! {
         url,
         zip,
         pypi,
+        local,
     }
 }
 

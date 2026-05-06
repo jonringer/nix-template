@@ -202,14 +202,10 @@ fn find_cargo_toml(source: &Path) -> Option<PathBuf> {
 ///
 /// Logs progress to stderr; returns `None` only on hard failures
 /// (network, missing manifest, etc.).
-pub fn infer_rust_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Vec<String>)> {
-    if info.template != Template::rust {
-        return None;
-    }
-
-    eprintln!("Materialising source to inspect Cargo.toml/Cargo.lock...");
-    let source = materialise_source(info)?;
-    let cargo_toml = find_cargo_toml(&source)?;
+/// Core inference logic: given a path to a Rust project, parse Cargo.toml
+/// and Cargo.lock and return inferred dependencies.
+fn infer_from_source_path(source_path: &Path) -> Option<(Vec<String>, Vec<String>)> {
+    let cargo_toml = find_cargo_toml(source_path)?;
 
     let manifest = match std::fs::read_to_string(&cargo_toml) {
         Ok(s) => s,
@@ -225,7 +221,7 @@ pub fn infer_rust_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Ve
 
     // Best-effort: scan Cargo.lock for transitive crates. Missing lockfile
     // is fine — many libraries don't ship one.
-    let lock_path = source.join("Cargo.lock");
+    let lock_path = source_path.join("Cargo.lock");
     if lock_path.is_file() {
         match std::fs::read_to_string(&lock_path) {
             Ok(s) => {
@@ -255,6 +251,25 @@ pub fn infer_rust_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Ve
         nbi,
     );
     Some((bi, nbi))
+}
+
+/// Infer Rust dependencies from a local path (for --init-flake/--init-npins).
+/// This skips the materialisation step and directly reads from the given path.
+pub fn infer_rust_dependencies_from_path(source_path: &Path) -> Option<(Vec<String>, Vec<String>)> {
+    eprintln!("Scanning local Cargo.toml/Cargo.lock for dependencies...");
+    infer_from_source_path(source_path)
+}
+
+/// Top-level entry point for remote sources: materialise the source into the
+/// Nix store, then delegate to the core inference logic.
+pub fn infer_rust_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Vec<String>)> {
+    if info.template != Template::rust {
+        return None;
+    }
+
+    eprintln!("Materialising source to inspect Cargo.toml/Cargo.lock...");
+    let source = materialise_source(info)?;
+    infer_from_source_path(&source)
 }
 
 #[cfg(test)]

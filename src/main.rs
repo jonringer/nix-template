@@ -95,18 +95,119 @@ fn main() {
                     None
                 };
 
+            // ----------------------------------------------------------------
+            // Init mode detection: --init-flake and --init-npins are special
+            // modes that initialize the current directory as a Nix project.
+            // They should:
+            // 1. Auto-detect template from local files
+            // 2. Infer dependencies from local sources
+            // 3. Default pname to directory name (kebab-case)
+            // 4. Use local fetcher (src = ./..;)
+            // 5. Enter interactive mode with smart defaults
+            //
+            // Init mode is only triggered when:
+            // - --init-flake or --init-npins is present
+            // - AND no --from-url is provided (we're working with local sources)
+            // - AND either auto-detection finds project files OR explicit template is not a remote-only one
+            // ----------------------------------------------------------------
+            let has_init_flag = m.is_present("init-flake") || m.is_present("init-npins");
+            let no_url = m.occurrences_of("from-url") == 0;
+
+            // Pre-detect to see if there are actual project files
+            let has_local_project_files = if has_init_flag && no_url {
+                let cwd = std::env::current_dir().unwrap_or_default();
+                !crate::detect::detect_template_candidates_from_path(&cwd).is_empty()
+            } else {
+                false
+            };
+
+            let is_init_mode = has_init_flag && no_url && has_local_project_files;
+
+            // Get current directory name for default pname (convert to kebab-case)
+            let directory_name = if is_init_mode {
+                std::env::current_dir()
+                    .ok()
+                    .and_then(|cwd| cwd.file_name().map(|n| n.to_owned()))
+                    .and_then(|n| n.to_str().map(|s| {
+                        // Convert to kebab-case: lowercase, replace _ and spaces with -
+                        s.to_lowercase().replace('_', "-").replace(' ', "-")
+                    }))
+                    .unwrap_or_else(|| "my-project".to_owned())
+            } else {
+                String::new()
+            };
+
+            // Auto-detect template and infer dependencies from local directory
+            let (detected_candidates, inferred_deps) = if is_init_mode {
+                let cwd = std::env::current_dir().unwrap_or_default();
+
+                // Detect template from local files
+                let candidates = crate::detect::detect_template_candidates_from_path(&cwd);
+
+                if !candidates.is_empty() {
+                    eprintln!("Detected project type: {}", candidates[0].template);
+                    if candidates.len() > 1 {
+                        eprintln!(
+                            "Note: Multiple project types detected ({}). Using first match.",
+                            candidates
+                                .iter()
+                                .map(|c| format!("{:?}", c.template))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        );
+                    }
+                }
+
+                // Infer dependencies for the detected template (if any)
+                let deps = if let Some(candidate) = candidates.first() {
+                    match candidate.template {
+                        crate::types::Template::rust => {
+                            crate::deps::rust::infer_rust_dependencies_from_path(&cwd)
+                                .unwrap_or_else(|| (Vec::new(), Vec::new()))
+                        }
+                        crate::types::Template::go => {
+                            crate::deps::go::infer_go_dependencies_from_path(&cwd)
+                                .unwrap_or_else(|| (Vec::new(), Vec::new()))
+                        }
+                        _ => (Vec::new(), Vec::new()),
+                    }
+                } else {
+                    (Vec::new(), Vec::new())
+                };
+
+                (candidates, deps)
+            } else {
+                (Vec::new(), (Vec::new(), Vec::new()))
+            };
+
             // Detect if we should enter interactive mode
             // Enter interactive mode if:
-            // 1. Template was not explicitly provided (using default)
-            // 2. AND no URL was provided
-            // 3. AND pname is still "CHANGE"
-            let should_use_interactive = m.occurrences_of("TEMPLATE") == 0
-                && m.occurrences_of("from-url") == 0
-                && m.value_of("pname") == Some("CHANGE");
+            // 1. We're in init mode AND essential info is missing (pname, license, maintainer)
+            // 2. OR (Template was not explicitly provided AND no URL AND pname is "CHANGE")
+            let should_use_interactive = (is_init_mode
+                && (m.value_of("pname") == Some("CHANGE")
+                    || m.value_of("license") == Some("CHANGE")
+                    || m.value_of("maintainer") == Some("CHANGE")))
+                || (m.occurrences_of("TEMPLATE") == 0
+                    && m.occurrences_of("from-url") == 0
+                    && m.value_of("pname") == Some("CHANGE"));
 
             let mut info = if should_use_interactive {
-                // Enter interactive mode
-                match interactive::run_interactive_mode(None, user_config.as_ref()) {
+                // Enter interactive mode (with defaults for init mode)
+                let interactive_result = if is_init_mode {
+                    interactive::run_interactive_mode_with_defaults(
+                        None,
+                        user_config.as_ref(),
+                        detected_candidates,
+                        Some(directory_name.clone()),
+                        Some(inferred_deps),
+                        true,  // is_local_init
+                    )
+                } else {
+                    interactive::run_interactive_mode(None, user_config.as_ref())
+                };
+
+                match interactive_result {
                     Ok(interactive_data) => {
                         cli::build_expression_info_from_interactive(
                             interactive_data,
@@ -120,7 +221,31 @@ fn main() {
                 }
             } else {
                 // Use traditional CLI mode
-                cli::validate_and_serialize_matches(&m, user_config.as_ref())
+                let mut cli_info = cli::validate_and_serialize_matches(&m, user_config.as_ref());
+
+                // Apply init mode defaults if in init mode
+                if is_init_mode {
+                    // Use local fetcher
+                    cli_info.fetcher = crate::types::Fetcher::local;
+
+                    // Use detected template if not explicitly set
+                    if cli_info.template == crate::types::Template::auto && !detected_candidates.is_empty() {
+                        cli_info.template = detected_candidates[0].template.clone();
+                    }
+
+                    // Use directory name if pname is still CHANGE
+                    if cli_info.pname == "CHANGE" && !directory_name.is_empty() {
+                        cli_info.pname = directory_name.clone();
+                    }
+
+                    // Apply inferred dependencies
+                    if !inferred_deps.0.is_empty() || !inferred_deps.1.is_empty() {
+                        cli_info.build_inputs = inferred_deps.0.clone();
+                        cli_info.native_build_inputs = inferred_deps.1.clone();
+                    }
+                }
+
+                cli_info
             };
 
             // ----------------------------------------------------------------

@@ -25,7 +25,7 @@ pub fn by_name_shard(pname: &str) -> String {
 /// ├── npins/                 (only when --init-npins)
 /// └── nix/
 ///     ├── overlay.nix
-///     ├── pkgs/<pname>/package.nix
+///     ├── package.nix
 ///     └── modules/<pname>/default.nix   (only when template is `module`)
 /// ```
 ///
@@ -40,7 +40,7 @@ pub struct NixDirLayout {
     /// callers that want to derive additional paths (e.g. release.nix).
     #[allow(dead_code)]
     pub base_dir: PathBuf,
-    /// `<base_dir>/nix/pkgs/<pname>/package.nix`.
+    /// `<base_dir>/nix/package.nix`.
     pub package_path: PathBuf,
     /// `<base_dir>/nix/overlay.nix`.
     pub overlay_path: PathBuf,
@@ -62,7 +62,8 @@ impl NixDirLayout {
     /// directory.
     pub fn new(base_dir: &Path, pname: &str, template: &Template) -> Self {
         let nix_dir = base_dir.join("nix");
-        let package_path = nix_dir.join("pkgs").join(pname).join("package.nix");
+        // Use simple nix/package.nix layout for local project initialization
+        let package_path = nix_dir.join("package.nix");
         let overlay_path = nix_dir.join("overlay.nix");
         let module_path = if *template == Template::module {
             Some(nix_dir.join("modules").join(pname).join("default.nix"))
