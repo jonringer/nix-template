@@ -4,6 +4,7 @@
 
 - Breaking Changes:
   - Removed Qt template (deprecated, use stdenv.mkDerivation with wrapQtAppsHook instead)
+  - Removed legacy `python` template (use `python_package` or `python_application` instead)
   - All templates now use `finalAttrs` pattern instead of `rec` for better override composition
 
 - Additions:

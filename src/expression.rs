@@ -9,7 +9,7 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             Some("stdenvNoCCMkDerivation"),
         ),
         // Python library packages use buildPythonPackage
-        Template::python | Template::python_package => {
+        Template::python_package => {
             ("buildPythonPackage", "buildPythonPackage", None)
         }
         // Python applications use buildPythonApplication
@@ -85,7 +85,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
 
 fn addtional_pkg_attr_headers(template: &Template) -> &'static str {
     match template {
-        Template::python | Template::python_package | Template::python_application => {
+        Template::python_package | Template::python_application => {
             "\n  @doc:pythonFormat@format = \"setuptools\";"
         }
         _ => "",
@@ -99,7 +99,7 @@ fn build_inputs(info: &ExpressionInfo) -> String {
         Template::python_application =>
             "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];".to_owned(),
         // Python packages (libraries) include pythonImportsCheck for smoke testing
-        Template::python | Template::python_package => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
+        Template::python_package => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
 
   @doc:pythonImportsCheck@pythonImportsCheck = [ \"@pname-import-check@\" ];".to_owned(),
         Template::rust => {
@@ -527,7 +527,7 @@ pub fn generate_npins_sources_json() -> &'static str {
 /// from `generate_flake_nix` so that python packages resolve through
 /// `pkgs.python3Packages.callPackage`.
 pub fn generate_npins_wrapper_default_nix(template: &Template, package_file: &str) -> String {
-    let inner_attr_path = if *template == Template::python {
+    let inner_attr_path = if *template == Template::python_package || *template == Template::python_application {
         ".python3Packages"
     } else {
         ""
@@ -551,7 +551,7 @@ pkgs{inner_attr_path}.callPackage ./{package_file} {{ }}
 }
 
 pub fn generate_flake_nix(template: &Template, output_file: &str, directory_name: &str) -> String {
-    let inner_attr_path = if *template == Template::python {
+    let inner_attr_path = if *template == Template::python_package || *template == Template::python_application {
         ".python3Packages"
     } else {
         ""
@@ -617,7 +617,7 @@ final: prev: {
     }
 
     let call_package = match template {
-        Template::python | Template::python_package | Template::python_application => {
+        Template::python_package | Template::python_application => {
             "final.python3Packages.callPackage"
         }
         _ => "final.callPackage",
@@ -671,7 +671,7 @@ pkgs
         );
     }
 
-    let attr_path = if *template == Template::python {
+    let attr_path = if *template == Template::python_package || *template == Template::python_application {
         format!("pkgs.python3Packages.{}", pname)
     } else {
         format!("pkgs.{}", pname)
@@ -721,7 +721,7 @@ pub fn generate_structured_flake_nix(template: &Template, pname: &str, directory
     }
 
     let attr_path = match template {
-        Template::python | Template::python_package | Template::python_application => {
+        Template::python_package | Template::python_application => {
             format!("overlayed.python3Packages.{}", pname)
         }
         _ => format!("overlayed.{}", pname),

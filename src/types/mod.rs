@@ -82,7 +82,6 @@ arg_enum! {
     pub enum Template {
         stdenv,
         stdenvNoCC,
-        python,
         python_package,
         python_application,
         module,
