@@ -1,7 +1,6 @@
 ---
 source: tests/integration_tests.rs
-assertion_line: 199
-expression: package_nix
+expression: stdout
 ---
 { lib
 , buildPythonPackage
@@ -15,7 +14,7 @@ buildPythonPackage (finalAttrs: {
 
   src = fetchFromGitHub {
     owner = "CHANGE";
-    repo = finalAttrs.pname;
+    repo = "requests";
     rev = finalAttrs.version;
     sha256 = "0000000000000000000000000000000000000000000000000000";
   };

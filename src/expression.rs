@@ -40,7 +40,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
             "fetchFromGitHub",
             "  @doc:fetcher@src = fetchFromGitHub {
     owner = \"@owner@\";
-    repo = finalAttrs.pname;
+    repo = \"@pname@\";
     rev = @rev@;
     sha256 = \"@src_sha@\";
   };",
@@ -49,7 +49,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
             "fetchFromGitLab",
             "  @doc:fetcher@src = fetchFromGitLab {
     owner = \"@owner@\";
-    repo = finalAttrs.pname;
+    repo = \"@pname@\";
     rev = @rev@;
     sha256 = \"@src_sha@\";
   };",
@@ -59,7 +59,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
             "  @doc:fetcher@src = fetchFromGitea {
     domain = \"@domain@\";
     owner = \"@owner@\";
-    repo = finalAttrs.pname;
+    repo = \"@pname@\";
     rev = @rev@;
     sha256 = \"@src_sha@\";
   };",
@@ -81,7 +81,8 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
         Fetcher::pypi => (
             "fetchPypi",
             "  @doc:fetcher@src = fetchPypi {
-    inherit (finalAttrs) pname version;
+    pname = \"@pname@\";
+    inherit (finalAttrs) version;
     sha256 = \"@src_sha@\";
   };",
         ),
@@ -160,7 +161,8 @@ fn build_inputs(info: &ExpressionInfo) -> String {
   ];
 
   pnpmDeps = fetchPnpmDeps {
-    inherit (finalAttrs) pname version src;
+    pname = \"@pname@\";
+    inherit (finalAttrs) version src;
     fetcherVersion = 3;
     hash = \"@pnpm_deps_hash@\";
   };".to_owned()

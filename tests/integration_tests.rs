@@ -602,7 +602,8 @@ fn test_dotnet_template_basic() {
     assert!(stdout.contains("buildDotnetModule (finalAttrs: {"));
     assert!(stdout.contains("projectFile = \"CHANGE\";"));
     assert!(stdout.contains("nugetDeps = ./deps.json;"));
-    assert!(stdout.contains("finalAttrs.pname"));
+    // pname should be a string literal, only version uses finalAttrs
+    assert!(stdout.contains("repo = \"example\";"));
     assert!(stdout.contains("finalAttrs.version"));
 
     // Verify proper spacing (blank lines between sections)

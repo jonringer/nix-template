@@ -1,6 +1,5 @@
 ---
 source: tests/integration_tests.rs
-assertion_line: 584
 expression: stdout
 ---
 { lib
@@ -18,7 +17,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   src = fetchFromGitHub {
     owner = "CHANGE";
-    repo = finalAttrs.pname;
+    repo = "example";
     rev = finalAttrs.version;
     sha256 = "0000000000000000000000000000000000000000000000000000";
   };
@@ -30,7 +29,8 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   pnpmDeps = fetchPnpmDeps {
-    inherit (finalAttrs) pname version src;
+    pname = "example";
+    inherit (finalAttrs) version src;
     fetcherVersion = 3;
     hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };

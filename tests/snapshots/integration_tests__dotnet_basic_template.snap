@@ -13,7 +13,7 @@ buildDotnetModule (finalAttrs: {
 
   src = fetchFromGitHub {
     owner = "CHANGE";
-    repo = finalAttrs.pname;
+    repo = "example";
     rev = finalAttrs.version;
     sha256 = "0000000000000000000000000000000000000000000000000000";
   };
