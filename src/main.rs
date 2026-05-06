@@ -266,17 +266,15 @@ fn main() {
             // Init-flag bookkeeping. We support three orthogonal init flags:
             //   --init-flake    write a top-level flake.nix
             //   --init-npins    scaffold an npins/ directory + default.nix
-            //   --init-project  produce a structured nix/ layout, prompting
-            //                   for the template if not given
             //
-            // When the structured layout is active (always for --init-project
-            // and --init-npins; opted into for --init-flake when no PATH was
+            // When the structured layout is active (always for
+            // --init-npins; opted into for --init-flake when no PATH was
             // given), files land at:
             //   ./flake.nix           (--init-flake)
-            //   ./default.nix         (--init-npins or --init-project)
+            //   ./default.nix         (--init-npins)
             //   ./npins/              (--init-npins)
             //   ./nix/overlay.nix
-            //   ./nix/pkgs/<pname>/package.nix
+            //   ./nix//package.nix
             //   ./nix/modules/<pname>/default.nix   (module template only)
             // ----------------------------------------------------------------
             let init_flake = m.is_present("init-flake");

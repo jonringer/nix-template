@@ -9,6 +9,8 @@ expression: wrapper_content
 # the locally defined package.
 let
   sources = import ./npins;
-  pkgs = (import sources.nixpkgs { }).extend (import ./nix/overlay.nix);
+  pkgs = import sources.nixpkgs {
+    overlays = [ (import ./nix/overlay.nix) ];
+  };
 in
 pkgs.hello

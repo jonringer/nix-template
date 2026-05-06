@@ -284,7 +284,7 @@ fn test_init_npins_stdout() {
 
     // Top-level default.nix imports the overlay and pulls pkgs from npins.
     assert!(stdout.contains("sources = import ./npins;"));
-    assert!(stdout.contains("(import sources.nixpkgs { }).extend (import ./nix/overlay.nix)"));
+    assert!(stdout.contains("overlays = [ (import ./nix/overlay.nix) ];"));
     assert!(stdout.contains("pkgs.hello"));
 
     // Overlay calls callPackage on the package under nix/pkgs/.
@@ -337,7 +337,7 @@ fn test_init_npins_writes_three_files_and_renames() {
     assert!(wrapper.exists(), "top-level default.nix should be created");
     let wrapper_content = std::fs::read_to_string(&wrapper).unwrap();
     assert!(wrapper_content.contains("sources = import ./npins;"));
-    assert!(wrapper_content.contains("(import sources.nixpkgs { }).extend (import ./nix/overlay.nix)"));
+    assert!(wrapper_content.contains("overlays = [ (import ./nix/overlay.nix) ];"));
     assert!(wrapper_content.contains("pkgs.hello"));
 
     // Overlay calls callPackage on the new package path.
@@ -459,7 +459,7 @@ fn test_init_npins_with_init_flake() {
 
     // Top-level default.nix imports the overlay applied to npins-pinned nixpkgs.
     let wrapper = std::fs::read_to_string(temp_path.join("default.nix")).unwrap();
-    assert!(wrapper.contains("(import sources.nixpkgs { }).extend (import ./nix/overlay.nix)"));
+    assert!(wrapper.contains("overlays = [ (import ./nix/overlay.nix) ];"));
 
     // Flake exposes the overlay and references the package under nix/pkgs/.
     let flake = std::fs::read_to_string(temp_path.join("flake.nix")).unwrap();
