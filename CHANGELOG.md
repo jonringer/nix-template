@@ -6,6 +6,7 @@
   - Removed Qt template (deprecated, use stdenv.mkDerivation with wrapQtAppsHook instead)
   - Removed legacy `python` template (use `python_package` or `python_application` instead)
   - Removed `--nixpkgs` flag (obsolete), replaced by `--by-name`
+  - Removed `--init-project` flag (use `--init-flake` or `--init-npins` instead for project scaffolding)
   - All templates now use `finalAttrs` pattern instead of `rec` for better override composition
 
 - Additions:
@@ -38,7 +39,7 @@
     - Auto-detects CMakeLists.txt and adds cmake to nativeBuildInputs
     - Auto-detects meson.build and adds meson + ninja to nativeBuildInputs
   - Auto-detection:
-    - Automatic project type detection from source code with `auto` template or `--init-project`
+    - Automatic project type detection from source code with `auto` template
     - Recognizes Rust projects (via Cargo.toml)
     - Recognizes Go projects (via go.mod)
     - Recognizes npm projects (via package-lock.json or package.json)

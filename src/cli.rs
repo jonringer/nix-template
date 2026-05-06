@@ -52,11 +52,14 @@ pub fn build_cli() -> App<'static, 'static> {
 
 EXAMPLES:
 
-# generate an expression for this package
+# generate an expression and infer dependencies for this package
 $ nix-template rust --from-url https://github.com/jonringer/nix-template
 
-# generate a python package expression using RFC140 by-name layout
-$ nix-template python --by-name --pname requests
+# generate a boilerplate python package expression with name
+$ nix-template python --pname requests ./pkgs/development/python-modules/requests/default.nix
+
+# generate requests package and infer dependencies using url
+$ nix-template --from-url https://pypi.org/project/requests/ ./pkgs/development/python-modules/requests/default.nix
 
 # generate a shell.nix in $PWD
 $ nix-template mkshell
@@ -101,10 +104,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "--init-flake 'Generate a flake.nix alongside the package expression'",
             ).takes_value(false))
         .arg(Arg::from_usage(
-            "--init-npins 'Generate an npins/ scaffold (npins/default.nix + empty npins/sources.json) and a wrapper default.nix at the project root. The package is placed under nix/pkgs/<pname>/package.nix and an overlay is generated at nix/overlay.nix. Combinable with --init-flake / --init-project. See https://github.com/andir/npins for the dependency manager itself.'",
-            ).takes_value(false))
-        .arg(Arg::from_usage(
-            "--init-project 'Scaffold a full project layout: top-level default.nix and nix/{overlay.nix, pkgs/<pname>/package.nix, modules/<pname>/default.nix (when -t module)}. Prompts for the template if none given. Combinable with --init-flake / --init-npins to add a flake.nix or npins/ directory.'",
+            "--init-npins 'Generate an npins/ scaffold (npins/default.nix + empty npins/sources.json) and a wrapper default.nix at the project root. The package is placed under nix/pkgs/<pname>/package.nix and an overlay is generated at nix/overlay.nix. Combinable with --init-flake. See https://github.com/andir/npins for the dependency manager itself.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
             "--skip-vendor-hashes 'Skip automatic computation of cargoHash/vendorHash for rust/go templates. By default, when --from-url is provided, nix-template runs nix-build with a fake hash to compute the real hash. Requires nix to be installed.'",
@@ -413,8 +413,7 @@ pub fn validate_and_serialize_matches(
     // triggers the structured nix/ layout. Skip the existence check in
     // that case; main.rs re-checks each artefact before writing.
     let init_will_rewrite_path = matches.is_present("init-flake")
-        || matches.is_present("init-npins")
-        || matches.is_present("init-project");
+        || matches.is_present("init-npins");
     assert(
         matches.is_present("stdout")
             || init_will_rewrite_path

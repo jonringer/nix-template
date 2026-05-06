@@ -206,7 +206,7 @@ fn test_python_template_github_fetcher_override() {
 /// `--init-flake` without an explicit PATH now uses the structured nix/
 /// layout, so files land at nix/pkgs/<pname>/package.nix, nix/overlay.nix,
 /// and flake.nix at the top. No top-level default.nix is emitted in this
-/// mode (it's only added by --init-npins / --init-project).
+/// mode (it's only added by --init-npins).
 #[test]
 fn test_python_template_file_writing_with_flake() {
     let temp_dir = TempDir::new().unwrap();
