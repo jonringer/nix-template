@@ -91,6 +91,7 @@ arg_enum! {
         rust,
         npm,
         pnpm,
+        dotnet,
         test,
     }
 }
@@ -175,6 +176,9 @@ pub struct ExpressionInfo {
     /// SRI hash of the pnpm dependencies (used for `pnpm` template).
     /// Defaults to `lib.fakeHash` when unknown.
     pub pnpm_deps_hash: String,
+    /// Path to the .NET project file (used for `dotnet` template).
+    /// Typically a .csproj, .fsproj, or .sln file relative to src root.
+    pub project_file: String,
     /// Domain of the Gitea instance (used by the `gitea` fetcher), e.g.
     /// "codeberg.org" or "gitea.com". Empty for non-Gitea fetchers.
     pub domain: String,
@@ -218,6 +222,7 @@ impl ExpressionInfo {
             .replace("@vendor_hash@", &self.vendor_hash)
             .replace("@npm_deps_hash@", &self.npm_deps_hash)
             .replace("@pnpm_deps_hash@", &self.pnpm_deps_hash)
+            .replace("@project_file@", &self.project_file)
             .replace("@domain@", &self.domain)
             .replace("@description@", &self.description)
             .replace("@homepage@", &self.homepage)

@@ -88,7 +88,42 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
         });
     }
 
+    // .NET detection: scan for .csproj, .fsproj, or .sln files
+    // These files have dynamic names (e.g., MyProject.csproj), so we need to scan the directory.
+    let has_dotnet = candidates
+        .iter()
+        .any(|c| c.template == Template::dotnet);
+
+    if !has_dotnet {
+        if let Some(reason) = find_dotnet_project_file(source_path) {
+            candidates.push(Candidate {
+                template: Template::dotnet,
+                reason,
+            });
+        }
+    }
+
     candidates
+}
+
+/// Scan a directory for .NET project files (.csproj, .fsproj, .sln).
+/// Returns the reason string (file type found) or None if no project files exist.
+fn find_dotnet_project_file(source_path: &Path) -> Option<&'static str> {
+    use std::fs;
+
+    if let Ok(entries) = fs::read_dir(source_path) {
+        for entry in entries.flatten() {
+            if let Some(ext) = entry.path().extension().and_then(|s| s.to_str()) {
+                match ext {
+                    "csproj" => return Some("*.csproj"),
+                    "fsproj" => return Some("*.fsproj"),
+                    "sln" => return Some("*.sln"),
+                    _ => {}
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Detect template candidates by materialising a remote source tree.
@@ -320,5 +355,41 @@ mod tests {
         assert_eq!(candidates.len(), 2);
         assert_eq!(candidates[0].template, Template::rust);
         assert_eq!(candidates[1].template, Template::npm);
+    }
+
+    #[test]
+    fn detect_dotnet_from_csproj() {
+        let dir = make_source_dir(&["MyProject.csproj", "Program.cs"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].template, Template::dotnet);
+        assert_eq!(candidates[0].reason, "*.csproj");
+    }
+
+    #[test]
+    fn detect_dotnet_from_fsproj() {
+        let dir = make_source_dir(&["MyProject.fsproj", "Program.fs"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].template, Template::dotnet);
+        assert_eq!(candidates[0].reason, "*.fsproj");
+    }
+
+    #[test]
+    fn detect_dotnet_from_sln() {
+        let dir = make_source_dir(&["MySolution.sln", "README.md"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].template, Template::dotnet);
+        assert_eq!(candidates[0].reason, "*.sln");
+    }
+
+    #[test]
+    fn detect_multiple_with_dotnet() {
+        let dir = make_source_dir(&["Cargo.toml", "MyProject.csproj"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].template, Template::rust);
+        assert_eq!(candidates[1].template, Template::dotnet);
     }
 }

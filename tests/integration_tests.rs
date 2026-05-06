@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use std::fs;
 use tempfile::TempDir;
 
 /// Test basic Python template generation without --flake-init
@@ -582,4 +583,47 @@ fn test_pnpm_template_basic() {
 
     // Snapshot the output
     insta::assert_snapshot!("pnpm_basic_template", stdout);
+}
+
+#[test]
+fn test_dotnet_template_basic() {
+    let temp_dir = TempDir::new().unwrap();
+    let temp_path = temp_dir.path().join("default.nix");
+
+    let output = Command::cargo_bin("nix-template").unwrap()
+        .args(&[
+            "dotnet",
+            "--pname",
+            "example",
+            "--maintainer",
+            "me",
+            temp_path.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(
+        output.status.success(),
+        "Command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Read the generated file
+    let stdout = fs::read_to_string(&temp_path).expect("Failed to read output file");
+
+    // Verify it contains buildDotnetModule with finalAttrs pattern
+    assert!(stdout.contains("buildDotnetModule"));
+    assert!(stdout.contains("buildDotnetModule (finalAttrs: {"));
+    assert!(stdout.contains("projectFile = \"CHANGE\";"));
+    assert!(stdout.contains("nugetDeps = ./deps.json;"));
+    assert!(stdout.contains("finalAttrs.pname"));
+    assert!(stdout.contains("finalAttrs.version"));
+
+    // Verify proper spacing (blank lines between sections)
+    assert!(stdout.contains("version = \"0.0.1\";\n\n  src ="));
+    assert!(stdout.contains("  };\n\n  projectFile ="));
+    assert!(stdout.contains("  nugetDeps = ./deps.json;  # Run `nix-build -A package-name.passthru.fetch-deps` to generate\n\n  meta ="));
+
+    // Snapshot the output
+    insta::assert_snapshot!("dotnet_basic_template", stdout);
 }

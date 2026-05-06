@@ -22,6 +22,7 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
         Template::rust => ("rustPlatform", "rustPlatform.buildRustPackage", None),
         Template::npm => ("buildNpmPackage", "buildNpmPackage", Some("buildNpmPackage")),
         Template::pnpm => ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation")),
+        Template::dotnet => ("buildDotnetModule", "buildDotnetModule", Some("buildDotnetModule")),
         Template::test => ("", "", None),  // Tests aren't a normal expression
         Template::module => ("", "", None), // Modules aren't a normal expression
     };
@@ -158,6 +159,9 @@ fn build_inputs(info: &ExpressionInfo) -> String {
     fetcherVersion = 3;
     hash = \"@pnpm_deps_hash@\";
   };".to_owned()
+        }
+        Template::dotnet => {
+            "  projectFile = \"@project_file@\";\n  nugetDeps = ./deps.json;  # Run `nix-build -A package-name.passthru.fetch-deps` to generate".to_owned()
         }
         // stdenv / stdenvNoCC: render `nativeBuildInputs` only when
         // populated (via --native-build-inputs); always render
@@ -350,6 +354,7 @@ mod tests {
             vendor_hash: "sha256-vendor".to_owned(),
             npm_deps_hash: "sha256-npm".to_owned(),
             pnpm_deps_hash: "sha256-pnpm".to_owned(),
+            project_file: "Project.csproj".to_owned(),
             domain: "".to_owned(),
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),
@@ -391,6 +396,7 @@ mod tests {
             vendor_hash: "".to_owned(),
             npm_deps_hash: "".to_owned(),
             pnpm_deps_hash: "".to_owned(),
+            project_file: "".to_owned(),
             domain: "".to_owned(),
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),

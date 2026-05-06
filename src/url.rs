@@ -928,6 +928,7 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         vendor_hash: FAKE_SRI_HASH.to_owned(),
         npm_deps_hash: FAKE_SRI_HASH.to_owned(),
         pnpm_deps_hash: FAKE_SRI_HASH.to_owned(),
+        project_file: String::new(),
         domain: info.domain.clone(),
         // Probe expressions don't need to render the inferred deps;
         // we want a minimal expression that just exercises src + cargo.
@@ -1023,6 +1024,71 @@ fn tempfile_dir() -> Option<std::path::PathBuf> {
     let dir = base.join(format!("nix-template-prefetch-{}", nanos));
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir)
+}
+
+/// Infer the .NET project file path by materializing the source and scanning for
+/// .csproj, .fsproj, or .sln files. Returns the path relative to the source root,
+/// or None if no project file is found or the source cannot be materialized.
+pub fn infer_dotnet_project_file(info: &types::ExpressionInfo) -> Option<String> {
+    use std::path::Path;
+
+    eprintln!("Materialising source to detect .NET project file...");
+    let source_path = match crate::source::materialise_source(info) {
+        Some(p) => p,
+        None => {
+            debug!(target: LOG_TARGET, "failed to materialise source; cannot infer project file");
+            return None;
+        }
+    };
+
+    // Search for project files in order of preference:
+    // 1. .csproj files (C#)
+    // 2. .fsproj files (F#)
+    // 3. .sln files (Solution)
+
+    fn find_project_files(dir: &Path, extension: &str) -> Vec<std::path::PathBuf> {
+        use std::fs;
+
+        let mut results = Vec::new();
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some(extension) {
+                    results.push(path);
+                } else if path.is_dir() {
+                    // Recursively search subdirectories (up to 3 levels deep)
+                    results.extend(find_project_files(&path, extension));
+                }
+            }
+        }
+        results
+    }
+
+    // Try .csproj first
+    let mut candidates = find_project_files(&source_path, "csproj");
+    if candidates.is_empty() {
+        // Try .fsproj
+        candidates = find_project_files(&source_path, "fsproj");
+    }
+    if candidates.is_empty() {
+        // Try .sln
+        candidates = find_project_files(&source_path, "sln");
+    }
+
+    if candidates.is_empty() {
+        eprintln!("No .NET project files (.csproj, .fsproj, .sln) found in source");
+        return None;
+    }
+
+    // Prefer files in the root directory, then shortest path
+    candidates.sort_by_key(|p| p.components().count());
+
+    let chosen = &candidates[0];
+    let relative = chosen.strip_prefix(&source_path).ok()?;
+    let relative_str = relative.to_str()?;
+
+    eprintln!("Detected project file: {}", relative_str);
+    Some(relative_str.to_owned())
 }
 
 pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo, include_prereleases: bool) {

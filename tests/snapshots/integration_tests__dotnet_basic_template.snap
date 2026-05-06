@@ -1,0 +1,30 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, buildDotnetModule
+, fetchFromGitHub
+}:
+
+buildDotnetModule (finalAttrs: {
+  pname = "example";
+  version = "0.0.1";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = finalAttrs.pname;
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  projectFile = "CHANGE";
+  nugetDeps = ./deps.json;  # Run `nix-build -A package-name.passthru.fetch-deps` to generate
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/example";
+    license = licenses.CHANGE;
+    maintainers = with maintainers; [ me ];
+  };
+})
