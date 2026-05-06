@@ -109,13 +109,12 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             let native = if info.native_build_inputs.is_empty() {
                 String::new()
             } else {
-                "\n  nativeBuildInputs = [@native_build_inputs@ ];\n".to_owned()
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
             };
             format!(
-                "  @doc:buildDependencies@
-  @doc:cargoHash@cargoHash = \"@cargo_hash@\";
-{native}
-  buildInputs = [@build_inputs@ ];",
+                "  @doc:cargoHash@cargoHash = \"@cargo_hash@\";{native}
+
+  @doc:buildDependencies@buildInputs = [@build_inputs@ ];",
                 native = native,
             )
         }
@@ -278,7 +277,7 @@ mkShell rec {
   version = \"{version}\";{addtional_pkg_attr_headers}
 
 {f_block}
-@doc:buildPhases@
+
 {build_inputs}
 {meta}
 }}

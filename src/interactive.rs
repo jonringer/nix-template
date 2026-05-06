@@ -168,11 +168,6 @@ pub struct UrlMetadata {
     pub description: String,
     pub homepage: String,
     pub fetcher: Fetcher,
-    pub owner: Option<String>,
-    /// Suggested Python template variant when PyPI metadata indicates this is
-    /// an end-user application (e.g. classifiers mention `Environment ::`).
-    /// When None, no suggestion is made.
-    pub suggested_python_template: Option<Template>,
 }
 
 impl Default for UrlMetadata {
@@ -183,8 +178,6 @@ impl Default for UrlMetadata {
             description: "CHANGE".to_string(),
             homepage: "".to_string(),
             fetcher: Fetcher::github,
-            owner: None,
-            suggested_python_template: None,
         }
     }
 }
@@ -195,6 +188,9 @@ impl Default for UrlMetadata {
 /// or `Environment :: Win32 (MS Windows)` which are typical for end-user
 /// programs. Web-environment projects are intentionally excluded since
 /// those are usually consumed as libraries (e.g. WSGI apps).
+///
+/// Note: Currently unused but kept for potential future use.
+#[allow(dead_code)]
 pub fn classifiers_suggest_application(classifiers: &[String]) -> bool {
     classifiers.iter().any(|c| {
         c.starts_with("Environment :: Console")
@@ -433,8 +429,6 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 description: repo_info.description.unwrap_or("CHANGE".to_string()),
                 homepage,
                 fetcher: Fetcher::github,
-                owner: Some(gh_repo.owner.clone()),
-                suggested_python_template: None,
             })
         }
         Repo::Pypi(pypi_repo) => {
@@ -447,21 +441,12 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 .unwrap_or(&"CHANGE")
                 .to_string();
 
-            let suggested_python_template =
-                if classifiers_suggest_application(&pypi_response.info.classifiers) {
-                    Some(Template::python_application)
-                } else {
-                    Some(Template::python_package)
-                };
-
             Ok(UrlMetadata {
                 pname: pypi_repo.project.clone(),
                 license,
                 description: pypi_response.info.summary.trim_end_matches('.').to_string(),
                 homepage: pypi_response.info.home_page.unwrap_or("CHANGE".to_string()),
                 fetcher: Fetcher::pypi,
-                owner: None,
-                suggested_python_template,
             })
         }
         Repo::Gitea(gitea_repo) => {
@@ -483,8 +468,6 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 description: "CHANGE".to_string(),
                 homepage,
                 fetcher: Fetcher::gitea,
-                owner: Some(gitea_repo.owner.clone()),
-                suggested_python_template: None,
             })
         }
         Repo::Gitlab(gitlab_repo) => {
@@ -506,8 +489,6 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
                 description: "CHANGE".to_string(),
                 homepage,
                 fetcher: Fetcher::gitlab,
-                owner: Some(gitlab_repo.owner.clone()),
-                suggested_python_template: None,
             })
         }
     }
