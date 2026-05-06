@@ -1,0 +1,20 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, bundlerApp
+}:
+
+bundlerApp {
+  pname = "example";
+  gemdir = ./.;
+  exes = [ "example" ];  # To build this package, you need Gemfile, Gemfile.lock, and gemset.nix in this directory
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/example";
+    license = licenses.CHANGE;
+    maintainers = with maintainers; [ me ];
+  };
+}

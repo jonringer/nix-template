@@ -23,6 +23,7 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
         Template::npm => ("buildNpmPackage", "buildNpmPackage", Some("buildNpmPackage")),
         Template::pnpm => ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation")),
         Template::dotnet => ("buildDotnetModule", "buildDotnetModule", Some("buildDotnetModule")),
+        Template::ruby => ("bundlerApp", "bundlerApp", Some("bundlerApp")),
         Template::test => ("", "", None),  // Tests aren't a normal expression
         Template::module => ("", "", None), // Modules aren't a normal expression
     };
@@ -163,6 +164,9 @@ fn build_inputs(info: &ExpressionInfo) -> String {
         Template::dotnet => {
             "  projectFile = \"@project_file@\";\n  nugetDeps = ./deps.json;  # Run `nix-build -A package-name.passthru.fetch-deps` to generate".to_owned()
         }
+        Template::ruby => {
+            "  gemdir = ./.;\n  exes = [ \"@pname@\" ];  # To build this package, you need Gemfile, Gemfile.lock, and gemset.nix in this directory\n".to_owned()
+        }
         // stdenv / stdenvNoCC: render `nativeBuildInputs` only when
         // populated (via --native-build-inputs); always render
         // `buildInputs` to preserve the existing template's ergonomic
@@ -266,6 +270,29 @@ mkShell rec {
 }
 "
         .to_string(),
+        Template::ruby => {
+            let (_, dh_block) = derivation_helper(info);
+            let meta_content = if info.include_meta { meta() } else { "" };
+
+            let inputs = vec![String::from("lib"), String::from("bundlerApp")];
+            let input_list = inputs.join("\n, ");
+            let header = format!("{{ {input_list}\n}}:", input_list = input_list);
+
+            info.format(&format!(
+                "{header}
+
+{dh_helper} {{
+  pname = \"{pname}\";
+{build_inputs}{meta}
+}}
+",
+                header = header,
+                dh_helper = dh_block,
+                pname = &info.pname,
+                build_inputs = build_inputs(info),
+                meta = meta_content,
+            ))
+        }
         _ => {
             // Generate nix expression
             let (dh_input, dh_block) = derivation_helper(info);

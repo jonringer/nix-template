@@ -358,6 +358,7 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
         ("npm", "Node.js package with buildNpmPackage"),
         ("pnpm", "Node.js package with pnpm (stdenv + fetchPnpmDeps)"),
         ("dotnet", ".NET package with buildDotnetModule"),
+        ("ruby", "Ruby application with bundlerApp"),
         ("mkshell", "Development shell.nix"),
         ("module", "NixOS module"),
         ("test", "NixOS test"),

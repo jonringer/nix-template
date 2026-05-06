@@ -30,6 +30,8 @@ const INDICATORS: &[(&str, Template, &str)] = &[
     ("pnpm-lock.yaml", Template::pnpm, "pnpm-lock.yaml"),
     ("package-lock.json", Template::npm, "package-lock.json"),
     // Note: package.json is handled separately as a fallback (see below)
+    ("Gemfile.lock", Template::ruby, "Gemfile.lock"),
+    ("Gemfile", Template::ruby, "Gemfile"),
     ("meson.build", Template::stdenv, "meson.build"),
     ("CMakeLists.txt", Template::stdenv, "CMakeLists.txt"),
     ("configure", Template::stdenv, "configure"),
@@ -391,5 +393,43 @@ mod tests {
         assert_eq!(candidates.len(), 2);
         assert_eq!(candidates[0].template, Template::rust);
         assert_eq!(candidates[1].template, Template::dotnet);
+    }
+
+    #[test]
+    fn detect_ruby_from_gemfile_lock() {
+        let dir = make_source_dir(&["Gemfile", "Gemfile.lock", "lib/app.rb"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].template, Template::ruby);
+        assert_eq!(candidates[0].reason, "Gemfile.lock");
+    }
+
+    #[test]
+    fn detect_ruby_from_gemfile_fallback() {
+        let dir = make_source_dir(&["Gemfile", "lib/app.rb"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].template, Template::ruby);
+        assert_eq!(candidates[0].reason, "Gemfile");
+    }
+
+    #[test]
+    fn detect_multiple_with_ruby() {
+        let dir = make_source_dir(&["Cargo.toml", "Gemfile"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].template, Template::rust);
+        assert_eq!(candidates[1].template, Template::ruby);
+    }
+
+    #[test]
+    fn deduplicate_ruby_indicators() {
+        // When both Gemfile.lock and Gemfile exist, only Gemfile.lock should be kept
+        let dir = make_source_dir(&["Gemfile", "Gemfile.lock"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].template, Template::ruby);
+        // Gemfile.lock has higher priority than Gemfile
+        assert_eq!(candidates[0].reason, "Gemfile.lock");
     }
 }

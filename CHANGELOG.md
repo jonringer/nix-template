@@ -14,9 +14,11 @@
   - Added `npm` template for Node.js packages using buildNpmPackage
   - Added `pnpm` template for pnpm-based packages using fetchPnpmDeps with stdenv.mkDerivation
   - Added `dotnet` template for .NET packages using buildDotnetModule
+  - Added `ruby` template for Ruby applications using bundlerApp
   - Dependency hash prefetching now supports npm and pnpm templates (requires package-lock.json/pnpm-lock.yaml in repository)
   - Auto-detection now recognizes npm and pnpm projects (via pnpm-lock.yaml, package-lock.json, or package.json)
   - Auto-detection now recognizes .NET projects (via *.csproj, *.fsproj, or *.sln files)
+  - Auto-detection now recognizes Ruby projects (via Gemfile.lock or Gemfile)
   - Project file inference for dotnet template when using --from-url (automatically detects .csproj, .fsproj, or .sln)
 
 ## v0.4.1
