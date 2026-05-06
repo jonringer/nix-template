@@ -8,9 +8,11 @@
   - All templates now use `finalAttrs` pattern instead of `rec` for better override composition
 
 - Additions:
-  - Modern `finalAttrs` pattern is now default for all package templates (stdenv, Python, Rust, Go)
+  - Modern `finalAttrs` pattern is now default for all package templates (stdenv, Python, Rust, Go, npm, pnpm)
   - Self-references now use `finalAttrs.pname` and `finalAttrs.version`
   - PyPI fetcher uses `inherit (finalAttrs) pname version;` syntax
+  - Added `npm` template for Node.js packages using buildNpmPackage
+  - Added `pnpm` template for pnpm-based packages using fetchPnpmDeps with stdenv.mkDerivation
 
 ## v0.4.1
 

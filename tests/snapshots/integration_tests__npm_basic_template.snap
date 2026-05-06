@@ -1,0 +1,30 @@
+---
+source: tests/integration_tests.rs
+assertion_line: 554
+expression: stdout
+---
+{ lib
+, buildNpmPackage
+, fetchFromGitHub
+}:
+
+buildNpmPackage (finalAttrs: {
+  pname = "example";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = finalAttrs.pname;
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  npmDepsHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/example";
+    license = licenses.mit;
+    maintainers = with maintainers; [  ];
+  };
+})

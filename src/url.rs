@@ -926,6 +926,8 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         propagated_build_inputs: info.propagated_build_inputs.clone(),
         cargo_hash: FAKE_SRI_HASH.to_owned(),
         vendor_hash: FAKE_SRI_HASH.to_owned(),
+        npm_deps_hash: FAKE_SRI_HASH.to_owned(),
+        pnpm_deps_hash: FAKE_SRI_HASH.to_owned(),
         domain: info.domain.clone(),
         // Probe expressions don't need to render the inferred deps;
         // we want a minimal expression that just exercises src + cargo.
