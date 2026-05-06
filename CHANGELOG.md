@@ -17,6 +17,12 @@
   - Added `ruby` template for Ruby applications using bundlerApp
   - Dependency hash prefetching now supports npm and pnpm templates (requires package-lock.json/pnpm-lock.yaml in repository)
   - Dependency inference for ruby template from Gemfile.lock (maps common gems like nokogiri, pg, mysql2 to their nixpkgs dependencies)
+  - Build system dependency inference for stdenv/stdenvNoCC templates:
+    - Auto-detects CMakeLists.txt and adds cmake to nativeBuildInputs
+    - Auto-detects meson.build and adds meson + ninja to nativeBuildInputs
+    - Parses find_package() and find_dependency() in CMake files for common dependencies (OpenSSL, ZLIB, Qt, Boost, etc.)
+    - Parses dependency() calls in Meson files for common dependencies (zlib, openssl, gtk, glib, etc.)
+    - Detects PKG_CHECK_MODULES in configure.ac and adds pkg-config to nativeBuildInputs
   - Auto-detection now recognizes npm and pnpm projects (via pnpm-lock.yaml, package-lock.json, or package.json)
   - Auto-detection now recognizes .NET projects (via *.csproj, *.fsproj, or *.sln files)
   - Auto-detection now recognizes Ruby projects (via Gemfile.lock or Gemfile)

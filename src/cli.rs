@@ -1,6 +1,7 @@
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use std::io::IsTerminal;
 
+use crate::deps::buildsystem;
 use crate::deps::go::infer_go_dependencies;
 use crate::deps::ruby;
 use crate::deps::rust::infer_rust_dependencies;
@@ -360,8 +361,8 @@ pub fn validate_and_serialize_matches(
         }
     }
 
-    // Inference is on by default for the rust, go, and ruby templates whenever we
-    // have a real source to inspect. Users can disable via `--skip-infer-deps`.
+    // Inference is on by default for the rust, go, ruby, stdenv, and stdenvNoCC
+    // templates whenever we have a real source to inspect. Users can disable via `--skip-infer-deps`.
     let infer_enabled = matches.is_present("from-url")
         && !matches.is_present("skip-infer-deps");
     if infer_enabled {
@@ -380,6 +381,9 @@ pub fn validate_and_serialize_matches(
             }
             Template::ruby => {
                 ruby::infer_dependencies(&mut info);
+            }
+            Template::stdenv | Template::stdenvNoCC => {
+                buildsystem::infer_buildsystem_dependencies(&mut info);
             }
             Template::dotnet => {
                 if let Some(project_file) = infer_dotnet_project_file(&info) {
@@ -492,6 +496,9 @@ pub fn build_expression_info_from_interactive(
             }
             Template::ruby => {
                 ruby::infer_dependencies(&mut info);
+            }
+            Template::stdenv | Template::stdenvNoCC => {
+                buildsystem::infer_buildsystem_dependencies(&mut info);
             }
             Template::dotnet => {
                 if let Some(project_file) = infer_dotnet_project_file(&info) {
