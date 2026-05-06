@@ -814,9 +814,9 @@ pub fn generate_structured_flake_nix(template: &Template, pname: &str, directory
 
     let attr_path = match template {
         Template::python_package | Template::python_application => {
-            format!("overlayed.python3Packages.{}", pname)
+            format!("pkgs.python3Packages.{}", pname)
         }
-        _ => format!("overlayed.{}", pname),
+        _ => format!("pkgs.{}", pname),
     };
 
     format!(
@@ -845,7 +845,10 @@ pub fn generate_structured_flake_nix(template: &Template, pname: &str, directory
       packages = forAllSystems (
         system:
         let
-          overlayed = (import nixpkgs {{ inherit system; }}).extend self.overlays.default;
+          pkgs = import nixpkgs {{
+            inherit system;
+            overlays = [ self.overlays.default ];
+          }};
         in
         {{
           {pname} = {attr_path};
