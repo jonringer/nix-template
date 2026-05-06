@@ -14,6 +14,7 @@
   - Added `npm` template for Node.js packages using buildNpmPackage
   - Added `pnpm` template for pnpm-based packages using fetchPnpmDeps with stdenv.mkDerivation
   - Dependency hash prefetching now supports npm and pnpm templates (requires package-lock.json/pnpm-lock.yaml in repository)
+  - Auto-detection now recognizes npm and pnpm projects (via pnpm-lock.yaml, package-lock.json, or package.json)
 
 ## v0.4.1
 

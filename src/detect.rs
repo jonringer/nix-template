@@ -27,6 +27,9 @@ const INDICATORS: &[(&str, Template, &str)] = &[
     ("pyproject.toml", Template::python_package, "pyproject.toml"),
     ("setup.py", Template::python_package, "setup.py"),
     ("setup.cfg", Template::python_package, "setup.cfg"),
+    ("pnpm-lock.yaml", Template::pnpm, "pnpm-lock.yaml"),
+    ("package-lock.json", Template::npm, "package-lock.json"),
+    // Note: package.json is handled separately as a fallback (see below)
     ("meson.build", Template::stdenv, "meson.build"),
     ("CMakeLists.txt", Template::stdenv, "CMakeLists.txt"),
     ("configure", Template::stdenv, "configure"),
@@ -70,6 +73,19 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
             }
             break;
         }
+    }
+
+    // npm/pnpm fallback: if no lockfile was found but package.json exists, use npm.
+    // This only runs if neither pnpm-lock.yaml nor package-lock.json were detected.
+    let has_npm_or_pnpm = candidates
+        .iter()
+        .any(|c| c.template == Template::npm || c.template == Template::pnpm);
+
+    if !has_npm_or_pnpm && source_path.join("package.json").exists() {
+        candidates.push(Candidate {
+            template: Template::npm,
+            reason: "package.json",
+        });
     }
 
     candidates
@@ -246,5 +262,63 @@ mod tests {
         let dir = make_source_dir(&["README.md", "data/font.ttf"]);
         let candidates = detect_template_candidates_from_path(dir.path());
         assert!(candidates.is_empty());
+    }
+
+    #[test]
+    fn detect_npm_from_package_lock() {
+        let dir = make_source_dir(&["package.json", "package-lock.json"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].template, Template::npm);
+        assert_eq!(candidates[0].reason, "package-lock.json");
+    }
+
+    #[test]
+    fn detect_pnpm_from_pnpm_lock() {
+        let dir = make_source_dir(&["package.json", "pnpm-lock.yaml"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].template, Template::pnpm);
+        assert_eq!(candidates[0].reason, "pnpm-lock.yaml");
+    }
+
+    #[test]
+    fn detect_npm_from_package_json_fallback() {
+        let dir = make_source_dir(&["package.json"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].template, Template::npm);
+        assert_eq!(candidates[0].reason, "package.json");
+    }
+
+    #[test]
+    fn prefer_pnpm_when_both_package_json_and_pnpm_lock() {
+        // This tests the sub-classification logic: if package.json would trigger npm
+        // but pnpm-lock.yaml also exists, we prefer pnpm.
+        let dir = make_source_dir(&["package.json", "pnpm-lock.yaml"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        // pnpm-lock.yaml has higher priority in INDICATORS, so it should win
+        assert_eq!(candidates[0].template, Template::pnpm);
+    }
+
+    #[test]
+    fn deduplicate_npm_indicators() {
+        // When both package-lock.json and package.json exist, only the first should be kept
+        let dir = make_source_dir(&["package.json", "package-lock.json"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].template, Template::npm);
+        // package-lock.json has higher priority than package.json
+        assert_eq!(candidates[0].reason, "package-lock.json");
+    }
+
+    #[test]
+    fn detect_multiple_with_npm() {
+        let dir = make_source_dir(&["Cargo.toml", "package.json"]);
+        let candidates = detect_template_candidates_from_path(dir.path());
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].template, Template::rust);
+        assert_eq!(candidates[1].template, Template::npm);
     }
 }
