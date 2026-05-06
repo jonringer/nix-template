@@ -740,11 +740,15 @@ pub fn generate_structured_default_nix(template: &Template, pname: &str, with_np
     let nixpkgs_import = if with_npins {
         r#"let
   sources = import ./npins;
-  pkgs = (import sources.nixpkgs { }).extend (import ./nix/overlay.nix);
+  pkgs = import sources.nixpkgs {
+    overlays = [ (import ./nix/overlay.nix) ];
+  };
 in"#
     } else {
         r#"let
-  pkgs = (import <nixpkgs> { }).extend (import ./nix/overlay.nix);
+  pkgs = import <nixpkgs> {
+    overlays = [ (import ./nix/overlay.nix) ];
+  };
 in"#
     };
 
