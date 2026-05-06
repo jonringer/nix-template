@@ -627,3 +627,46 @@ fn test_dotnet_template_basic() {
     // Snapshot the output
     insta::assert_snapshot!("dotnet_basic_template", stdout);
 }
+
+#[test]
+fn test_ruby_template_basic() {
+    let temp_dir = TempDir::new().unwrap();
+    let temp_path = temp_dir.path().join("default.nix");
+
+    let output = Command::cargo_bin("nix-template").unwrap()
+        .args(&[
+            "ruby",
+            "--pname",
+            "example",
+            "--maintainer",
+            "me",
+            temp_path.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(
+        output.status.success(),
+        "Command failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Read the generated file
+    let stdout = fs::read_to_string(&temp_path).expect("Failed to read output file");
+
+    // Verify it contains bundlerApp (NOT finalAttrs pattern)
+    assert!(stdout.contains("bundlerApp"));
+    assert!(stdout.contains("bundlerApp {"));
+    assert!(!stdout.contains("finalAttrs"));  // Ruby doesn't use finalAttrs
+    assert!(stdout.contains("gemdir = ./.;"));
+    assert!(stdout.contains("exes = [ \"example\" ];"));
+
+    // Verify function header
+    assert!(stdout.contains("{ lib\n, bundlerApp"));
+
+    // Verify proper spacing (blank lines between sections)
+    assert!(stdout.contains("pname = \"example\";\n  gemdir"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("ruby_basic_template", stdout);
+}

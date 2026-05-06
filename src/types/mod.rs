@@ -92,6 +92,7 @@ arg_enum! {
         npm,
         pnpm,
         dotnet,
+        ruby,
         test,
     }
 }
