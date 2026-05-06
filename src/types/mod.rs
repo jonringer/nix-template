@@ -37,6 +37,10 @@ lazy_static! {
             "fetcher",
             "https://nixos.org/nixpkgs/manual/#chap-pkgs-fetchers\n  ",
         );
+        m.insert(
+            "fetcherPypi",
+            "https://nixos.org/nixpkgs/manual/#chap-pkgs-fetchers\n  # NOTE: fetchPypi is discouraged in nixpkgs; prefer fetching from the original source (GitHub, GitLab, etc.)\n  ",
+        );
         m.insert("meta", "https://nixos.org/nixpkgs/manual/#chap-meta\n  ");
         // Template-specific documentation
         m.insert(
