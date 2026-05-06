@@ -861,13 +861,45 @@ pub fn run_interactive_mode(
     initial_template: Option<Template>,
     user_config: Option<&UserConfig>,
 ) -> Result<InteractiveData> {
+    run_interactive_mode_with_defaults(
+        initial_template,
+        user_config,
+        Vec::new(),      // detected_candidates
+        None,            // default_pname
+        None,            // inferred_deps
+        false,           // is_local_init
+    )
+}
+
+pub fn run_interactive_mode_with_defaults(
+    initial_template: Option<Template>,
+    user_config: Option<&UserConfig>,
+    detected_candidates: Vec<crate::detect::Candidate>,
+    default_pname: Option<String>,
+    inferred_deps: Option<(Vec<String>, Vec<String>)>,
+    is_local_init: bool,
+) -> Result<InteractiveData> {
     println!("\n=== Interactive nix-template ===\n");
 
-    // 1. Template type
-    let template = prompt_template_type(initial_template)?;
+    // 1. Template type - use detected if available
+    let template = if !detected_candidates.is_empty() && initial_template.is_none() {
+        // Multiple candidates - prompt user to choose
+        if detected_candidates.len() > 1 {
+            prompt_template_from_candidates(&detected_candidates)?
+        } else {
+            // Single candidate - use it directly
+            detected_candidates[0].template.clone()
+        }
+    } else {
+        prompt_template_type(initial_template)?
+    };
 
-    // 2. URL (optional) - fetch metadata immediately
-    let url_with_metadata = prompt_url()?;
+    // 2. URL (optional) - skip if we're in local init mode
+    let url_with_metadata = if is_local_init {
+        None
+    } else {
+        prompt_url()?
+    };
 
     // Extract metadata for defaults
     let metadata = url_with_metadata
@@ -875,8 +907,11 @@ pub fn run_interactive_mode(
         .map(|(_, meta)| meta.clone())
         .unwrap_or_default();
 
-    // 3. Package name (pre-filled from URL if available)
-    let pname = prompt_pname(&metadata.pname)?;
+    // 3. Package name (use defaults: default_pname from init mode, or URL metadata)
+    let pname_default = default_pname
+        .as_deref()
+        .unwrap_or_else(|| &metadata.pname);
+    let pname = prompt_pname(pname_default)?;
 
     // 4. Version (with auto-fetch if URL provided)
     let url_str = url_with_metadata.as_ref().map(|(url, _)| url.as_str());
@@ -889,8 +924,10 @@ pub fn run_interactive_mode(
     let maintainer_default = user_config.and_then(|c| c.maintainer.as_deref());
     let maintainer = prompt_maintainer(maintainer_default)?;
 
-    // 7. Fetcher (auto-detected from URL or based on template)
-    let default_fetcher = if url_with_metadata.is_some() {
+    // 7. Fetcher (auto-detected from URL, local for init mode, or based on template)
+    let default_fetcher = if is_local_init {
+        Fetcher::local
+    } else if url_with_metadata.is_some() {
         // Use fetcher from URL metadata
         metadata.fetcher
     } else if template == Template::python_package || template == Template::python_application {
@@ -898,7 +935,11 @@ pub fn run_interactive_mode(
     } else {
         Fetcher::github
     };
-    let fetcher = prompt_fetcher(default_fetcher, &template)?;
+    let fetcher = if is_local_init {
+        Fetcher::local  // Force local fetcher in init mode
+    } else {
+        prompt_fetcher(default_fetcher, &template)?
+    };
 
     // 8. Description (pre-filled from URL if available)
     let description = prompt_description(&metadata.description)?;
@@ -911,11 +952,17 @@ pub fn run_interactive_mode(
     };
     let homepage = prompt_homepage(default_homepage)?;
 
-    // 10. Output path
-    let default_path = match template {
-        Template::mkshell => "shell.nix",
-        Template::test => "test.nix",
-        _ => "default.nix",
+    // 10. Output path (for init mode, use nix/pkgs/<pname>/package.nix)
+    let default_path = if is_local_init {
+        // In init mode, the structured layout will handle the path
+        // Just use a placeholder that will be rewritten
+        "nix/package.nix"
+    } else {
+        match template {
+            Template::mkshell => "shell.nix",
+            Template::test => "test.nix",
+            _ => "default.nix",
+        }
     };
     let output_path = prompt_output_path(&template, default_path)?;
 
@@ -945,7 +992,10 @@ pub fn run_interactive_mode(
     // we walk the source for `// #cgo` directives and translate
     // pkg-config / -l tokens into nixpkgs inputs. Default is on — users
     // can decline at the prompt.
-    let infer_deps = if (template == Template::rust || template == Template::go)
+    // In init mode, dependencies are already inferred, so just use true.
+    let infer_deps = if is_local_init && inferred_deps.is_some() {
+        true  // Already inferred in init mode
+    } else if (template == Template::rust || template == Template::go)
         && url_with_metadata.is_some()
     {
         let prompt_text = if template == Template::rust {
@@ -983,6 +1033,7 @@ pub fn run_interactive_mode(
         skip_vendor_hashes,
         infer_deps,
         include_prereleases,
+        preinferred_deps: inferred_deps,
     })
 }
 
@@ -1010,4 +1061,6 @@ pub struct InteractiveData {
     pub infer_deps: bool,
     /// Whether to include prerelease versions when fetching from GitLab or other forges.
     pub include_prereleases: bool,
+    /// Pre-inferred dependencies (from init mode). (buildInputs, nativeBuildInputs)
+    pub preinferred_deps: Option<(Vec<String>, Vec<String>)>,
 }

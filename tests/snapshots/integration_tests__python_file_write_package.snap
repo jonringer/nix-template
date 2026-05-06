@@ -1,6 +1,5 @@
 ---
 source: tests/integration_tests.rs
-assertion_line: 277
 expression: package_nix_content
 ---
 { lib

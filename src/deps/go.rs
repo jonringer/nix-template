@@ -349,14 +349,10 @@ fn walk(root: &Path, dir: &Path, acc: &mut CgoDirectives) {
 ///
 /// Returns `None` only on hard failures (no source, fetcher unsupported,
 /// network down, etc.). A pure-Go module yields `Some((vec![], vec![]))`.
-pub fn infer_go_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Vec<String>)> {
-    if info.template != Template::go {
-        return None;
-    }
-
-    eprintln!("Materialising source to scan for CGO directives...");
-    let source = materialise_source(info)?;
-    let directives = scan_directory(&source);
+/// Core inference logic: given a path to a Go project, scan for CGO
+/// directives and return inferred dependencies.
+fn infer_from_source_path(source_path: &Path) -> Option<(Vec<String>, Vec<String>)> {
+    let directives = scan_directory(source_path);
     if directives.is_empty() {
         eprintln!("No CGO directives found; treating as pure-Go module.");
         return Some((Vec::new(), Vec::new()));
@@ -371,6 +367,25 @@ pub fn infer_go_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Vec<
         nbi,
     );
     Some((bi, nbi))
+}
+
+/// Infer Go dependencies from a local path (for --init-flake/--init-npins).
+/// This skips the materialisation step and directly scans the given path.
+pub fn infer_go_dependencies_from_path(source_path: &Path) -> Option<(Vec<String>, Vec<String>)> {
+    eprintln!("Scanning local Go sources for CGO directives...");
+    infer_from_source_path(source_path)
+}
+
+/// Top-level entry point for remote sources: materialise the source into the
+/// Nix store, then delegate to the core inference logic.
+pub fn infer_go_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Vec<String>)> {
+    if info.template != Template::go {
+        return None;
+    }
+
+    eprintln!("Materialising source to scan for CGO directives...");
+    let source = materialise_source(info)?;
+    infer_from_source_path(&source)
 }
 
 #[cfg(test)]
