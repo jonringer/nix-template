@@ -291,50 +291,53 @@ pub fn validate_and_serialize_matches(
     }
 
     // Auto-detect template when "auto" is selected (either explicitly or as
-    // default) and --from-url is provided.
-    if info.template == Template::auto {
-        if !matches.is_present("from-url") {
-            // Cannot auto-detect without a source URL; fall back to stdenv.
-            eprintln!("nix-template: 'auto' template requires --from-url; defaulting to stdenv");
-            info.template = Template::stdenv;
-        } else if matches.is_present("no-detect") {
-            info.template = Template::stdenv;
+    // default). Uses remote source (--from-url) or local directory (CWD).
+    if info.template == Template::auto && !matches.is_present("no-detect") {
+        let candidates = if matches.is_present("from-url") {
+            // Remote detection: materialise source from URL
+            crate::detect::detect_template_candidates(&info)
         } else {
-            let candidates = crate::detect::detect_template_candidates(&info);
-            match candidates.len() {
-                0 => {
-                    eprintln!("nix-template: no build system detected; defaulting to stdenv");
-                    info.template = Template::stdenv;
-                }
-                1 => {
+            // Local detection: scan current working directory
+            let cwd = std::env::current_dir().unwrap_or_default();
+            crate::detect::detect_template_candidates_from_path(&cwd)
+        };
+
+        match candidates.len() {
+            0 => {
+                eprintln!("nix-template: no build system detected; defaulting to stdenv");
+                info.template = Template::stdenv;
+            }
+            1 => {
+                eprintln!(
+                    "nix-template: auto-detected template '{}' (found {})",
+                    candidates[0].template, candidates[0].reason
+                );
+                info.template = candidates[0].template.clone();
+            }
+            _ => {
+                if std::io::stdin().is_terminal() {
+                    match crate::interactive::prompt_template_from_candidates(&candidates) {
+                        Ok(chosen) => {
+                            info.template = chosen;
+                        }
+                        Err(e) => {
+                            eprintln!("Template selection cancelled: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                } else {
+                    // Non-interactive: use highest-priority candidate
                     eprintln!(
                         "nix-template: auto-detected template '{}' (found {})",
                         candidates[0].template, candidates[0].reason
                     );
                     info.template = candidates[0].template.clone();
                 }
-                _ => {
-                    if std::io::stdin().is_terminal() {
-                        match crate::interactive::prompt_template_from_candidates(&candidates) {
-                            Ok(chosen) => {
-                                info.template = chosen;
-                            }
-                            Err(e) => {
-                                eprintln!("Template selection cancelled: {}", e);
-                                std::process::exit(1);
-                            }
-                        }
-                    } else {
-                        // Non-interactive: use highest-priority candidate
-                        eprintln!(
-                            "nix-template: auto-detected template '{}' (found {})",
-                            candidates[0].template, candidates[0].reason
-                        );
-                        info.template = candidates[0].template.clone();
-                    }
-                }
             }
         }
+    } else if info.template == Template::auto {
+        // --no-detect was specified
+        info.template = Template::stdenv;
     }
 
     // Vendor hash prefetching is on by default when --from-url is provided.

@@ -157,13 +157,11 @@ fn main() {
             let use_structured_layout = !nixpkgs_layout_active
                 && (init_project || init_npins || (init_flake && no_path_given));
 
-            // When --init-project is requested without an explicit template,
-            // prompt the user to pick one. We also re-run when the legacy
-            // path (template default + pname provided) didn't trigger
-            // interactive mode. Also prompt if template is still 'auto'
-            // (detection didn't resolve it).
+            // When --init-project is requested and the template is still
+            // unresolved (auto-detection didn't produce a result), prompt
+            // the user to pick one.
             if init_project
-                && (m.occurrences_of("TEMPLATE") == 0 || info.template == Template::auto)
+                && info.template == Template::auto
                 && !should_use_interactive
             {
                 match interactive::prompt_template_type(None) {

@@ -34,34 +34,16 @@ const INDICATORS: &[(&str, Template, &str)] = &[
     ("Makefile", Template::stdenv, "Makefile"),
 ];
 
-/// Detect template candidates by inspecting the source tree.
+/// Scan a directory for build-system indicator files and return template candidates.
 ///
-/// Returns a list of candidates ordered by priority. If the fetcher is PyPI,
-/// short-circuits without materialising the source (we already know it's Python).
+/// This is the core detection logic, usable with both local paths (e.g., the
+/// current working directory for `--init-*` flags) and materialised remote sources.
 ///
 /// Multiple candidates are returned when several indicator files are found
 /// from *different* template categories (e.g., `Cargo.toml` + `pyproject.toml`).
 /// Duplicate template entries (e.g., both `setup.py` and `pyproject.toml` for
 /// python) are deduplicated, keeping the first-seen reason.
-pub fn detect_template_candidates(info: &ExpressionInfo) -> Vec<Candidate> {
-    // PyPI short-circuit: we know it's Python, just classify package vs application.
-    if info.fetcher == Fetcher::pypi {
-        let template = Template::python_package;
-        return vec![Candidate {
-            template,
-            reason: "PyPI source",
-        }];
-    }
-
-    eprintln!("Materialising source to detect project type...");
-    let source_path = match source::materialise_source(info) {
-        Some(p) => p,
-        None => {
-            debug!(target: LOG_TARGET, "failed to materialise source; cannot detect template");
-            return Vec::new();
-        }
-    };
-
+pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate> {
     let mut candidates: Vec<Candidate> = Vec::new();
     let mut seen_templates: Vec<Template> = Vec::new();
 
@@ -83,7 +65,7 @@ pub fn detect_template_candidates(info: &ExpressionInfo) -> Vec<Candidate> {
     // Python sub-classification: if python was detected, check if it's an application.
     for candidate in candidates.iter_mut() {
         if candidate.template == Template::python_package {
-            if is_python_application(&source_path) {
+            if is_python_application(source_path) {
                 candidate.template = Template::python_application;
             }
             break;
@@ -91,6 +73,32 @@ pub fn detect_template_candidates(info: &ExpressionInfo) -> Vec<Candidate> {
     }
 
     candidates
+}
+
+/// Detect template candidates by materialising a remote source tree.
+///
+/// If the fetcher is PyPI, short-circuits without materialising (we already
+/// know it's Python). Otherwise fetches the source into the Nix store and
+/// delegates to `detect_template_candidates_from_path`.
+pub fn detect_template_candidates(info: &ExpressionInfo) -> Vec<Candidate> {
+    // PyPI short-circuit: we know it's Python, just classify package vs application.
+    if info.fetcher == Fetcher::pypi {
+        return vec![Candidate {
+            template: Template::python_package,
+            reason: "PyPI source",
+        }];
+    }
+
+    eprintln!("Materialising source to detect project type...");
+    let source_path = match source::materialise_source(info) {
+        Some(p) => p,
+        None => {
+            debug!(target: LOG_TARGET, "failed to materialise source; cannot detect template");
+            return Vec::new();
+        }
+    };
+
+    detect_template_candidates_from_path(&source_path)
 }
 
 /// Determine whether a Python project is an application (has entry points /
@@ -165,7 +173,7 @@ mod tests {
     #[test]
     fn detect_rust_from_cargo_toml() {
         let dir = make_source_dir(&["Cargo.toml", "src/main.rs"]);
-        let candidates = scan_dir_for_candidates(dir.path());
+        let candidates = detect_template_candidates_from_path(dir.path());
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].template, Template::rust);
     }
@@ -173,7 +181,7 @@ mod tests {
     #[test]
     fn detect_go_from_go_mod() {
         let dir = make_source_dir(&["go.mod", "main.go"]);
-        let candidates = scan_dir_for_candidates(dir.path());
+        let candidates = detect_template_candidates_from_path(dir.path());
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].template, Template::go);
     }
@@ -187,7 +195,7 @@ mod tests {
             "[project]\nname = \"mypackage\"\n",
         )
         .unwrap();
-        let candidates = scan_dir_for_candidates(dir.path());
+        let candidates = detect_template_candidates_from_path(dir.path());
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].template, Template::python_package);
     }
@@ -200,7 +208,7 @@ mod tests {
             "[project]\nname = \"myapp\"\n\n[project.scripts]\nmyapp = \"myapp:main\"\n",
         )
         .unwrap();
-        let candidates = scan_dir_for_candidates(dir.path());
+        let candidates = detect_template_candidates_from_path(dir.path());
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].template, Template::python_application);
     }
@@ -209,7 +217,7 @@ mod tests {
     fn detect_multiple_candidates() {
         let dir = make_source_dir(&["Cargo.toml", "pyproject.toml"]);
         fs::write(dir.path().join("pyproject.toml"), "[project]\nname = \"x\"\n").unwrap();
-        let candidates = scan_dir_for_candidates(dir.path());
+        let candidates = detect_template_candidates_from_path(dir.path());
         assert_eq!(candidates.len(), 2);
         assert_eq!(candidates[0].template, Template::rust);
         assert_eq!(candidates[1].template, Template::python_package);
@@ -219,7 +227,7 @@ mod tests {
     fn deduplicate_python_indicators() {
         let dir = make_source_dir(&["pyproject.toml", "setup.py", "setup.cfg"]);
         fs::write(dir.path().join("pyproject.toml"), "[project]\nname = \"x\"\n").unwrap();
-        let candidates = scan_dir_for_candidates(dir.path());
+        let candidates = detect_template_candidates_from_path(dir.path());
         // Only one python entry despite three indicator files
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].template, Template::python_package);
@@ -228,7 +236,7 @@ mod tests {
     #[test]
     fn detect_stdenv_from_cmake() {
         let dir = make_source_dir(&["CMakeLists.txt", "src/main.c"]);
-        let candidates = scan_dir_for_candidates(dir.path());
+        let candidates = detect_template_candidates_from_path(dir.path());
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].template, Template::stdenv);
     }
@@ -236,38 +244,7 @@ mod tests {
     #[test]
     fn no_indicators_returns_empty() {
         let dir = make_source_dir(&["README.md", "data/font.ttf"]);
-        let candidates = scan_dir_for_candidates(dir.path());
+        let candidates = detect_template_candidates_from_path(dir.path());
         assert!(candidates.is_empty());
-    }
-
-    /// Helper: scan a directory directly (bypasses materialise_source for unit tests).
-    fn scan_dir_for_candidates(source_path: &Path) -> Vec<Candidate> {
-        let mut candidates: Vec<Candidate> = Vec::new();
-        let mut seen_templates: Vec<Template> = Vec::new();
-
-        for &(filename, ref template, reason) in INDICATORS {
-            if source_path.join(filename).exists() {
-                if seen_templates.contains(template) {
-                    continue;
-                }
-                seen_templates.push(template.clone());
-                candidates.push(Candidate {
-                    template: template.clone(),
-                    reason,
-                });
-            }
-        }
-
-        // Python sub-classification
-        for candidate in candidates.iter_mut() {
-            if candidate.template == Template::python_package {
-                if is_python_application(source_path) {
-                    candidate.template = Template::python_application;
-                }
-                break;
-            }
-        }
-
-        candidates
     }
 }
