@@ -52,13 +52,13 @@ pub fn build_cli() -> App<'static, 'static> {
 
 EXAMPLES:
 
-# generate an expression and infer dependencies for this package
-$ nix-template rust --from-url https://github.com/jonringer/nix-template
+# generate an expression and infer dependencies for this package and write it to package.nix
+$ nix-template rust --from-url https://github.com/jonringer/nix-template ./package.nix
 
 # generate a boilerplate python package expression with name
 $ nix-template python --pname requests ./pkgs/development/python-modules/requests/default.nix
 
-# generate requests package and infer dependencies using url
+# generate requests package and infer template and dependencies using url
 $ nix-template --from-url https://pypi.org/project/requests/ ./pkgs/development/python-modules/requests/default.nix
 
 # generate a shell.nix in $PWD
