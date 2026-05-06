@@ -160,9 +160,10 @@ fn main() {
             // When --init-project is requested without an explicit template,
             // prompt the user to pick one. We also re-run when the legacy
             // path (template default + pname provided) didn't trigger
-            // interactive mode.
+            // interactive mode. Also prompt if template is still 'auto'
+            // (detection didn't resolve it).
             if init_project
-                && m.occurrences_of("TEMPLATE") == 0
+                && (m.occurrences_of("TEMPLATE") == 0 || info.template == Template::auto)
                 && !should_use_interactive
             {
                 match interactive::prompt_template_type(None) {

@@ -66,10 +66,10 @@ $ nix-template config nixpkgs-root ~/nixpkgs
 ",
         )
         .arg(
-            Arg::from_usage("<TEMPLATE> 'Language or framework template target'")
+            Arg::from_usage("<TEMPLATE> 'Language or framework template target. Use \"auto\" to detect from source (requires --from-url).'")
                 .possible_values(&Template::variants())
                 .case_insensitive(true)
-                .default_value("stdenv"),
+                .default_value("auto"),
         )
         .arg(
             Arg::from_usage("[PATH] 'directory or file to be written. In the case of a directory, a default.nix will be created. When used with --by-name, it will be appended to nixpkgs-root to determine path location.'")
@@ -290,43 +290,48 @@ pub fn validate_and_serialize_matches(
         read_meta_from_url(url, &mut info, include_prereleases);
     }
 
-    // Auto-detect template when --from-url is provided and user didn't
-    // explicitly specify a template.
-    let user_specified_template = matches.occurrences_of("TEMPLATE") > 0;
-    if matches.is_present("from-url")
-        && !user_specified_template
-        && !matches.is_present("no-detect")
-    {
-        let candidates = crate::detect::detect_template_candidates(&info);
-        match candidates.len() {
-            0 => {
-                eprintln!("nix-template: no build system detected; defaulting to stdenv");
-            }
-            1 => {
-                eprintln!(
-                    "nix-template: auto-detected template '{}' (found {})",
-                    candidates[0].template, candidates[0].reason
-                );
-                info.template = candidates[0].template.clone();
-            }
-            _ => {
-                if std::io::stdin().is_terminal() {
-                    match crate::interactive::prompt_template_from_candidates(&candidates) {
-                        Ok(chosen) => {
-                            info.template = chosen;
-                        }
-                        Err(e) => {
-                            eprintln!("Template selection cancelled: {}", e);
-                            std::process::exit(1);
-                        }
-                    }
-                } else {
-                    // Non-interactive: use highest-priority candidate
+    // Auto-detect template when "auto" is selected (either explicitly or as
+    // default) and --from-url is provided.
+    if info.template == Template::auto {
+        if !matches.is_present("from-url") {
+            // Cannot auto-detect without a source URL; fall back to stdenv.
+            eprintln!("nix-template: 'auto' template requires --from-url; defaulting to stdenv");
+            info.template = Template::stdenv;
+        } else if matches.is_present("no-detect") {
+            info.template = Template::stdenv;
+        } else {
+            let candidates = crate::detect::detect_template_candidates(&info);
+            match candidates.len() {
+                0 => {
+                    eprintln!("nix-template: no build system detected; defaulting to stdenv");
+                    info.template = Template::stdenv;
+                }
+                1 => {
                     eprintln!(
                         "nix-template: auto-detected template '{}' (found {})",
                         candidates[0].template, candidates[0].reason
                     );
                     info.template = candidates[0].template.clone();
+                }
+                _ => {
+                    if std::io::stdin().is_terminal() {
+                        match crate::interactive::prompt_template_from_candidates(&candidates) {
+                            Ok(chosen) => {
+                                info.template = chosen;
+                            }
+                            Err(e) => {
+                                eprintln!("Template selection cancelled: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    } else {
+                        // Non-interactive: use highest-priority candidate
+                        eprintln!(
+                            "nix-template: auto-detected template '{}' (found {})",
+                            candidates[0].template, candidates[0].reason
+                        );
+                        info.template = candidates[0].template.clone();
+                    }
                 }
             }
         }
