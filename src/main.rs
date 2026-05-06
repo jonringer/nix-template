@@ -142,37 +142,17 @@ fn main() {
             // ----------------------------------------------------------------
             let init_flake = m.is_present("init-flake");
             let init_npins = m.is_present("init-npins");
-            let init_project = m.is_present("init-project");
             let no_path_given = m.occurrences_of("PATH") == 0;
 
             // Decide whether to use the structured nix/ layout.
-            //   - Always for --init-project, --init-npins, and --init-flake
-            //     when no explicit PATH was given. (--init-flake with an
-            //     explicit PATH preserves the legacy flat layout for scripts
-            //     that depend on it.)
+            //   - Always for --init-npins, and --init-flake when no explicit
+            //     PATH was given. (--init-flake with an explicit PATH preserves
+            //     the legacy flat layout for scripts that depend on it.)
             //   - Never when --by-name is in play (it has its own canonical
             //     placement under nixpkgs).
             let nixpkgs_layout_active = m.is_present("by-name");
             let use_structured_layout = !nixpkgs_layout_active
-                && (init_project || init_npins || (init_flake && no_path_given));
-
-            // When --init-project is requested and the template is still
-            // unresolved (auto-detection didn't produce a result), prompt
-            // the user to pick one.
-            if init_project
-                && info.template == Template::auto
-                && !should_use_interactive
-            {
-                match interactive::prompt_template_type(None) {
-                    Ok(t) => {
-                        info.template = t;
-                    }
-                    Err(e) => {
-                        eprintln!("Template selection cancelled: {}", e);
-                        std::process::exit(1);
-                    }
-                }
-            }
+                && (init_npins || (init_flake && no_path_given));
 
             // Compute the structured layout up front so every downstream
             // step (path rewrite, overlay, top-level wrappers, flake) can
@@ -284,11 +264,11 @@ for the npins wrapper."
                 });
 
             // ----- top-level default.nix payload (structured layout only) -----
-            // Emitted whenever --init-npins or --init-project is in play, so
-            // that non-flake consumers have a working entry point. We skip
-            // it for `--init-flake` alone since flake.nix is the only entry
-            // point the user asked for in that case.
-            let want_top_default = layout.is_some() && (init_npins || init_project);
+            // Emitted whenever --init-npins is in play, so that non-flake
+            // consumers have a working entry point. We skip it for
+            // `--init-flake` alone since flake.nix is the only entry point
+            // the user asked for in that case.
+            let want_top_default = layout.is_some() && init_npins;
             let top_default_payload: Option<(std::path::PathBuf, String)> = if want_top_default {
                 layout.as_ref().map(|l| {
                     (
