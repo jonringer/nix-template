@@ -12,20 +12,26 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
 - Ease usage with nixpkgs repo
   - [X] Write to correct location using path
     - [X] Improve logic around directories vs files
-    - [ ] Improve template-specific items
-      - [ ] generate buildGoModule's depsSha256
-      - [ ] generate buildRustPackages's cargoSha256
+    - [X] Improve template-specific items
+      - [X] generate buildGoModule's vendorHash
+      - [X] generate buildRustPackages's cargoHash
+      - [X] generate npm/pnpm dependency hashes
   - [X] Print top-level addition statement
+  - [X] Support RFC 140 with `--by-name` flag
 - Support Language/frameworks/usage templates:
-  - [X] Stdenv
-  - [X] Python
+  - [X] Stdenv / stdenvNoCC
+  - [X] Python (python_package, python_application)
   - [X] mkShell
-  - [x] Qt
-  - [x] Go
-  - [x] Rust
-  - [x] Flakes
-  - [x] NixOS Module
-  - [x] NixOS Test
+  - [X] Go
+  - [X] Rust
+  - [X] npm
+  - [X] pnpm
+  - [X] .NET
+  - [X] Ruby
+  - [X] Flakes
+  - [X] NixOS Module
+  - [X] NixOS Test
+  - [X] npins
   - [ ] Haskell
   - [ ] and many more...
 - [ ] Add option (-d, --documentation-url) to embed noob-friendly comments and explanations about common usage patterns
@@ -36,16 +42,18 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
   - Automatically determine version and sha256
     - [X] Github (need a way to pass owner and repo)
     - [X] Pypi (will need a way to pass pypi pname, as it may differ from installable path)
+    - [X] GitLab
+    - [X] Gitea
 - [X] Implement shell completion (nix-template completions <SHELL>)
-- [ ] Implement `project` subcommand, for creating a flake setup for new projects #51
-  - [ ] Implement `init` subcommand, for creating new projects #52
+- [X] Implement automatic project type detection with `auto` template
+- [X] Implement automatic dependency inference for Rust, Go, Ruby, CMake, and Meson
 
-## Current Usage (--from-url, github and pypi only)
+## Current Usage (--from-url, supports GitHub, GitLab, Gitea, and PyPI)
 
 ```bash
 $ nix-template rust -n --from-url github.com/jonringer/nix-template
 Creating directory: /home/jon/projects/nixpkgs/pkgs/applications/misc/nix-template
-Generating python expression at /home/jon/projects/nixpkgs/pkgs/applications/misc/nix-template/default.nix
+Generating rust expression at /home/jon/projects/nixpkgs/pkgs/applications/misc/nix-template/default.nix
 Please add the following line to the approriate file in top-level:
 
   nix-template = callPackage ../applications/misc/nix-template { };
@@ -89,16 +97,13 @@ rustPlatform.buildRustPackage (finalAttrs: {
 $ nix-template config name jonringer
 $ nix-template config nixpkgs-root /home/jon/projects/nixpkgs
 
-# add a package
-$ nix-template python --nixpkgs --pname requests -f pypi -l asl20
-Creating directory: /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/
-Generating python expression at /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/default.nix
-Please add the following line to the approriate file in top-level:
-
-  requests = callPackage ../development/python-modules/requests { };
+# add a package (using RFC 140 by-name structure)
+$ nix-template python_package --by-name --pname requests -f pypi -l asl20
+Creating directory: /home/jon/projects/nixpkgs/pkgs/by-name/re/requests/
+Generating python expression at /home/jon/projects/nixpkgs/pkgs/by-name/re/requests/package.nix
 ```
 ```nix
-# pkgs/development/python-modules/requests/default.nix
+# pkgs/by-name/re/requests/package.nix
 { lib
 , buildPythonPackage
 , fetchPypi
@@ -124,6 +129,51 @@ buildPythonPackage (finalAttrs: {
     maintainer = with maintainers; [ jonringer ];
   };
 })
+```
+
+## Key Features
+
+### Automatic Project Detection
+Use the `auto` template to automatically detect project type from source code:
+```bash
+$ nix-template auto --from-url github.com/user/project
+# Automatically detects if it's Rust, Go, Python, npm, pnpm, .NET, or Ruby
+```
+
+### Dependency Inference
+Automatically infers dependencies for supported languages:
+- **Rust**: Scans `Cargo.toml` and `Cargo.lock` for native dependencies
+- **Go**: Detects CGO directives and maps to nixpkgs inputs
+- **Ruby**: Maps gems from `Gemfile.lock` to nixpkgs dependencies
+- **CMake/Meson**: Parses build files for common dependencies
+- **Python**: Fetches dependencies from PyPI metadata
+
+Use `--skip-infer-deps` to disable this feature.
+
+### Vendor Hash Prefetching
+Automatically prefetches and calculates vendor hashes for:
+- Rust (`Cargo.lock`)
+- Go (`go.sum`)
+- npm (`package-lock.json`)
+- pnpm (`pnpm-lock.yaml`)
+
+Use `--skip-vendor-hash` to disable this feature.
+
+### Multiple Fetcher Support
+Supports fetching from:
+- GitHub
+- GitLab
+- Gitea
+- PyPI
+
+### RFC 140 Support
+Use `--by-name` flag to generate packages using the modern `pkgs/by-name` directory structure.
+
+### Project Templates
+Initialize new projects with flake or npins-based setups:
+```bash
+$ nix-template flake --pname my-project /path/to/project
+$ nix-template npins --pname my-project /path/to/project
 ```
 
 ### Installation
@@ -157,26 +207,27 @@ Other platforms, you'll need the following dependencies:
   - rustc
   - rust-clippy
 
-## End Goal (Only better nixpkgs support missing)
+## Advanced Usage with Automatic Dependency Inference
+
+The example below shows automatic dependency detection from PyPI, which fetches all required Python dependencies:
 
 ```bash
 # only need to config once per user
 $ nix-template config name jonringer
 $ nix-template config nixpkgs-root /home/jon/projects/nixpkgs
 
-# add a package
-$ nix-template python --nixpkgs -u https://pypi.org/project/requests/
+# add a package with automatic dependency detection and hash prefetching
+$ nix-template python_package -u https://pypi.org/project/requests/
 Determining latest release for requests
+Fetching PyPI metadata and dependencies...
 Creating directory: /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/
 Generating python expression at /home/jon/projects/nixpkgs/pkgs/development/python-modules/requests/default.nix
-For an addition to nixpkgs as a python package, please add the following to pkgs/top-level/python-packages.nix:
 
-  requests = callPackage ../development/python-modules/requests { };
-
-For an addition to nixpkgs as a python application, please add the following to pkgs/top-level/all-packages.nix:
-
-  requests = with python3Packages; toPythonApplication requests { };
+For RFC 140 by-name structure, use --by-name flag instead.
 ```
+
+The generated file includes automatically detected dependencies:
+
 ```nix
 { lib
 , buildPythonPackage
