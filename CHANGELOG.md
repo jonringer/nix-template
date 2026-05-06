@@ -16,6 +16,7 @@
   - Added `dotnet` template for .NET packages using buildDotnetModule
   - Added `ruby` template for Ruby applications using bundlerApp
   - Dependency hash prefetching now supports npm and pnpm templates (requires package-lock.json/pnpm-lock.yaml in repository)
+  - Dependency inference for ruby template from Gemfile.lock (maps common gems like nokogiri, pg, mysql2 to their nixpkgs dependencies)
   - Auto-detection now recognizes npm and pnpm projects (via pnpm-lock.yaml, package-lock.json, or package.json)
   - Auto-detection now recognizes .NET projects (via *.csproj, *.fsproj, or *.sln files)
   - Auto-detection now recognizes Ruby projects (via Gemfile.lock or Gemfile)

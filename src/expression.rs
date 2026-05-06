@@ -165,7 +165,22 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             "  projectFile = \"@project_file@\";\n  nugetDeps = ./deps.json;  # Run `nix-build -A package-name.passthru.fetch-deps` to generate".to_owned()
         }
         Template::ruby => {
-            "  gemdir = ./.;\n  exes = [ \"@pname@\" ];  # To build this package, you need Gemfile, Gemfile.lock, and gemset.nix in this directory\n".to_owned()
+            // Conditionally render build inputs only when inferred
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+            format!(
+                "  gemdir = ./.;\n  exes = [ \"@pname@\" ];  # To build this package, you need Gemfile, Gemfile.lock, and gemset.nix in this directory{native}{build}\n",
+                native = native,
+                build = build,
+            )
         }
         // stdenv / stdenvNoCC: render `nativeBuildInputs` only when
         // populated (via --native-build-inputs); always render
@@ -274,7 +289,12 @@ mkShell rec {
             let (_, dh_block) = derivation_helper(info);
             let meta_content = if info.include_meta { meta() } else { "" };
 
-            let inputs = vec![String::from("lib"), String::from("bundlerApp")];
+            let mut inputs = vec![String::from("lib"), String::from("bundlerApp")];
+
+            // Add inferred system dependencies to function header
+            inputs.extend(info.native_build_inputs.iter().map(|s| s.to_owned()));
+            inputs.extend(info.build_inputs.iter().map(|s| s.to_owned()));
+
             let input_list = inputs.join("\n, ");
             let header = format!("{{ {input_list}\n}}:", input_list = input_list);
 
