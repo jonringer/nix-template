@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.4.2 (Unreleased)
+
+- Breaking Changes:
+  - Removed Qt template (deprecated, use stdenv.mkDerivation with wrapQtAppsHook instead)
+  - All templates now use `finalAttrs` pattern instead of `rec` for better override composition
+
+- Additions:
+  - Modern `finalAttrs` pattern is now default for all package templates (stdenv, Python, Rust, Go)
+  - Self-references now use `finalAttrs.pname` and `finalAttrs.version`
+  - PyPI fetcher uses `inherit (finalAttrs) pname version;` syntax
+
 ## v0.4.1
 
 - Additions:

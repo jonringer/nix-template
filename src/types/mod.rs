@@ -89,7 +89,6 @@ arg_enum! {
         mkshell,
         go,
         rust,
-        qt,
         test,
     }
 }
@@ -185,9 +184,9 @@ pub const FAKE_SRI_HASH: &str = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 impl ExpressionInfo {
     pub fn format(&self, s: &str) -> String {
         let rev: String = if self.tag_prefix.is_empty() {
-            "version".to_owned()
+            "finalAttrs.version".to_owned()
         } else {
-            format!(r#""{}${{version}}""#, &self.tag_prefix)
+            format!(r#""{}${{finalAttrs.version}}""#, &self.tag_prefix)
         };
 
         fn format_inputs(inputs: &Vec<String>) -> String {
