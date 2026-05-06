@@ -620,7 +620,7 @@ for the npins wrapper."
                     }
 
                     println!();
-                    println!("Next steps:");
+                    println!("Next steps (assuming npins v0.4.0+):");
                     let project_dir = npins_dir
                         .parent()
                         .map(|p| {
@@ -632,7 +632,7 @@ for the npins wrapper."
                         "  1. cd into {} (if not already there)",
                         project_dir
                     );
-                    println!("  2. Pin nixpkgs:  npins add channel nixpkgs-unstable");
+                    println!("  2. Pin nixpkgs:  npins add channel --name nixpkgs nixpkgs-unstable");
                     println!("  3. Build:        nix-build");
                     println!();
                 }
