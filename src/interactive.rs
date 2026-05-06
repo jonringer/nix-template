@@ -398,6 +398,36 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
     })
 }
 
+/// Prompt the user to select from a list of auto-detected template candidates.
+///
+/// Called when multiple indicator files are found (e.g., both `Cargo.toml` and
+/// `pyproject.toml`) and the user is in an interactive terminal.
+pub fn prompt_template_from_candidates(
+    candidates: &[crate::detect::Candidate],
+) -> Result<Template> {
+    let display_options: Vec<String> = candidates
+        .iter()
+        .map(|c| format!("{:<20} (detected from {})", c.template, c.reason))
+        .collect();
+
+    let selection = Select::new(
+        "Multiple build systems detected. Select template:",
+        display_options,
+    )
+    .with_scorer(&fuzzy_scorer_string)
+    .prompt()?;
+
+    // Match back to the candidate by finding which one matches the displayed string
+    let selected_idx = candidates
+        .iter()
+        .position(|c| {
+            selection.starts_with(&format!("{}", c.template))
+        })
+        .unwrap_or(0);
+
+    Ok(candidates[selected_idx].template.clone())
+}
+
 /// Extract metadata from a URL
 pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
     let repo = parse_url(url)?;

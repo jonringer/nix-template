@@ -10,11 +10,10 @@
 //! mapped. Users can edit the generated expression to add anything we
 //! missed.
 
-use crate::types::{ExpressionInfo, Fetcher, Template};
+use crate::types::{ExpressionInfo, Template};
 use log::debug;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use toml::Value;
 
 const LOG_TARGET: &str = "nix-template::rust_deps";
@@ -172,79 +171,10 @@ pub fn map_crates_to_nix(crate_names: &[String]) -> (Vec<String>, Vec<String>) {
     )
 }
 
-/// Materialise the source tree referenced by `info` into the Nix store
-/// and return the resulting `/nix/store/...-source` path.
-///
-/// Currently supports `fetchFromGitHub` and `fetchFromGitea`. Returns
-/// `None` for fetchers we can't cleanly drive headlessly (e.g. fetchurl
-/// without a known unpacked layout) or when the build fails.
+/// Materialise the source tree referenced by `info` into the Nix store.
+/// Delegates to the shared `crate::source::materialise_source`.
 fn materialise_source(info: &ExpressionInfo) -> Option<PathBuf> {
-    if info.src_sha.is_empty()
-        || info.src_sha.starts_with("0000000000000000000000000000000000000000000000000000")
-    {
-        debug!(target: LOG_TARGET, "src_sha not yet known; skipping source materialisation");
-        return None;
-    }
-
-    let rev = if info.tag_prefix.is_empty() {
-        info.version.clone()
-    } else {
-        format!("{}{}", info.tag_prefix, info.version)
-    };
-
-    let expr = match info.fetcher {
-        Fetcher::github => format!(
-            "(import <nixpkgs> {{}}).fetchFromGitHub {{ owner = \"{owner}\"; repo = \"{repo}\"; rev = \"{rev}\"; sha256 = \"{sha}\"; }}",
-            owner = info.owner,
-            repo = info.pname,
-            rev = rev,
-            sha = info.src_sha,
-        ),
-        Fetcher::gitea => format!(
-            "(import <nixpkgs> {{}}).fetchFromGitea {{ domain = \"{domain}\"; owner = \"{owner}\"; repo = \"{repo}\"; rev = \"{rev}\"; sha256 = \"{sha}\"; }}",
-            domain = info.domain,
-            owner = info.owner,
-            repo = info.pname,
-            rev = rev,
-            sha = info.src_sha,
-        ),
-        _ => {
-            debug!(
-                target: LOG_TARGET,
-                "fetcher {:?} not supported for dependency inference",
-                info.fetcher
-            );
-            return None;
-        }
-    };
-
-    let output = Command::new("nix-build")
-        .args(&["--no-out-link", "-E"])
-        .arg(&expr)
-        .output();
-
-    let output = match output {
-        Ok(o) if o.status.success() => o,
-        Ok(o) => {
-            debug!(
-                target: LOG_TARGET,
-                "nix-build failed: {}",
-                String::from_utf8_lossy(&o.stderr)
-            );
-            return None;
-        }
-        Err(e) => {
-            debug!(target: LOG_TARGET, "failed to invoke nix-build: {}", e);
-            return None;
-        }
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let path = stdout.trim().lines().last()?.trim().to_owned();
-    if path.is_empty() {
-        return None;
-    }
-    Some(PathBuf::from(path))
+    crate::source::materialise_source(info)
 }
 
 /// Locate `Cargo.toml` inside an unpacked source tree. Picks the

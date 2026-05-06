@@ -1,4 +1,5 @@
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use std::io::IsTerminal;
 
 use crate::file_path::nix_file_paths;
 use crate::interactive::InteractiveData;
@@ -111,6 +112,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             ).takes_value(false))
         .arg(Arg::from_usage(
             "--skip-infer-deps 'Skip automatic inference of buildInputs/nativeBuildInputs. By default, when --from-url is provided, nix-template materialises the source: for the rust template it parses Cargo.toml/Cargo.lock to detect well-known *-sys crates; for the go template it scans *.go files for `// #cgo` directives to detect pkg-config tokens and -l libraries.'",
+            ).takes_value(false))
+        .arg(Arg::from_usage(
+            "--no-detect 'Disable automatic template detection. By default, when --from-url is provided without an explicit template, nix-template inspects the source tree for build system files (Cargo.toml, go.mod, pyproject.toml, etc.) to auto-select the template.'",
             ).takes_value(false))
         .arg(
             // User-supplied buildInputs. Accepts comma-separated values
@@ -284,6 +288,48 @@ pub fn validate_and_serialize_matches(
     if let Some(url) = matches.value_of("from-url") {
         let include_prereleases = matches.is_present("include-prereleases");
         read_meta_from_url(url, &mut info, include_prereleases);
+    }
+
+    // Auto-detect template when --from-url is provided and user didn't
+    // explicitly specify a template.
+    let user_specified_template = matches.occurrences_of("TEMPLATE") > 0;
+    if matches.is_present("from-url")
+        && !user_specified_template
+        && !matches.is_present("no-detect")
+    {
+        let candidates = crate::detect::detect_template_candidates(&info);
+        match candidates.len() {
+            0 => {
+                eprintln!("nix-template: no build system detected; defaulting to stdenv");
+            }
+            1 => {
+                eprintln!(
+                    "nix-template: auto-detected template '{}' (found {})",
+                    candidates[0].template, candidates[0].reason
+                );
+                info.template = candidates[0].template.clone();
+            }
+            _ => {
+                if std::io::stdin().is_terminal() {
+                    match crate::interactive::prompt_template_from_candidates(&candidates) {
+                        Ok(chosen) => {
+                            info.template = chosen;
+                        }
+                        Err(e) => {
+                            eprintln!("Template selection cancelled: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                } else {
+                    // Non-interactive: use highest-priority candidate
+                    eprintln!(
+                        "nix-template: auto-detected template '{}' (found {})",
+                        candidates[0].template, candidates[0].reason
+                    );
+                    info.template = candidates[0].template.clone();
+                }
+            }
+        }
     }
 
     // Vendor hash prefetching is on by default when --from-url is provided.
