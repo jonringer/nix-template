@@ -17,7 +17,6 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             ("buildPythonApplication", "buildPythonApplication", None)
         }
         Template::mkshell => ("pkgs ? import <nixpkgs> {}", "with pkgs;\n\nmkShell", None),
-        Template::qt => ("mkDerivation", "mkDerivation", None),
         Template::go => ("buildGoModule", "buildGoModule", None),
         Template::rust => ("rustPlatform", "rustPlatform.buildRustPackage", None),
         Template::test => ("", "", None),  // Tests aren't a normal expression
@@ -36,7 +35,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
             "fetchFromGitHub",
             "  @doc:fetcher@src = fetchFromGitHub {
     owner = \"@owner@\";
-    repo = pname;
+    repo = finalAttrs.pname;
     rev = @rev@;
     sha256 = \"@src_sha@\";
   };",
@@ -45,7 +44,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
             "fetchFromGitLab",
             "  @doc:fetcher@src = fetchFromGitLab {
     owner = \"@owner@\";
-    repo = pname;
+    repo = finalAttrs.pname;
     rev = @rev@;
     sha256 = \"@src_sha@\";
   };",
@@ -55,7 +54,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
             "  @doc:fetcher@src = fetchFromGitea {
     domain = \"@domain@\";
     owner = \"@owner@\";
-    repo = pname;
+    repo = finalAttrs.pname;
     rev = @rev@;
     sha256 = \"@src_sha@\";
   };",
@@ -77,7 +76,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
         Fetcher::pypi => (
             "fetchPypi",
             "  @doc:fetcher@src = fetchPypi {
-    inherit pname version;
+    inherit (finalAttrs) pname version;
     sha256 = \"@src_sha@\";
   };",
         ),
@@ -141,7 +140,7 @@ fn build_inputs(info: &ExpressionInfo) -> String {
                 build = build,
             )
         }
-        // stdenv / stdenvNoCC / qt: render `nativeBuildInputs` only when
+        // stdenv / stdenvNoCC: render `nativeBuildInputs` only when
         // populated (via --native-build-inputs); always render
         // `buildInputs` to preserve the existing template's ergonomic
         // placeholder when no inputs are supplied.
@@ -272,7 +271,7 @@ mkShell rec {
             info.format(&format!(
                 "{header}
 
-{dh_helper} rec {{
+{dh_helper} (finalAttrs: {{
   pname = \"{pname}\";
   version = \"{version}\";{addtional_pkg_attr_headers}
 
@@ -280,7 +279,7 @@ mkShell rec {
 
 {build_inputs}
 {meta}
-}}
+}})
 ",
                 header = header,
                 dh_helper = dh_block,

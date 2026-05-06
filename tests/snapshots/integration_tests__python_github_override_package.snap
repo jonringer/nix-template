@@ -1,5 +1,6 @@
 ---
 source: tests/integration_tests.rs
+assertion_line: 199
 expression: package_nix
 ---
 { lib
@@ -7,15 +8,15 @@ expression: package_nix
 , fetchFromGitHub
 }:
 
-buildPythonPackage rec {
+buildPythonPackage (finalAttrs: {
   pname = "requests";
   version = "2.31.0";
   format = "setuptools";
 
   src = fetchFromGitHub {
     owner = "CHANGE";
-    repo = pname;
-    rev = version;
+    repo = finalAttrs.pname;
+    rev = finalAttrs.version;
     sha256 = "0000000000000000000000000000000000000000000000000000";
   };
 
@@ -29,4 +30,4 @@ buildPythonPackage rec {
     license = licenses.asl20;
     maintainers = with maintainers; [  ];
   };
-}
+})

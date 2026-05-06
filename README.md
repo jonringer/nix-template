@@ -58,14 +58,14 @@ The resulting file:
 , fetchFromGitHub
 }:
 
-rustPlatform.buildRustPackage rec {
+rustPlatform.buildRustPackage (finalAttrs: {
   pname = "nix-template";
   version = "0.3.0";
 
   src = fetchFromGitHub {
     owner = "jonringer";
-    repo = pname;
-    rev = "v${version}";
+    repo = finalAttrs.pname;
+    rev = "v${finalAttrs.version}";
     sha256 = "sha256-5redgssfwbNEgpjmakIcU8cL4Xg1kPvyK88v+xMqAtw=";
   };
 
@@ -79,7 +79,7 @@ rustPlatform.buildRustPackage rec {
     license = licenses.cc0;
     maintainers = with maintainers; [ jonringer ];
   };
-}
+})
 ```
 
 ## Current Usage (Generically)
@@ -104,12 +104,12 @@ Please add the following line to the approriate file in top-level:
 , fetchPypi
 }:
 
-buildPythonPackage rec {
+buildPythonPackage (finalAttrs: {
   pname = "requests";
   version = "0.0.1";
 
   src = fetchPypi {
-    inherit pname version;
+    inherit (finalAttrs) pname version;
     sha256 = "0000000000000000000000000000000000000000000000000000";
   };
 
@@ -123,7 +123,7 @@ buildPythonPackage rec {
     license = licenses.asl20;
     maintainer = with maintainers; [ jonringer ];
   };
-}
+})
 ```
 
 ### Installation
@@ -187,12 +187,12 @@ For an addition to nixpkgs as a python application, please add the following to 
 , urllib3
 }:
 
-buildPythonPackage rec {
+buildPythonPackage (finalAttrs: {
   pname = "requests";
   version = "2.28.1";
 
   src = fetchPypi {
-    inherit pname version;
+    inherit (finalAttrs) pname version;
     sha256 = "sha256-fFWZsQL+3apmHIJsVqtP7ii/0X9avKHrvj5/GdfJeYM=";
   };
 
@@ -211,6 +211,6 @@ buildPythonPackage rec {
     license = licenses.asl20;
     maintainers = with maintainers; [ jonringer ];
   };
-}
+})
 ```
 
