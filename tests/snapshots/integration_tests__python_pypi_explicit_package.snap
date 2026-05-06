@@ -1,7 +1,6 @@
 ---
 source: tests/integration_tests.rs
-assertion_line: 139
-expression: package_nix
+expression: stdout
 ---
 { lib
 , buildPythonPackage
@@ -14,7 +13,8 @@ buildPythonPackage (finalAttrs: {
   format = "setuptools";
 
   src = fetchPypi {
-    inherit (finalAttrs) pname version;
+    pname = "requests";
+    inherit (finalAttrs) version;
     sha256 = "0000000000000000000000000000000000000000000000000000";
   };
 
