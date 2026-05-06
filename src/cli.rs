@@ -6,7 +6,7 @@ use crate::interactive::InteractiveData;
 use crate::go_deps::infer_go_dependencies;
 use crate::rust_deps::infer_rust_dependencies;
 use crate::types::{ExpressionInfo, Fetcher, Template, UserConfig, FAKE_SRI_HASH};
-use crate::url::{prefetch_dependency_hash, read_meta_from_url};
+use crate::url::{infer_dotnet_project_file, prefetch_dependency_hash, read_meta_from_url};
 
 // clap will validate inputs, only use on functions with possible_values defined
 pub fn arg_to_type<T>(arg: Option<&str>) -> T
@@ -282,6 +282,7 @@ pub fn validate_and_serialize_matches(
         vendor_hash: FAKE_SRI_HASH.to_owned(),
         npm_deps_hash: FAKE_SRI_HASH.to_owned(),
         pnpm_deps_hash: FAKE_SRI_HASH.to_owned(),
+        project_file: "CHANGE".to_owned(),
         domain: "CHANGE".to_owned(),
         build_inputs: Vec::new(),
         native_build_inputs: Vec::new(),
@@ -376,6 +377,11 @@ pub fn validate_and_serialize_matches(
                     info.native_build_inputs = native;
                 }
             }
+            Template::dotnet => {
+                if let Some(project_file) = infer_dotnet_project_file(&info) {
+                    info.project_file = project_file;
+                }
+            }
             _ => {}
         }
     }
@@ -444,6 +450,7 @@ pub fn build_expression_info_from_interactive(
         vendor_hash: FAKE_SRI_HASH.to_owned(),
         npm_deps_hash: FAKE_SRI_HASH.to_owned(),
         pnpm_deps_hash: FAKE_SRI_HASH.to_owned(),
+        project_file: "CHANGE".to_owned(),
         domain: "CHANGE".to_owned(),
         build_inputs: Vec::new(),
         native_build_inputs: Vec::new(),
@@ -477,6 +484,11 @@ pub fn build_expression_info_from_interactive(
                 if let Some((build, native)) = infer_go_dependencies(&info) {
                     info.build_inputs = build;
                     info.native_build_inputs = native;
+                }
+            }
+            Template::dotnet => {
+                if let Some(project_file) = infer_dotnet_project_file(&info) {
+                    info.project_file = project_file;
                 }
             }
             _ => {}

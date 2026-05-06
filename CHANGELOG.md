@@ -8,13 +8,16 @@
   - All templates now use `finalAttrs` pattern instead of `rec` for better override composition
 
 - Additions:
-  - Modern `finalAttrs` pattern is now default for all package templates (stdenv, Python, Rust, Go, npm, pnpm)
+  - Modern `finalAttrs` pattern is now default for all package templates (stdenv, Python, Rust, Go, npm, pnpm, dotnet)
   - Self-references now use `finalAttrs.pname` and `finalAttrs.version`
   - PyPI fetcher uses `inherit (finalAttrs) pname version;` syntax
   - Added `npm` template for Node.js packages using buildNpmPackage
   - Added `pnpm` template for pnpm-based packages using fetchPnpmDeps with stdenv.mkDerivation
+  - Added `dotnet` template for .NET packages using buildDotnetModule
   - Dependency hash prefetching now supports npm and pnpm templates (requires package-lock.json/pnpm-lock.yaml in repository)
   - Auto-detection now recognizes npm and pnpm projects (via pnpm-lock.yaml, package-lock.json, or package.json)
+  - Auto-detection now recognizes .NET projects (via *.csproj, *.fsproj, or *.sln files)
+  - Project file inference for dotnet template when using --from-url (automatically detects .csproj, .fsproj, or .sln)
 
 ## v0.4.1
 

@@ -357,6 +357,7 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
         ("go", "Go package with buildGoModule"),
         ("npm", "Node.js package with buildNpmPackage"),
         ("pnpm", "Node.js package with pnpm (stdenv + fetchPnpmDeps)"),
+        ("dotnet", ".NET package with buildDotnetModule"),
         ("mkshell", "Development shell.nix"),
         ("module", "NixOS module"),
         ("test", "NixOS test"),
