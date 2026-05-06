@@ -155,9 +155,8 @@ $ nix-template config nixpkgs-root ~/nixpkgs
                 .possible_values(&Fetcher::variants())
                 .case_insensitive(true)
                 .default_value("github")
-                .default_value_if("TEMPLATE", Some("python"), "pypi")
-                .default_value_if("TEMPLATE", Some("python-package"), "pypi")
-                .default_value_if("TEMPLATE", Some("python-application"), "pypi"),
+                .default_value_if("TEMPLATE", Some("python_package"), "pypi")
+                .default_value_if("TEMPLATE", Some("python_application"), "pypi"),
         )
         .subcommand(
             SubCommand::with_name("completions")
@@ -447,7 +446,7 @@ mod tests {
     fn test_python() {
         let m = build_cli().get_matches_from(vec![
             "nix-template",
-            "python",
+            "python_package",
             "-r",
             "/tmp",
             "--by-name",
@@ -456,7 +455,7 @@ mod tests {
         ]);
         println!("{:?}", m);
         assert_eq!(m.value_of("pname"), Some("requests"));
-        assert_eq!(m.value_of("TEMPLATE"), Some("python"));
+        assert_eq!(m.value_of("TEMPLATE"), Some("python_package"));
         assert_eq!(m.value_of("fetcher"), Some("pypi"));
         assert_eq!(m.value_of("v"), Some("0.0.1"));
         assert_eq!(m.value_of("pname"), Some("requests"));
@@ -471,7 +470,7 @@ mod tests {
 
     #[test]
     fn test_url() {
-        let m = build_cli().get_matches_from(vec!["nix-template", "python", "-u", "https://pypi.org/project/requests/", "--by-name"]);
+        let m = build_cli().get_matches_from(vec!["nix-template", "python_package", "-u", "https://pypi.org/project/requests/", "--by-name"]);
         assert_eq!(m.is_present("stdout"), false);
         assert_eq!(m.is_present("by-name"), true);
         assert_eq!(m.occurrences_of("from-url"), 1);

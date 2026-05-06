@@ -351,7 +351,6 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
     let options = vec![
         ("stdenv", "Standard environment derivation"),
         ("stdenvNoCC", "Standard environment without a C compiler (fonts, data, scripts)"),
-        ("python", "Python package (legacy, use python-package or python-application)"),
         ("python-package", "Python library with buildPythonPackage"),
         ("python-application", "Python application with buildPythonApplication"),
         ("rust", "Rust package with rustPlatform.buildRustPackage"),
@@ -388,7 +387,6 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
     Ok(match template_name {
         "stdenv" => Template::stdenv,
         "stdenvNoCC" => Template::stdenvNoCC,
-        "python" => Template::python,
         "python-package" => Template::python_package,
         "python-application" => Template::python_application,
         "rust" => Template::rust,
@@ -859,7 +857,7 @@ pub fn run_interactive_mode(
     let default_fetcher = if url_with_metadata.is_some() {
         // Use fetcher from URL metadata
         metadata.fetcher
-    } else if template == Template::python {
+    } else if template == Template::python_package || template == Template::python_application {
         Fetcher::pypi
     } else {
         Fetcher::github

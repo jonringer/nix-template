@@ -8,7 +8,7 @@ fn test_python_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
-            "python",
+            "python_package",
             "-p", "requests",
             "-v", "2.31.0",
             "-l", "asl20",
@@ -41,7 +41,7 @@ fn test_python_template_with_flake_init() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
-            "python",
+            "python_package",
             "-p", "requests",
             "-v", "2.31.0",
             "-l", "asl20",
@@ -113,7 +113,7 @@ fn test_python_template_pypi_fetcher_explicit() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
-            "python",
+            "python_package",
             "-f", "pypi",  // Explicitly specify PyPI fetcher
             "-p", "requests",
             "-v", "2.31.0",
@@ -148,7 +148,7 @@ fn test_python_template_github_fetcher_override() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
-            "python",
+            "python_package",
             "-f", "github",  // Override with GitHub fetcher
             "-p", "requests",
             "-v", "2.31.0",
@@ -215,7 +215,7 @@ fn test_python_template_file_writing_with_flake() {
     let output = cmd
         .current_dir(temp_path)
         .args(&[
-            "python",
+            "python_package",
             "-p", "requests",
             "-v", "2.31.0",
             "-l", "asl20",
@@ -404,7 +404,7 @@ fn test_init_npins_python_wrapper() {
     let output = cmd
         .current_dir(temp_path)
         .args(&[
-            "python",
+            "python_package",
             "-p", "requests",
             "-v", "2.31.0",
             "-l", "asl20",
