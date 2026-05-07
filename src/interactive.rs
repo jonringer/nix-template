@@ -96,7 +96,11 @@ impl Autocomplete for FuzzyAutocomplete {
         }
         // Otherwise fall back to the top fuzzy match for what they
         // typed. This makes Tab behave like fzf's "accept best".
-        Ok(self.ranked(input).into_iter().next().map_or(Replacement::None, Replacement::Some))
+        Ok(self
+            .ranked(input)
+            .into_iter()
+            .next()
+            .map_or(Replacement::None, Replacement::Some))
     }
 }
 
@@ -286,8 +290,17 @@ mod autocomplete_tests {
 
     fn licenses() -> FuzzyAutocomplete {
         FuzzyAutocomplete::new(vec![
-            "mit", "asl20", "gpl3", "gpl2", "lgpl21", "bsd3", "bsd2",
-            "agpl3", "mpl20", "cc0", "unlicense",
+            "mit",
+            "asl20",
+            "gpl3",
+            "gpl2",
+            "lgpl21",
+            "bsd3",
+            "bsd2",
+            "agpl3",
+            "mpl20",
+            "cc0",
+            "unlicense",
         ])
     }
 
@@ -324,9 +337,7 @@ mod autocomplete_tests {
     #[test]
     fn tab_with_highlight_returns_highlighted() {
         let mut ac = licenses();
-        let r = ac
-            .get_completion("g", Some("gpl3".to_string()))
-            .unwrap();
+        let r = ac.get_completion("g", Some("gpl3".to_string())).unwrap();
         assert_eq!(r, Replacement::Some("gpl3".to_string()));
     }
 
@@ -350,9 +361,15 @@ mod autocomplete_tests {
 pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
     let options = vec![
         ("stdenv", "Standard environment derivation"),
-        ("stdenvNoCC", "Standard environment without a C compiler (fonts, data, scripts)"),
+        (
+            "stdenvNoCC",
+            "Standard environment without a C compiler (fonts, data, scripts)",
+        ),
         ("python-package", "Python library with buildPythonPackage"),
-        ("python-application", "Python application with buildPythonApplication"),
+        (
+            "python-application",
+            "Python application with buildPythonApplication",
+        ),
         ("rust", "Rust package with rustPlatform.buildRustPackage"),
         ("go", "Go package with buildGoModule"),
         ("npm", "Node.js package with buildNpmPackage"),
@@ -426,9 +443,7 @@ pub fn prompt_template_from_candidates(
     // Match back to the candidate by finding which one matches the displayed string
     let selected_idx = candidates
         .iter()
-        .position(|c| {
-            selection.starts_with(&format!("{}", c.template))
-        })
+        .position(|c| selection.starts_with(&format!("{}", c.template)))
         .unwrap_or(0);
 
     Ok(candidates[selected_idx].template.clone())
@@ -440,7 +455,10 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
 
     match repo {
         Repo::Github(gh_repo) => {
-            eprintln!("Fetching metadata from GitHub for {}/{}...", gh_repo.owner, gh_repo.repo);
+            eprintln!(
+                "Fetching metadata from GitHub for {}/{}...",
+                gh_repo.owner, gh_repo.repo
+            );
 
             let repo_info = fetch_github_repo_info(&gh_repo);
 
@@ -528,9 +546,10 @@ pub fn extract_metadata_from_url(url: &str) -> Result<UrlMetadata> {
 
 /// Prompt for URL (GitHub or PyPI) and return URL with extracted metadata
 pub fn prompt_url() -> Result<Option<(String, UrlMetadata)>> {
-    let should_provide = Confirm::new("Do you want to fetch metadata from a URL (GitHub/PyPI/Gitea)?")
-        .with_default(false)
-        .prompt()?;
+    let should_provide =
+        Confirm::new("Do you want to fetch metadata from a URL (GitHub/PyPI/Gitea)?")
+            .with_default(false)
+            .prompt()?;
 
     if !should_provide {
         return Ok(None);
@@ -724,9 +743,7 @@ pub fn prompt_version(url: Option<&str>, default: &str) -> Result<String> {
 
 /// Prompt for version manually
 fn prompt_version_manual(default: &str) -> Result<String> {
-    let version = Text::new("Version:")
-        .with_default(default)
-        .prompt()?;
+    let version = Text::new("Version:").with_default(default).prompt()?;
     Ok(version)
 }
 
@@ -740,7 +757,10 @@ pub fn prompt_pname(default: &str) -> Result<String> {
 
         // Validate length (max 255 characters for filesystem compatibility)
         if pname.len() > 255 {
-            eprintln!("Error: Package name too long (max 255 characters, got {})", pname.len());
+            eprintln!(
+                "Error: Package name too long (max 255 characters, got {})",
+                pname.len()
+            );
             continue;
         }
 
@@ -874,7 +894,10 @@ pub fn prompt_description(default: &str) -> Result<String> {
 
         // Validate length (reasonable limit for descriptions)
         if description.len() > 1000 {
-            eprintln!("Error: Description too long (max 1000 characters, got {})", description.len());
+            eprintln!(
+                "Error: Description too long (max 1000 characters, got {})",
+                description.len()
+            );
             continue;
         }
 
@@ -902,10 +925,10 @@ pub fn run_interactive_mode(
     run_interactive_mode_with_defaults(
         initial_template,
         user_config,
-        Vec::new(),      // detected_candidates
-        None,            // default_pname
-        None,            // inferred_deps
-        false,           // is_local_init
+        Vec::new(), // detected_candidates
+        None,       // default_pname
+        None,       // inferred_deps
+        false,      // is_local_init
     )
 }
 
@@ -933,11 +956,7 @@ pub fn run_interactive_mode_with_defaults(
     };
 
     // 2. URL (optional) - skip if we're in local init mode
-    let url_with_metadata = if is_local_init {
-        None
-    } else {
-        prompt_url()?
-    };
+    let url_with_metadata = if is_local_init { None } else { prompt_url()? };
 
     // Extract metadata for defaults
     let metadata = url_with_metadata
@@ -946,9 +965,7 @@ pub fn run_interactive_mode_with_defaults(
         .unwrap_or_default();
 
     // 3. Package name (use defaults: default_pname from init mode, or URL metadata)
-    let pname_default = default_pname
-        .as_deref()
-        .unwrap_or_else(|| &metadata.pname);
+    let pname_default = default_pname.as_deref().unwrap_or_else(|| &metadata.pname);
     let pname = prompt_pname(pname_default)?;
 
     // 4. Version (with auto-fetch if URL provided)
@@ -974,7 +991,7 @@ pub fn run_interactive_mode_with_defaults(
         Fetcher::github
     };
     let fetcher = if is_local_init {
-        Fetcher::local  // Force local fetcher in init mode
+        Fetcher::local // Force local fetcher in init mode
     } else {
         prompt_fetcher(default_fetcher, &template)?
     };
@@ -1032,10 +1049,8 @@ pub fn run_interactive_mode_with_defaults(
     // can decline at the prompt.
     // In init mode, dependencies are already inferred, so just use true.
     let infer_deps = if is_local_init && inferred_deps.is_some() {
-        true  // Already inferred in init mode
-    } else if (template.is_rust() || template.is_go())
-        && url_with_metadata.is_some()
-    {
+        true // Already inferred in init mode
+    } else if (template.is_rust() || template.is_go()) && url_with_metadata.is_some() {
         let prompt_text = if template.is_rust() {
             "Infer system dependencies from Cargo.toml/Cargo.lock?"
         } else {

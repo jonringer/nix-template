@@ -25,7 +25,11 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
     vec![
         ("Cargo.toml", Template::rust(), "Cargo.toml"),
         ("go.mod", Template::go(), "go.mod"),
-        ("pyproject.toml", Template::python_package(), "pyproject.toml"),
+        (
+            "pyproject.toml",
+            Template::python_package(),
+            "pyproject.toml",
+        ),
         ("setup.py", Template::python_package(), "setup.py"),
         ("setup.cfg", Template::python_package(), "setup.cfg"),
         ("pnpm-lock.yaml", Template::pnpm(), "pnpm-lock.yaml"),
@@ -62,10 +66,7 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
                 continue;
             }
             seen_templates.push(template.clone());
-            candidates.push(Candidate {
-                template,
-                reason,
-            });
+            candidates.push(Candidate { template, reason });
         }
     }
 
@@ -81,9 +82,7 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
 
     // npm/pnpm fallback: if no lockfile was found but package.json exists, use npm.
     // This only runs if neither pnpm-lock.yaml nor package-lock.json were detected.
-    let has_npm_or_pnpm = candidates
-        .iter()
-        .any(|c| c.template.is_node());
+    let has_npm_or_pnpm = candidates.iter().any(|c| c.template.is_node());
 
     if !has_npm_or_pnpm && source_path.join("package.json").exists() {
         candidates.push(Candidate {
@@ -94,9 +93,7 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
 
     // .NET detection: scan for .csproj, .fsproj, or .sln files
     // These files have dynamic names (e.g., MyProject.csproj), so we need to scan the directory.
-    let has_dotnet = candidates
-        .iter()
-        .any(|c| c.template == Template::Dotnet);
+    let has_dotnet = candidates.iter().any(|c| c.template == Template::Dotnet);
 
     if !has_dotnet {
         if let Some(reason) = find_dotnet_project_file(source_path) {
@@ -196,7 +193,10 @@ pub fn detect_python_format(source_path: &Path) -> String {
         if let Some(s) = req.as_str() {
             let lower = s.to_lowercase();
             // Extract package name (before any version specifier)
-            let pkg = lower.split(&['>', '<', '=', '!', ';', '['][..]).next().unwrap_or("");
+            let pkg = lower
+                .split(&['>', '<', '=', '!', ';', '['][..])
+                .next()
+                .unwrap_or("");
             let pkg = pkg.trim();
             match pkg {
                 "flit_core" | "flit" => return "flit".to_owned(),
@@ -322,13 +322,17 @@ mod tests {
         .unwrap();
         let candidates = detect_template_candidates_from_path(dir.path());
         assert_eq!(candidates.len(), 1);
-        assert_eq!(candidates[0].template, Template::python_package());
+        assert_eq!(candidates[0].template, Template::python_application());
     }
 
     #[test]
     fn detect_multiple_candidates() {
         let dir = make_source_dir(&["Cargo.toml", "pyproject.toml"]);
-        fs::write(dir.path().join("pyproject.toml"), "[project]\nname = \"x\"\n").unwrap();
+        fs::write(
+            dir.path().join("pyproject.toml"),
+            "[project]\nname = \"x\"\n",
+        )
+        .unwrap();
         let candidates = detect_template_candidates_from_path(dir.path());
         assert_eq!(candidates.len(), 2);
         assert_eq!(candidates[0].template, Template::rust());
@@ -338,7 +342,11 @@ mod tests {
     #[test]
     fn deduplicate_python_indicators() {
         let dir = make_source_dir(&["pyproject.toml", "setup.py", "setup.cfg"]);
-        fs::write(dir.path().join("pyproject.toml"), "[project]\nname = \"x\"\n").unwrap();
+        fs::write(
+            dir.path().join("pyproject.toml"),
+            "[project]\nname = \"x\"\n",
+        )
+        .unwrap();
         let candidates = detect_template_candidates_from_path(dir.path());
         // Only one python entry despite three indicator files
         assert_eq!(candidates.len(), 1);

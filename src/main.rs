@@ -37,12 +37,12 @@ fn main() {
     let user_config: Option<UserConfig> =
         if let Some(file) = xdg_dirs.find_config_file("config.toml") {
             match std::fs::read_to_string(&file) {
-                Ok(contents) => {
-                    toml::from_str(&contents).map_err(|e| {
+                Ok(contents) => toml::from_str(&contents)
+                    .map_err(|e| {
                         eprintln!("Warning: Could not parse config file {:?}: {}", file, e);
                         eprintln!("Continuing without user configuration...");
-                    }).ok()
-                }
+                    })
+                    .ok(),
                 Err(e) => {
                     eprintln!("Warning: Could not read config file {:?}: {}", file, e);
                     eprintln!("Continuing without user configuration...");

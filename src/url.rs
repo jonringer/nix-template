@@ -105,10 +105,7 @@ fn validate_url_component(component: &str, field_name: &str) -> Result<()> {
 
     // Check for null bytes specifically (even though covered above)
     if component.contains('\0') {
-        return Err(anyhow!(
-            "Invalid {}: contains null bytes",
-            field_name
-        ));
+        return Err(anyhow!("Invalid {}: contains null bytes", field_name));
     }
 
     // Check for excessive length (DoS prevention)
@@ -122,10 +119,7 @@ fn validate_url_component(component: &str, field_name: &str) -> Result<()> {
 
     // Check that it's not empty
     if component.trim().is_empty() {
-        return Err(anyhow!(
-            "Invalid {}: cannot be empty",
-            field_name
-        ));
+        return Err(anyhow!("Invalid {}: cannot be empty", field_name));
     }
 
     Ok(())
@@ -172,14 +166,21 @@ fn validate_version_components(version: &str, tag_prefix: &str) -> Result<()> {
 }
 
 fn to_sri(hash: &str) -> String {
-   let sha256_cmd = Command::new("nix")
-     .args(&["hash", "to-sri", "--type", "sha256", "--experimental-features", "nix-command"])
-     .arg(hash)
-     .output();
-   std::str::from_utf8(&sha256_cmd.expect("failed to run 'nix hash'").stdout)
-     .unwrap()
-     .trim()
-     .to_owned()
+    let sha256_cmd = Command::new("nix")
+        .args(&[
+            "hash",
+            "to-sri",
+            "--type",
+            "sha256",
+            "--experimental-features",
+            "nix-command",
+        ])
+        .arg(hash)
+        .output();
+    std::str::from_utf8(&sha256_cmd.expect("failed to run 'nix hash'").stdout)
+        .unwrap()
+        .trim()
+        .to_owned()
 }
 
 /// Heuristic detection of prerelease tags for platforms that don't have
@@ -493,11 +494,10 @@ pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionIn
                 &repo.owner, &repo.repo, &info.tag_prefix, &info.version
             ))
             .output();
-        let output = String::from_utf8_lossy(
-            &sha256_cmd.expect("failed to run 'nix-prefetch-url'").stdout,
-        )
-        .trim()
-        .to_owned();
+        let output =
+            String::from_utf8_lossy(&sha256_cmd.expect("failed to run 'nix-prefetch-url'").stdout)
+                .trim()
+                .to_owned();
         info.src_sha = to_sri(&output);
     } else {
         eprintln!(
@@ -528,7 +528,11 @@ pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionIn
 /// Uses GitLab's API v4 to fetch release and project information.
 /// Supports nested groups (e.g., gitlab.com/org/subgroup/repo).
 /// The project_path is URL-encoded for API calls.
-pub fn fill_gitlab_info(repo: &types::GitlabRepo, info: &mut types::ExpressionInfo, include_prereleases: bool) {
+pub fn fill_gitlab_info(
+    repo: &types::GitlabRepo,
+    info: &mut types::ExpressionInfo,
+    include_prereleases: bool,
+) {
     // Validate repo components to prevent injection attacks
     if let Err(e) = validate_gitlab_repo(repo) {
         error!(target: LOG_TARGET, "Invalid GitLab repository: {}", e);
@@ -663,11 +667,8 @@ pub fn fill_gitlab_info(repo: &types::GitlabRepo, info: &mut types::ExpressionIn
                 match sha256_cmd {
                     Ok(output) => {
                         if output.status.success() {
-                            info.src_sha = to_sri(
-                                String::from_utf8_lossy(&output.stdout)
-                                    .to_string()
-                                    .trim(),
-                            );
+                            info.src_sha =
+                                to_sri(String::from_utf8_lossy(&output.stdout).to_string().trim());
                         } else {
                             eprintln!(
                                 "Warning: nix-prefetch-url failed: {}",
@@ -699,7 +700,8 @@ pub fn fill_gitlab_info(repo: &types::GitlabRepo, info: &mut types::ExpressionIn
 
             match get_json(tags_request) {
                 Ok(tags_body) => {
-                    let tags_result: Result<types::GitlabTagsResponse, _> = serde_json::from_str(&tags_body);
+                    let tags_result: Result<types::GitlabTagsResponse, _> =
+                        serde_json::from_str(&tags_body);
                     if let Ok(mut tags) = tags_result {
                         if !tags.is_empty() {
                             // Sort by tag name using version comparison
@@ -757,7 +759,10 @@ pub fn fill_gitlab_info(repo: &types::GitlabRepo, info: &mut types::ExpressionIn
                                             }
                                         }
                                         Err(e) => {
-                                            eprintln!("Warning: Could not run nix-prefetch-url: {}", e);
+                                            eprintln!(
+                                                "Warning: Could not run nix-prefetch-url: {}",
+                                                e
+                                            );
                                         }
                                     }
                                 }
@@ -840,7 +845,10 @@ pub fn fill_gitea_info(repo: &types::GiteaRepo, info: &mut types::ExpressionInfo
 
     let request_client = Client::new();
 
-    eprintln!("Determining latest release for {}/{}", &repo.owner, &repo.repo);
+    eprintln!(
+        "Determining latest release for {}/{}",
+        &repo.owner, &repo.repo
+    );
     let releases_url = format!(
         "https://{}/api/v1/repos/{}/{}/releases",
         repo.domain, repo.owner, repo.repo
@@ -868,14 +876,13 @@ pub fn fill_gitea_info(repo: &types::GiteaRepo, info: &mut types::ExpressionInfo
                     });
                     releases = releases.into_iter().filter(|a| !a.prerelease).collect();
                     if let Some(latest) = releases.first() {
-                        let parsed_version =
-                            VERSION_REGEX.captures(&latest.tag_name).unwrap();
+                        let parsed_version = VERSION_REGEX.captures(&latest.tag_name).unwrap();
                         info.version = parsed_version.get(2).unwrap().as_str().to_owned();
-                        info.tag_prefix =
-                            parsed_version.get(1).unwrap().as_str().to_owned();
+                        info.tag_prefix = parsed_version.get(1).unwrap().as_str().to_owned();
 
                         // Validate version components before using in commands
-                        if let Err(e) = validate_version_components(&info.version, &info.tag_prefix) {
+                        if let Err(e) = validate_version_components(&info.version, &info.tag_prefix)
+                        {
                             error!(target: LOG_TARGET, "Invalid version from Gitea API: {}", e);
                             eprintln!("Error: {}", e);
                             exit(1);
@@ -885,11 +892,7 @@ pub fn fill_gitea_info(repo: &types::GiteaRepo, info: &mut types::ExpressionInfo
                         // Gitea archive URL: <domain>/<owner>/<repo>/archive/<tag>.tar.gz
                         let archive_url = format!(
                             "https://{}/{}/{}/archive/{}{}.tar.gz",
-                            &repo.domain,
-                            &repo.owner,
-                            &repo.repo,
-                            &info.tag_prefix,
-                            &info.version,
+                            &repo.domain, &repo.owner, &repo.repo, &info.tag_prefix, &info.version,
                         );
                         let sha256_cmd = Command::new("nix-prefetch-url")
                             .args(&["--unpack", "--type", "sha256"])
@@ -934,21 +937,15 @@ pub fn fill_gitea_info(repo: &types::GiteaRepo, info: &mut types::ExpressionInfo
         // GhRepoResponse deserializer where compatible.
         if let Ok(parsed) = serde_json::from_str::<types::GhRepoResponse>(&body) {
             if info.description == "CHANGE" {
-                info.description = parsed
-                    .description
-                    .unwrap_or_else(|| "CHANGE".to_owned());
+                info.description = parsed.description.unwrap_or_else(|| "CHANGE".to_owned());
             }
         }
     }
 
-    info.homepage = format!(
-        "https://{}/{}/{}",
-        repo.domain, repo.owner, repo.repo
-    );
+    info.homepage = format!("https://{}/{}/{}", repo.domain, repo.owner, repo.repo);
 }
 
 pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionInfo) {
-
     eprintln!("Determining latest release for {}", &pypi_repo.project);
     let pypi_response = fetch_pypi_project_info(pypi_repo);
     if info.pname == "CHANGE" {
@@ -985,16 +982,28 @@ pub fn fill_pypi_info(pypi_repo: &types::PypiRepo, info: &mut types::ExpressionI
             .to_string();
 
         // Grab dependencies, filter out extras, normalize names
-        debug!("Python dependencies before normalization: {:?}", &pypi_response.info.requires_dist);
-        let mut dependencies: Vec<String> = pypi_response.info.requires_dist
+        debug!(
+            "Python dependencies before normalization: {:?}",
+            &pypi_response.info.requires_dist
+        );
+        let mut dependencies: Vec<String> = pypi_response
+            .info
+            .requires_dist
             .unwrap_or_else(|| Vec::new())
             .into_iter()
             .filter(|s| !s.contains("extra =="))
-            .map(|s| s.split(" ").next().unwrap()
-                // Remove version information
-                .chars().take_while( |&ch| ch != '!' && ch != '<' && ch != '>' && ch != '=').collect::<String>()
-                // Normalize name to adhere to Nixpkgs conventions
-                .replace(".", "-").replace("_", "-"))
+            .map(|s| {
+                s.split(" ")
+                    .next()
+                    .unwrap()
+                    // Remove version information
+                    .chars()
+                    .take_while(|&ch| ch != '!' && ch != '<' && ch != '>' && ch != '=')
+                    .collect::<String>()
+                    // Normalize name to adhere to Nixpkgs conventions
+                    .replace(".", "-")
+                    .replace("_", "-")
+            })
             .collect();
         dependencies.sort();
         debug!("dependencies after normalization: {:?}", &dependencies);
@@ -1037,7 +1046,7 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
 
     // Only Rust, Go, npm, and pnpm packages need dependency hash prefetching.
     match info.template {
-        Template::Rust(_) | Template::Go(_) | Template::Node(_) | Template::Node(_) => (),
+        Template::Rust(_) | Template::Go(_) | Template::Node(_) => (),
         _ => return None,
     }
 
@@ -1053,7 +1062,9 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
 
     // We can't prefetch without a real source hash to feed the builder.
     if info.src_sha.is_empty()
-        || info.src_sha.starts_with("0000000000000000000000000000000000000000000000000000")
+        || info
+            .src_sha
+            .starts_with("0000000000000000000000000000000000000000000000000000")
     {
         eprintln!("Skipping hash prefetch: src_sha is not yet known");
         return None;
@@ -1112,12 +1123,18 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         let mut f = match std::fs::File::create(&probe_path) {
             Ok(f) => f,
             Err(e) => {
-                eprintln!("Skipping hash prefetch: failed to write probe expression: {}", e);
+                eprintln!(
+                    "Skipping hash prefetch: failed to write probe expression: {}",
+                    e
+                );
                 return None;
             }
         };
         if let Err(e) = f.write_all(probe_text.as_bytes()) {
-            eprintln!("Skipping hash prefetch: failed to write probe expression: {}", e);
+            eprintln!(
+                "Skipping hash prefetch: failed to write probe expression: {}",
+                e
+            );
             return None;
         }
     }
@@ -1131,7 +1148,10 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         },
         _ => unreachable!(),
     };
-    eprintln!("Prefetching {} for {} (this may take a while)...", kind, &info.pname);
+    eprintln!(
+        "Prefetching {} for {} (this may take a while)...",
+        kind, &info.pname
+    );
 
     let output = Command::new("nix-build")
         .args(&["--no-out-link", "-E"])
@@ -1208,7 +1228,11 @@ pub fn infer_dotnet_project_file(info: &types::ExpressionInfo) -> Option<String>
     // 2. .fsproj files (F#)
     // 3. .sln files (Solution)
 
-    fn find_project_files_impl(dir: &Path, extension: &str, depth: usize) -> Vec<std::path::PathBuf> {
+    fn find_project_files_impl(
+        dir: &Path,
+        extension: &str,
+        depth: usize,
+    ) -> Vec<std::path::PathBuf> {
         use std::fs;
 
         // Base case: if depth is 0, stop recursing
@@ -1291,9 +1315,9 @@ pub fn read_meta_from_url(url: &str, info: &mut types::ExpressionInfo, include_p
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
-    use crate::types::Repo::{Github, Gitea};
+    use crate::types::Repo::{Gitea, Github};
     use crate::types::{GiteaRepo, GithubRepo};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_url_parse() {
@@ -1303,10 +1327,13 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(repo, Github(GithubRepo {
-            owner: "jonringer".to_string(),
-            repo: "nix-template".to_string()
-        }));
+        assert_eq!(
+            repo,
+            Github(GithubRepo {
+                owner: "jonringer".to_string(),
+                repo: "nix-template".to_string()
+            })
+        );
     }
 
     #[test]
@@ -1317,26 +1344,29 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(repo, Gitea(GiteaRepo {
-            domain: "codeberg.org".to_string(),
-            owner: "forgejo".to_string(),
-            repo: "forgejo".to_string(),
-        }));
+        assert_eq!(
+            repo,
+            Gitea(GiteaRepo {
+                domain: "codeberg.org".to_string(),
+                owner: "forgejo".to_string(),
+                repo: "forgejo".to_string(),
+            })
+        );
     }
 
     #[test]
     fn test_gitea_com_url_parse() {
-        let repo = validate_and_parse_url(
-            "gitea.com/user/project",
-            "gitea.com/user/project",
-        )
-        .unwrap();
+        let repo =
+            validate_and_parse_url("gitea.com/user/project", "gitea.com/user/project").unwrap();
 
-        assert_eq!(repo, Gitea(GiteaRepo {
-            domain: "gitea.com".to_string(),
-            owner: "user".to_string(),
-            repo: "project".to_string(),
-        }));
+        assert_eq!(
+            repo,
+            Gitea(GiteaRepo {
+                domain: "gitea.com".to_string(),
+                owner: "user".to_string(),
+                repo: "project".to_string(),
+            })
+        );
     }
 
     #[test]
@@ -1393,7 +1423,7 @@ mod tests {
             let captured_hash = captures.get(1).unwrap().as_str();
             // Should capture at most "sha256-" + 100 chars
             assert!(
-                captured_hash.len() <= 107,  // "sha256-" (7 chars) + 100 chars
+                captured_hash.len() <= 107, // "sha256-" (7 chars) + 100 chars
                 "Should not capture more than bounded amount"
             );
         }
@@ -1431,7 +1461,7 @@ mod tests {
         // Test that bounded quantifier prevents ReDoS from nested quantifiers
         // The old pattern ^([0-9.]*)+$ would cause catastrophic backtracking
         let mut malicious_input = "1".repeat(100);
-        malicious_input.push('X');  // Doesn't end with valid chars
+        malicious_input.push('X'); // Doesn't end with valid chars
 
         // Should complete quickly and not match
         let result = STABLE_RELEASE_REGEX.is_match(&malicious_input);

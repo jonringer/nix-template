@@ -166,9 +166,7 @@ fn infer_from_source_path(source_path: &Path) -> Option<(Vec<String>, Vec<String
 
 /// Infer Ruby gem dependencies from a local source path.
 /// Used during local project initialization (--init-flake/--init-npins).
-pub fn infer_ruby_dependencies_from_path(
-    source_path: &Path,
-) -> Option<(Vec<String>, Vec<String>)> {
+pub fn infer_ruby_dependencies_from_path(source_path: &Path) -> Option<(Vec<String>, Vec<String>)> {
     eprintln!("Scanning local Gemfile.lock for dependencies...");
     infer_from_source_path(source_path)
 }
@@ -176,8 +174,7 @@ pub fn infer_ruby_dependencies_from_path(
 /// Infer Ruby gem dependencies from an already-materialized source in ExpressionInfo.
 /// This is the original function used when inferring from remote sources.
 pub fn infer_dependencies(info: &mut ExpressionInfo) -> bool {
-    if let Some((build_inputs, native_build_inputs)) =
-        infer_from_source_path(&info.top_level_path)
+    if let Some((build_inputs, native_build_inputs)) = infer_from_source_path(&info.top_level_path)
     {
         info.build_inputs.extend(build_inputs);
         info.native_build_inputs.extend(native_build_inputs);

@@ -35,9 +35,8 @@ pub fn write_new(path: &Path, content: &str, label: &str) {
     if let Some(parent) = path.parent() {
         if parent.to_str() != Some("") && !parent.exists() {
             println!("Creating directory: {}", parent.display());
-            std::fs::create_dir_all(parent).unwrap_or_else(|_| {
-                panic!("Was unable to create directory {}", parent.display())
-            });
+            std::fs::create_dir_all(parent)
+                .unwrap_or_else(|_| panic!("Was unable to create directory {}", parent.display()));
         }
     }
 
@@ -45,7 +44,7 @@ pub fn write_new(path: &Path, content: &str, label: &str) {
     // This prevents TOCTOU race conditions and symlink attacks
     match OpenOptions::new()
         .write(true)
-        .create_new(true)  // Atomic: fails if file exists
+        .create_new(true) // Atomic: fails if file exists
         .open(path)
     {
         Ok(mut file) => {
@@ -54,10 +53,7 @@ pub fn write_new(path: &Path, content: &str, label: &str) {
             });
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            eprintln!(
-                "Refusing to overwrite existing file: {}",
-                path.display()
-            );
+            eprintln!("Refusing to overwrite existing file: {}", path.display());
             std::process::exit(1);
         }
         Err(e) => {
@@ -65,11 +61,7 @@ pub fn write_new(path: &Path, content: &str, label: &str) {
         }
     }
 
-    println!(
-        "Generated {} at {}",
-        label,
-        display_path(path).display()
-    );
+    println!("Generated {} at {}", label, display_path(path).display());
 }
 
 /// Write a file, creating parent directories as needed (allows overwriting).
@@ -79,9 +71,8 @@ pub fn write_file(path: &Path, content: &str) {
         // TODO: better way to determine that file will be written PWD
         if p.to_str() != Some("") && !p.exists() {
             println!("Creating directory: {}", p.display());
-            std::fs::create_dir_all(p).unwrap_or_else(|_| {
-                panic!("Was unable to create directory {}", p.display())
-            });
+            std::fs::create_dir_all(p)
+                .unwrap_or_else(|_| panic!("Was unable to create directory {}", p.display()));
         }
     }
     // write file

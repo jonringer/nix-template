@@ -116,11 +116,17 @@ pub fn nix_file_paths(
     if path.as_os_str().to_string_lossy().ends_with("/") {
         // Validate that the path doesn't contain parent directory components (..)
         // This prevents path traversal attacks
-        if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+        if path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
             eprintln!("Warning: Path contains '..' components, which may be unsafe");
         }
         path_buf.push("default.nix");
-        eprintln!("Directory was passed as [PATH], defaulting to {:?}", path_buf.display());
+        eprintln!(
+            "Directory was passed as [PATH], defaulting to {:?}",
+            path_buf.display()
+        );
     }
 
     (path_buf, PathBuf::from(""))
@@ -140,7 +146,6 @@ mod tests {
 
         assert_eq!(expected, actual);
     }
-
 
     #[test]
     fn by_name_shard_basic() {

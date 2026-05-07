@@ -80,7 +80,9 @@ fn lookup_cmake_package(name: &str) -> Option<(&'static [&'static str], &'static
 /// Static mapping from Meson dependency name to nixpkgs equivalent.
 ///
 /// Meson uses pkg-config names, so these map more directly.
-fn lookup_meson_dependency(name: &str) -> Option<(&'static [&'static str], &'static [&'static str])> {
+fn lookup_meson_dependency(
+    name: &str,
+) -> Option<(&'static [&'static str], &'static [&'static str])> {
     match name {
         // Core libraries (pkg-config names)
         "zlib" => Some((&["zlib"], &[])),
@@ -163,8 +165,7 @@ pub fn parse_meson_dependencies(meson_content: &str) -> Vec<String> {
     let mut deps = BTreeSet::new();
 
     // Regex for dependency('name') or dependency("name")
-    let re = Regex::new(r#"dependency\s*\(\s*['"]([a-zA-Z0-9_+\-\.]+)['"]"#)
-        .expect("valid regex");
+    let re = Regex::new(r#"dependency\s*\(\s*['"]([a-zA-Z0-9_+\-\.]+)['"]"#).expect("valid regex");
 
     for cap in re.captures_iter(meson_content) {
         if let Some(dep_name) = cap.get(1) {
@@ -287,8 +288,7 @@ pub fn infer_buildsystem_dependencies_from_path(
 /// Infer build system dependencies from an already-materialized source in ExpressionInfo.
 /// This is the original function used when inferring from remote sources.
 pub fn infer_buildsystem_dependencies(info: &mut ExpressionInfo) -> bool {
-    if let Some((build_inputs, native_build_inputs)) =
-        infer_from_source_path(&info.top_level_path)
+    if let Some((build_inputs, native_build_inputs)) = infer_from_source_path(&info.top_level_path)
     {
         info.build_inputs.extend(build_inputs);
         info.native_build_inputs.extend(native_build_inputs);

@@ -235,13 +235,20 @@ pub fn validate_and_serialize_matches(
     let include_meta: bool = !matches.is_present("no-meta");
 
     let nixpkgs_layout = matches.is_present("by-name");
-    assert(!(nixpkgs_layout && matches.value_of("pname") == Some("CHANGE") && matches.value_of("from-url") == None),
-        "'-p,--pname' or '-u,--from-url' is required when using the --by-name flag");
+    assert(
+        !(nixpkgs_layout
+            && matches.value_of("pname") == Some("CHANGE")
+            && matches.value_of("from-url") == None),
+        "'-p,--pname' or '-u,--from-url' is required when using the --by-name flag",
+    );
 
     if matches.is_present("by-name") {
         match arg_to_type::<Template>(matches.value_of("TEMPLATE")) {
             Template::Module | Template::Test | Template::Mkshell => {
-                assert(false, "--by-name cannot be used with the 'module', 'test', or 'mkshell' templates");
+                assert(
+                    false,
+                    "--by-name cannot be used with the 'module', 'test', or 'mkshell' templates",
+                );
             }
             _ => {}
         }
@@ -376,8 +383,8 @@ pub fn validate_and_serialize_matches(
 
     // Dependency hash prefetching is on by default when --from-url is provided.
     // Users can disable via --skip-vendor-hashes.
-    let should_prefetch_hashes = matches.is_present("from-url")
-        && !matches.is_present("skip-vendor-hashes");
+    let should_prefetch_hashes =
+        matches.is_present("from-url") && !matches.is_present("skip-vendor-hashes");
     if should_prefetch_hashes {
         if let Some(hash) = prefetch_dependency_hash(&info) {
             match &info.template {
@@ -394,8 +401,7 @@ pub fn validate_and_serialize_matches(
 
     // Inference is on by default for the rust, go, ruby, stdenv, and stdenvNoCC
     // templates whenever we have a real source to inspect. Users can disable via `--skip-infer-deps`.
-    let infer_enabled = matches.is_present("from-url")
-        && !matches.is_present("skip-infer-deps");
+    let infer_enabled = matches.is_present("from-url") && !matches.is_present("skip-infer-deps");
     if infer_enabled {
         match &info.template {
             Template::Rust(_) => {
@@ -449,13 +455,14 @@ pub fn validate_and_serialize_matches(
     // The path may be rewritten downstream when one of the --init-* flags
     // triggers the structured nix/ layout. Skip the existence check in
     // that case; main.rs re-checks each artefact before writing.
-    let init_will_rewrite_path = matches.is_present("init-flake")
-        || matches.is_present("init-npins");
+    let init_will_rewrite_path =
+        matches.is_present("init-flake") || matches.is_present("init-npins");
     assert(
-        matches.is_present("stdout")
-            || init_will_rewrite_path
-            || !path_to_write.exists(),
-        &format!("Cannot write to file '{}', already exists", path_to_write.display()),
+        matches.is_present("stdout") || init_will_rewrite_path || !path_to_write.exists(),
+        &format!(
+            "Cannot write to file '{}', already exists",
+            path_to_write.display()
+        ),
     );
 
     info
@@ -607,7 +614,13 @@ mod tests {
 
     #[test]
     fn test_url() {
-        let m = build_cli().get_matches_from(vec!["nix-template", "python_package", "-u", "https://pypi.org/project/requests/", "--by-name"]);
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "python_package",
+            "-u",
+            "https://pypi.org/project/requests/",
+            "--by-name",
+        ]);
         assert_eq!(m.is_present("stdout"), false);
         assert_eq!(m.is_present("by-name"), true);
         assert_eq!(m.occurrences_of("from-url"), 1);

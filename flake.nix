@@ -29,7 +29,7 @@
       hydraJobs = { inherit (legacyPackages) nix-template; };
       checks = { inherit (legacyPackages) nix-template; };              # items to be ran as part of `nix flake check`
       devShells.default = with legacyPackages; mkShell {
-        nativeBuildInputs = [ rustc cargo clippy pkg-config ];
+        nativeBuildInputs = [ rustc cargo clippy pkg-config rustfmt ];
         buildInputs = [ openssl ];
       };
   }) // {

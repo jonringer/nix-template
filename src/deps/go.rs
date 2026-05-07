@@ -19,7 +19,7 @@
 //! well-known system libraries, and users can edit the generated
 //! expression to add anything we missed.
 
-use crate::types::{ExpressionInfo, Template};
+use crate::types::ExpressionInfo;
 use log::debug;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -518,7 +518,8 @@ mod tests {
     #[test]
     fn map_unknown_tokens_drop_silently() {
         let mut d = CgoDirectives::default();
-        d.pkg_config_tokens.insert("totally-fictional-lib".to_owned());
+        d.pkg_config_tokens
+            .insert("totally-fictional-lib".to_owned());
         d.ld_libs.insert("notreal".to_owned());
         let (bi, nbi) = map_cgo_to_nix(&d);
         // pkg-config still gets added because there *was* a pkg-config
