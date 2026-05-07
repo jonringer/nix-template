@@ -415,6 +415,12 @@ pub fn validate_and_serialize_matches(
                     info.project_file = project_file;
                 }
             }
+            Template::python_package | Template::python_application => {
+                let deps = crate::deps::python::infer_python_dependencies(&info);
+                if !deps.is_empty() {
+                    info.propagated_build_inputs = deps;
+                }
+            }
             _ => {}
         }
     }
@@ -536,6 +542,12 @@ pub fn build_expression_info_from_interactive(
             Template::dotnet => {
                 if let Some(project_file) = infer_dotnet_project_file(&info) {
                     info.project_file = project_file;
+                }
+            }
+            Template::python_package | Template::python_application => {
+                let deps = crate::deps::python::infer_python_dependencies(&info);
+                if !deps.is_empty() {
+                    info.propagated_build_inputs = deps;
                 }
             }
             _ => {}
