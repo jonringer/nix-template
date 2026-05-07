@@ -767,3 +767,99 @@ fn test_file_write_shows_success_message() {
     assert!(content.contains("stdenv.mkDerivation"));
     assert!(content.contains("test-package"));
 }
+
+/// Test that write_new atomically prevents overwriting files.
+/// This is a regression test for the TOCTOU race condition bug.
+/// The atomic create_new operation should prevent race conditions where
+/// a file could be created between the existence check and write.
+#[test]
+fn test_write_new_atomic_overwrite_prevention() {
+    let temp_dir = TempDir::new().unwrap();
+    let output_path = temp_dir.path().join("existing.nix");
+
+    // Pre-create a file
+    fs::write(&output_path, "# original content\n").unwrap();
+
+    // Try to generate a file at the same path
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "stdenv",
+            "-p", "test-overwrite",
+            "-v", "1.0.0",
+            "-l", "mit",
+            "--maintainer", "Test",
+            output_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    // Command should fail
+    assert!(
+        !output.status.success(),
+        "Command should have failed when trying to overwrite existing file"
+    );
+
+    // Error message should indicate refusal to overwrite
+    // Either from early check in cli.rs or from atomic operation in output.rs
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("Refusing to overwrite") || stderr.contains("already exists"),
+        "Error should mention file conflict, got: {}",
+        stderr
+    );
+
+    // Original file should be preserved unchanged
+    let preserved_content = fs::read_to_string(&output_path).unwrap();
+    assert_eq!(
+        preserved_content,
+        "# original content\n",
+        "Original file should not have been modified"
+    );
+}
+
+/// Test that write_new won't follow symlinks to overwrite target files.
+/// This prevents symlink attack scenarios.
+#[test]
+#[cfg(unix)]  // Symlinks work differently on Windows
+fn test_write_new_prevents_symlink_attacks() {
+    use std::os::unix::fs::symlink;
+
+    let temp_dir = TempDir::new().unwrap();
+    let target_file = temp_dir.path().join("important_file.txt");
+    let symlink_path = temp_dir.path().join("test_symlink.nix");
+
+    // Create an important target file
+    fs::write(&target_file, "important data\n").unwrap();
+
+    // Create a symlink pointing to the important file
+    symlink(&target_file, &symlink_path).unwrap();
+
+    // Try to generate a file at the symlink path
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "stdenv",
+            "-p", "symlink-test",
+            "-v", "1.0.0",
+            "-l", "mit",
+            "--maintainer", "Test",
+            symlink_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    // Command should fail because symlink already exists
+    assert!(
+        !output.status.success(),
+        "Command should fail when symlink exists at target path"
+    );
+
+    // Important: the target file should remain unchanged
+    let preserved_content = fs::read_to_string(&target_file).unwrap();
+    assert_eq!(
+        preserved_content,
+        "important data\n",
+        "Target file should not have been modified through symlink"
+    );
+}
