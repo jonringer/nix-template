@@ -23,6 +23,8 @@ pub struct Candidate {
 /// non-interactive fallback (first match wins).
 fn indicators() -> Vec<(&'static str, Template, &'static str)> {
     vec![
+        // UV (modern Python) should be checked before pyproject.toml since it's more specific
+        ("uv.lock", Template::uv(), "uv.lock"),
         ("Cargo.toml", Template::rust(), "Cargo.toml"),
         ("go.mod", Template::go(), "go.mod"),
         (

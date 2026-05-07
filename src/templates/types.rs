@@ -17,6 +17,8 @@ pub enum Template {
     Stdenv(StdenvVariant),
     /// Python package or application with build format
     Python(PythonConfig),
+    /// Python UV workspace (modern Python packaging with uv2nix)
+    Uv,
     /// Rust package with lock file strategy
     Rust(RustConfig),
     /// Go module with optional module path
@@ -108,11 +110,13 @@ pub struct RustConfig {
     pub lock_strategy: RustLockStrategy,
 }
 
-/// Rust package variant (currently only one, but extensible).
+/// Rust package variant.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RustVariant {
     /// rustPlatform.buildRustPackage (library or binary)
     Package,
+    /// crane-based build with incremental caching
+    Crane,
 }
 
 /// Rust dependency locking strategy: cargoHash or cargoLock.lockFile.
@@ -136,11 +140,13 @@ pub struct GoConfig {
     pub module_path: Option<String>,
 }
 
-/// Go package variant (currently only one, but extensible).
+/// Go package variant.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum GoVariant {
     /// buildGoModule (any Go module)
     Module,
+    /// gomod2nix-based build with better dependency sharing
+    Gomod2nix,
 }
 
 /// Node.js template configuration: npm or pnpm.
@@ -166,8 +172,11 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "stdenvNoCC",
     "python_package",
     "python_application",
+    "uv",
     "rust",
+    "rust_crane",
     "go",
+    "go_gomod2nix",
     "npm",
     "pnpm",
     "dotnet",
@@ -215,6 +224,27 @@ impl Template {
         })
     }
 
+    /// Create a default UV template (modern Python with uv2nix).
+    pub fn uv() -> Self {
+        Template::Uv
+    }
+
+    /// Create a crane-based Rust template.
+    pub fn rust_crane() -> Self {
+        Template::Rust(RustConfig {
+            variant: RustVariant::Crane,
+            lock_strategy: RustLockStrategy::LockFile { git_deps: vec![] },
+        })
+    }
+
+    /// Create a gomod2nix-based Go template.
+    pub fn go_gomod2nix() -> Self {
+        Template::Go(GoConfig {
+            variant: GoVariant::Gomod2nix,
+            module_path: None,
+        })
+    }
+
     /// Create a default npm template.
     pub fn npm() -> Self {
         Template::Node(NodeConfig {
@@ -253,12 +283,21 @@ impl Template {
                 variant: PythonVariant::Application,
                 format: PythonFormat::Setuptools,
             })),
+            "uv" => Ok(Template::Uv),
             "rust" => Ok(Template::Rust(RustConfig {
                 variant: RustVariant::Package,
                 lock_strategy: RustLockStrategy::CargoHash,
             })),
+            "rust_crane" => Ok(Template::Rust(RustConfig {
+                variant: RustVariant::Crane,
+                lock_strategy: RustLockStrategy::LockFile { git_deps: vec![] },
+            })),
             "go" => Ok(Template::Go(GoConfig {
                 variant: GoVariant::Module,
+                module_path: None,
+            })),
+            "go_gomod2nix" => Ok(Template::Go(GoConfig {
+                variant: GoVariant::Gomod2nix,
                 module_path: None,
             })),
             "npm" => Ok(Template::Node(NodeConfig {
@@ -286,8 +325,15 @@ impl Template {
                 PythonVariant::Package => "python_package",
                 PythonVariant::Application => "python_application",
             },
-            Template::Rust(_) => "rust",
-            Template::Go(_) => "go",
+            Template::Uv => "uv",
+            Template::Rust(config) => match config.variant {
+                RustVariant::Package => "rust",
+                RustVariant::Crane => "rust_crane",
+            },
+            Template::Go(config) => match config.variant {
+                GoVariant::Module => "go",
+                GoVariant::Gomod2nix => "go_gomod2nix",
+            },
             Template::Node(config) => match config.variant {
                 NodeVariant::Npm => "npm",
                 NodeVariant::Pnpm => "pnpm",
