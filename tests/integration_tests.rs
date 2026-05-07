@@ -863,3 +863,159 @@ fn test_write_new_prevents_symlink_attacks() {
         "Target file should not have been modified through symlink"
     );
 }
+
+/// Test that the program handles corrupted config files gracefully
+/// This is a regression test for the XDG/Config unwrap crash bug.
+#[test]
+fn test_corrupted_config_file_doesnt_crash() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Set XDG_CONFIG_HOME to our temp directory
+    let config_dir = temp_dir.path().join("nix-template");
+    fs::create_dir_all(&config_dir).unwrap();
+
+    // Create a corrupted (non-UTF8) config file
+    let config_file = config_dir.join("config.toml");
+    fs::write(&config_file, b"\xFF\xFE invalid utf8 \x80\x81").unwrap();
+
+    // Run nix-template with the corrupted config
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .env("XDG_CONFIG_HOME", temp_dir.path())
+        .args(&[
+            "stdenv",
+            "-p", "test-config",
+            "-v", "1.0.0",
+            "-l", "mit",
+            "--maintainer", "Test",
+            "-s",  // Use stdout to avoid file creation
+        ])
+        .output()
+        .unwrap();
+
+    // Command should succeed (not crash) despite corrupted config
+    assert!(
+        output.status.success(),
+        "Program should not crash with corrupted config file. Stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Should show warning about config issue
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Warning") || stderr.contains("Could not read"),
+        "Should warn about config issue, got: {}",
+        stderr
+    );
+
+    // Should still produce valid output
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("stdenv.mkDerivation"),
+        "Should still produce valid output despite config error"
+    );
+}
+
+/// Test that the program handles malformed TOML config gracefully
+#[test]
+fn test_malformed_toml_config_doesnt_crash() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Set XDG_CONFIG_HOME to our temp directory
+    let config_dir = temp_dir.path().join("nix-template");
+    fs::create_dir_all(&config_dir).unwrap();
+
+    // Create a malformed TOML config file
+    let config_file = config_dir.join("config.toml");
+    fs::write(&config_file, "this is [ not valid = toml {{").unwrap();
+
+    // Run nix-template with the malformed config
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .env("XDG_CONFIG_HOME", temp_dir.path())
+        .args(&[
+            "stdenv",
+            "-p", "test-toml",
+            "-v", "1.0.0",
+            "-l", "mit",
+            "--maintainer", "Test",
+            "-s",  // Use stdout to avoid file creation
+        ])
+        .output()
+        .unwrap();
+
+    // Command should succeed (not crash) despite malformed TOML
+    assert!(
+        output.status.success(),
+        "Program should not crash with malformed TOML config. Stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Should show warning about config parsing issue
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Warning") || stderr.contains("Could not parse"),
+        "Should warn about TOML parsing issue, got: {}",
+        stderr
+    );
+
+    // Should still produce valid output
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("stdenv.mkDerivation"),
+        "Should still produce valid output despite config error"
+    );
+}
+
+/// Test that the program works when config directory cannot be created
+/// (simulated by using a read-only location)
+#[test]
+#[cfg(unix)]  // Unix-specific test using permissions
+fn test_no_config_directory_doesnt_crash() {
+    // This test verifies that if XDG setup fails entirely,
+    // the program uses fallback and continues
+
+    let temp_dir = TempDir::new().unwrap();
+    let readonly_dir = temp_dir.path().join("readonly");
+    fs::create_dir(&readonly_dir).unwrap();
+
+    // Make directory read-only
+    use std::os::unix::fs::PermissionsExt;
+    let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+    perms.set_mode(0o444);  // Read-only
+    fs::set_permissions(&readonly_dir, perms).unwrap();
+
+    // Try to use the read-only directory as config home
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .env("XDG_CONFIG_HOME", &readonly_dir)
+        .args(&[
+            "stdenv",
+            "-p", "test-readonly",
+            "-v", "1.0.0",
+            "-l", "mit",
+            "--maintainer", "Test",
+            "-s",
+        ])
+        .output()
+        .unwrap();
+
+    // Program should still succeed (with warning)
+    assert!(
+        output.status.success(),
+        "Program should not crash when config directory is read-only. Stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Should produce valid output
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("stdenv.mkDerivation"),
+        "Should still produce valid output despite XDG issues"
+    );
+
+    // Clean up: restore permissions so temp_dir can be deleted
+    let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+    perms.set_mode(0o755);
+    fs::set_permissions(&readonly_dir, perms).unwrap();
+}

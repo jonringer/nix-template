@@ -18,11 +18,36 @@ use types::UserConfig;
 fn main() {
     env_logger::init();
 
-    let xdg_dirs = xdg::BaseDirectories::with_prefix("nix-template").unwrap();
+    // Attempt to set up XDG directories; warn and continue if it fails
+    let xdg_dirs = match xdg::BaseDirectories::with_prefix("nix-template") {
+        Ok(dirs) => dirs,
+        Err(e) => {
+            eprintln!("Warning: Unable to access config directory: {}", e);
+            eprintln!("Continuing without user configuration...");
+            // Create a fallback with current directory to allow the program to run
+            xdg::BaseDirectories::new().unwrap_or_else(|err| {
+                eprintln!("Error: Cannot initialize XDG directories: {}", err);
+                std::process::exit(1);
+            })
+        }
+    };
 
+    // Attempt to load user config; warn and continue if it fails
     let user_config: Option<UserConfig> =
         if let Some(file) = xdg_dirs.find_config_file("config.toml") {
-            toml::from_str(&std::fs::read_to_string(file).unwrap()).ok()
+            match std::fs::read_to_string(&file) {
+                Ok(contents) => {
+                    toml::from_str(&contents).map_err(|e| {
+                        eprintln!("Warning: Could not parse config file {:?}: {}", file, e);
+                        eprintln!("Continuing without user configuration...");
+                    }).ok()
+                }
+                Err(e) => {
+                    eprintln!("Warning: Could not read config file {:?}: {}", file, e);
+                    eprintln!("Continuing without user configuration...");
+                    None
+                }
+            }
         } else {
             None
         };
