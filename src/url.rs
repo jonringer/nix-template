@@ -92,6 +92,79 @@ lazy_static! {
 
 const LOG_TARGET: &str = "nix-template::url";
 
+/// Validates a URL component (owner, repo, version, etc.) to prevent injection attacks.
+/// Returns an error if the component contains dangerous characters.
+fn validate_url_component(component: &str, field_name: &str) -> Result<()> {
+    // Check for control characters (including newlines, null bytes, etc.)
+    if component.chars().any(|c| c.is_control()) {
+        return Err(anyhow!(
+            "Invalid {}: contains control characters",
+            field_name
+        ));
+    }
+
+    // Check for null bytes specifically (even though covered above)
+    if component.contains('\0') {
+        return Err(anyhow!(
+            "Invalid {}: contains null bytes",
+            field_name
+        ));
+    }
+
+    // Check for excessive length (DoS prevention)
+    if component.len() > 255 {
+        return Err(anyhow!(
+            "Invalid {}: exceeds maximum length of 255 characters (got {})",
+            field_name,
+            component.len()
+        ));
+    }
+
+    // Check that it's not empty
+    if component.trim().is_empty() {
+        return Err(anyhow!(
+            "Invalid {}: cannot be empty",
+            field_name
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validates all components of a GitHub repo for use in commands/URLs.
+fn validate_github_repo(repo: &types::GithubRepo) -> Result<()> {
+    validate_url_component(&repo.owner, "GitHub owner")?;
+    validate_url_component(&repo.repo, "GitHub repo")?;
+    Ok(())
+}
+
+/// Validates all components of a GitLab repo for use in commands/URLs.
+fn validate_gitlab_repo(repo: &types::GitlabRepo) -> Result<()> {
+    validate_url_component(&repo.domain, "GitLab domain")?;
+    validate_url_component(&repo.project_path, "GitLab project path")?;
+    validate_url_component(&repo.owner, "GitLab owner")?;
+    validate_url_component(&repo.repo, "GitLab repo")?;
+    Ok(())
+}
+
+/// Validates all components of a Gitea repo for use in commands/URLs.
+fn validate_gitea_repo(repo: &types::GiteaRepo) -> Result<()> {
+    validate_url_component(&repo.domain, "Gitea domain")?;
+    validate_url_component(&repo.owner, "Gitea owner")?;
+    validate_url_component(&repo.repo, "Gitea repo")?;
+    Ok(())
+}
+
+/// Validates version and tag_prefix components.
+fn validate_version_components(version: &str, tag_prefix: &str) -> Result<()> {
+    validate_url_component(version, "version")?;
+    // tag_prefix can be empty, so only validate if non-empty
+    if !tag_prefix.is_empty() {
+        validate_url_component(tag_prefix, "tag prefix")?;
+    }
+    Ok(())
+}
+
 fn to_sri(hash: &str) -> String {
    let sha256_cmd = Command::new("nix")
      .args(&["hash", "to-sri", "--type", "sha256", "--experimental-features", "nix-command"])
@@ -295,6 +368,13 @@ pub fn fetch_pypi_project_info(pypi_repo: &types::PypiRepo) -> types::PypiRespon
 }
 
 pub fn fetch_github_repo_info(repo: &types::GithubRepo) -> types::GhRepoResponse {
+    // Validate repo components to prevent injection attacks
+    if let Err(e) = validate_github_repo(repo) {
+        error!(target: LOG_TARGET, "Invalid repository: {}", e);
+        eprintln!("Error: {}", e);
+        exit(1);
+    }
+
     let request_client = Client::new();
     let mut request = request_client
         .get(format!(
@@ -324,6 +404,13 @@ pub fn fetch_github_repo_info(repo: &types::GithubRepo) -> types::GhRepoResponse
 }
 
 pub fn fetch_github_release_info(repo: &types::GithubRepo) -> types::GhReleaseResponse {
+    // Validate repo components to prevent injection attacks
+    if let Err(e) = validate_github_repo(repo) {
+        error!(target: LOG_TARGET, "Invalid repository: {}", e);
+        eprintln!("Error: {}", e);
+        exit(1);
+    }
+
     let request_client = Client::new();
     let mut request = request_client
         .get(format!(
@@ -373,6 +460,13 @@ pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionIn
         info.version = parsed_version.get(2).unwrap().as_str().to_owned();
         info.tag_prefix = parsed_version.get(1).unwrap().as_str().to_owned();
 
+        // Validate version components before using in commands
+        if let Err(e) = validate_version_components(&info.version, &info.tag_prefix) {
+            error!(target: LOG_TARGET, "Invalid version from GitHub API: {}", e);
+            eprintln!("Error: {}", e);
+            exit(1);
+        }
+
         eprintln!("Determining sha256 for {}", &repo.repo);
         let sha256_cmd = Command::new("nix-prefetch-url")
             .args(&["--unpack", "--type", "sha256"])
@@ -416,6 +510,13 @@ pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionIn
 /// Supports nested groups (e.g., gitlab.com/org/subgroup/repo).
 /// The project_path is URL-encoded for API calls.
 pub fn fill_gitlab_info(repo: &types::GitlabRepo, info: &mut types::ExpressionInfo, include_prereleases: bool) {
+    // Validate repo components to prevent injection attacks
+    if let Err(e) = validate_gitlab_repo(repo) {
+        error!(target: LOG_TARGET, "Invalid GitLab repository: {}", e);
+        eprintln!("Error: {}", e);
+        exit(1);
+    }
+
     if info.pname == "CHANGE" {
         info.pname = repo.repo.to_string();
     }
@@ -513,6 +614,13 @@ pub fn fill_gitlab_info(repo: &types::GitlabRepo, info: &mut types::ExpressionIn
                 let parsed_version = VERSION_REGEX.captures(&latest.tag_name).unwrap();
                 info.version = parsed_version.get(2).unwrap().as_str().to_owned();
                 info.tag_prefix = parsed_version.get(1).unwrap().as_str().to_owned();
+
+                // Validate version components before using in commands
+                if let Err(e) = validate_version_components(&info.version, &info.tag_prefix) {
+                    error!(target: LOG_TARGET, "Invalid version from GitLab API: {}", e);
+                    eprintln!("Error: {}", e);
+                    exit(1);
+                }
 
                 eprintln!("Determining sha256 for {}", &repo.repo);
 
@@ -695,6 +803,13 @@ pub fn fill_gitlab_info(repo: &types::GitlabRepo, info: &mut types::ExpressionIn
 /// gracefully degrades to leaving the version/hash placeholders alone if
 /// the API call fails or returns no releases.
 pub fn fill_gitea_info(repo: &types::GiteaRepo, info: &mut types::ExpressionInfo) {
+    // Validate repo components to prevent injection attacks
+    if let Err(e) = validate_gitea_repo(repo) {
+        error!(target: LOG_TARGET, "Invalid Gitea repository: {}", e);
+        eprintln!("Error: {}", e);
+        exit(1);
+    }
+
     if info.pname == "CHANGE" {
         info.pname = repo.repo.to_string();
     }
@@ -739,6 +854,13 @@ pub fn fill_gitea_info(repo: &types::GiteaRepo, info: &mut types::ExpressionInfo
                         info.version = parsed_version.get(2).unwrap().as_str().to_owned();
                         info.tag_prefix =
                             parsed_version.get(1).unwrap().as_str().to_owned();
+
+                        // Validate version components before using in commands
+                        if let Err(e) = validate_version_components(&info.version, &info.tag_prefix) {
+                            error!(target: LOG_TARGET, "Invalid version from Gitea API: {}", e);
+                            eprintln!("Error: {}", e);
+                            exit(1);
+                        }
 
                         eprintln!("Determining sha256 for {}", &repo.repo);
                         // Gitea archive URL: <domain>/<owner>/<repo>/archive/<tag>.tar.gz
@@ -1286,5 +1408,92 @@ mod tests {
             !STABLE_RELEASE_REGEX.is_match(&too_long),
             "Should reject excessively long version strings"
         );
+    }
+
+    #[test]
+    fn test_validate_url_component_valid() {
+        // Test normal valid components
+        assert!(validate_url_component("valid-repo", "test").is_ok());
+        assert!(validate_url_component("repo_123", "test").is_ok());
+        assert!(validate_url_component("1.2.3", "test").is_ok());
+        assert!(validate_url_component("v1.0.0", "test").is_ok());
+    }
+
+    #[test]
+    fn test_validate_url_component_rejects_control_chars() {
+        // Test that control characters are rejected
+        assert!(validate_url_component("foo\nbar", "test").is_err());
+        assert!(validate_url_component("foo\rbar", "test").is_err());
+        assert!(validate_url_component("foo\tbar", "test").is_err());
+        assert!(validate_url_component("foo\x00bar", "test").is_err());
+    }
+
+    #[test]
+    fn test_validate_url_component_rejects_null_bytes() {
+        // Test explicit null byte rejection
+        let with_null = "test\0value";
+        assert!(validate_url_component(with_null, "test").is_err());
+    }
+
+    #[test]
+    fn test_validate_url_component_rejects_too_long() {
+        // Test length validation (max 255)
+        let too_long = "a".repeat(256);
+        assert!(validate_url_component(&too_long, "test").is_err());
+
+        // Test that 255 is OK
+        let max_length = "a".repeat(255);
+        assert!(validate_url_component(&max_length, "test").is_ok());
+    }
+
+    #[test]
+    fn test_validate_url_component_rejects_empty() {
+        // Test that empty strings are rejected
+        assert!(validate_url_component("", "test").is_err());
+        assert!(validate_url_component("   ", "test").is_err());
+    }
+
+    #[test]
+    fn test_validate_github_repo_valid() {
+        // Test valid GitHub repo
+        let repo = types::GithubRepo {
+            owner: "octocat".to_string(),
+            repo: "Hello-World".to_string(),
+        };
+        assert!(validate_github_repo(&repo).is_ok());
+    }
+
+    #[test]
+    fn test_validate_github_repo_invalid_owner() {
+        // Test invalid owner with newline
+        let repo = types::GithubRepo {
+            owner: "bad\nowner".to_string(),
+            repo: "Hello-World".to_string(),
+        };
+        assert!(validate_github_repo(&repo).is_err());
+    }
+
+    #[test]
+    fn test_validate_version_components_valid() {
+        // Test valid version components
+        assert!(validate_version_components("1.2.3", "v").is_ok());
+        assert!(validate_version_components("2024.1.15", "").is_ok());
+        assert!(validate_version_components("0.1.0", "version-").is_ok());
+    }
+
+    #[test]
+    fn test_validate_version_components_invalid() {
+        // Test invalid version with control characters
+        assert!(validate_version_components("1.2.3\n4", "v").is_err());
+        assert!(validate_version_components("1.2.3", "v\r").is_err());
+
+        // Test empty version (tag_prefix can be empty though)
+        assert!(validate_version_components("", "v").is_err());
+    }
+
+    #[test]
+    fn test_validate_version_components_allows_empty_prefix() {
+        // Tag prefix can be empty (no prefix)
+        assert!(validate_version_components("1.2.3", "").is_ok());
     }
 }
