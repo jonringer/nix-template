@@ -1192,8 +1192,13 @@ pub fn infer_dotnet_project_file(info: &types::ExpressionInfo) -> Option<String>
     // 2. .fsproj files (F#)
     // 3. .sln files (Solution)
 
-    fn find_project_files(dir: &Path, extension: &str) -> Vec<std::path::PathBuf> {
+    fn find_project_files_impl(dir: &Path, extension: &str, depth: usize) -> Vec<std::path::PathBuf> {
         use std::fs;
+
+        // Base case: if depth is 0, stop recursing
+        if depth == 0 {
+            return Vec::new();
+        }
 
         let mut results = Vec::new();
         if let Ok(entries) = fs::read_dir(dir) {
@@ -1202,12 +1207,17 @@ pub fn infer_dotnet_project_file(info: &types::ExpressionInfo) -> Option<String>
                 if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some(extension) {
                     results.push(path);
                 } else if path.is_dir() {
-                    // Recursively search subdirectories (up to 3 levels deep)
-                    results.extend(find_project_files(&path, extension));
+                    // Recursively search subdirectories with decremented depth
+                    results.extend(find_project_files_impl(&path, extension, depth - 1));
                 }
             }
         }
         results
+    }
+
+    fn find_project_files(dir: &Path, extension: &str) -> Vec<std::path::PathBuf> {
+        // Search up to 3 levels deep
+        find_project_files_impl(dir, extension, 3)
     }
 
     // Try .csproj first
