@@ -732,11 +732,37 @@ fn prompt_version_manual(default: &str) -> Result<String> {
 
 /// Prompt for package name
 pub fn prompt_pname(default: &str) -> Result<String> {
-    let pname = Text::new("Package name (pname):")
-        .with_default(default)
-        .with_help_message("The name attribute for the package")
-        .prompt()?;
-    Ok(pname)
+    loop {
+        let pname = Text::new("Package name (pname):")
+            .with_default(default)
+            .with_help_message("The name attribute for the package")
+            .prompt()?;
+
+        // Validate length (max 255 characters for filesystem compatibility)
+        if pname.len() > 255 {
+            eprintln!("Error: Package name too long (max 255 characters, got {})", pname.len());
+            continue;
+        }
+
+        // Validate characters (no control characters or path separators)
+        if pname.chars().any(|c| c.is_control()) {
+            eprintln!("Error: Package name contains control characters");
+            continue;
+        }
+
+        if pname.contains('/') || pname.contains('\\') {
+            eprintln!("Error: Package name cannot contain path separators (/ or \\)");
+            continue;
+        }
+
+        // Validate not empty (after trimming)
+        if pname.trim().is_empty() {
+            eprintln!("Error: Package name cannot be empty");
+            continue;
+        }
+
+        return Ok(pname);
+    }
 }
 
 /// Prompt for license
@@ -840,11 +866,23 @@ pub fn prompt_output_path(_template: &Template, default: &str) -> Result<String>
 
 /// Prompt for description
 pub fn prompt_description(default: &str) -> Result<String> {
-    let description = Text::new("Description:")
-        .with_default(default)
-        .with_help_message("Brief description of the package")
-        .prompt()?;
-    Ok(description)
+    loop {
+        let description = Text::new("Description:")
+            .with_default(default)
+            .with_help_message("Brief description of the package")
+            .prompt()?;
+
+        // Validate length (reasonable limit for descriptions)
+        if description.len() > 1000 {
+            eprintln!("Error: Description too long (max 1000 characters, got {})", description.len());
+            continue;
+        }
+
+        // Allow empty descriptions (optional field)
+        // No control character validation needed for descriptions as they're for human reading
+
+        return Ok(description);
+    }
 }
 
 /// Prompt for homepage
