@@ -291,6 +291,7 @@ pub fn validate_and_serialize_matches(
         build_inputs: Vec::new(),
         native_build_inputs: Vec::new(),
         use_cargo_lock_file: false,
+        cargo_lock_git_deps: Vec::new(),
         python_format: "setuptools".to_owned(),
     };
 
@@ -485,6 +486,7 @@ pub fn build_expression_info_from_interactive(
         build_inputs: Vec::new(),
         native_build_inputs: Vec::new(),
         use_cargo_lock_file: false,
+        cargo_lock_git_deps: Vec::new(),
         python_format: "setuptools".to_owned(),
     };
 
@@ -493,8 +495,9 @@ pub fn build_expression_info_from_interactive(
         read_meta_from_url(&url, &mut info, data.include_prereleases);
     }
 
-    // Vendor hash prefetching is enabled by default (opt-out via skip flag)
-    if !skip_vendor_hashes {
+    // Vendor hash prefetching is enabled by default (opt-out via skip flag).
+    // Skip for Rust when using cargoLock.lockFile (no hash needed).
+    if !skip_vendor_hashes && !info.use_cargo_lock_file {
         if let Some(hash) = prefetch_dependency_hash(&info) {
             match info.template {
                 Template::rust => info.cargo_hash = hash,

@@ -1041,6 +1041,16 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         _ => return None,
     }
 
+    // Skip when the hash is already determined:
+    // - Rust with cargoLock.lockFile doesn't need cargoHash.
+    // - Go with a committed vendor/ directory uses vendorHash = null.
+    if info.use_cargo_lock_file {
+        return None;
+    }
+    if info.template == Template::go && info.vendor_hash == types::VENDOR_HASH_NULL {
+        return None;
+    }
+
     // We can't prefetch without a real source hash to feed the builder.
     if info.src_sha.is_empty()
         || info.src_sha.starts_with("0000000000000000000000000000000000000000000000000000")
@@ -1081,6 +1091,7 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         build_inputs: Vec::new(),
         native_build_inputs: Vec::new(),
         use_cargo_lock_file: false,
+        cargo_lock_git_deps: Vec::new(),
         python_format: "setuptools".to_owned(),
     };
 

@@ -125,7 +125,18 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             // The lockFile path is ../Cargo.lock because the package
             // expression lives under nix/package.nix in the structured layout.
             let cargo_block = if info.use_cargo_lock_file {
-                "  cargoLock.lockFile = ../Cargo.lock;".to_owned()
+                let mut block = "  cargoLock.lockFile = ../Cargo.lock;".to_owned();
+                if !info.cargo_lock_git_deps.is_empty() {
+                    block.push_str("\n  cargoLock.outputHashes = {");
+                    for dep in &info.cargo_lock_git_deps {
+                        block.push_str(&format!(
+                            "\n    \"{}\" = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\";",
+                            dep
+                        ));
+                    }
+                    block.push_str("\n  };");
+                }
+                block
             } else {
                 "  @doc:cargoHash@cargoHash = \"@cargo_hash@\";".to_owned()
             };
@@ -434,6 +445,7 @@ mod tests {
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),
             use_cargo_lock_file: false,
+            cargo_lock_git_deps: Vec::new(),
             python_format: "setuptools".to_owned(),
         }
     }
@@ -478,6 +490,7 @@ mod tests {
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),
             use_cargo_lock_file: false,
+            cargo_lock_git_deps: Vec::new(),
             python_format: "setuptools".to_owned(),
         }
     }
@@ -630,6 +643,34 @@ mod tests {
         assert!(
             !out.contains("cargoHash"),
             "should not contain cargoHash when using lockFile:\n{}",
+            out
+        );
+    }
+
+    #[test]
+    fn rust_local_mode_with_git_deps_renders_output_hashes() {
+        let mut info = rust_info();
+        info.use_cargo_lock_file = true;
+        info.fetcher = Fetcher::local;
+        info.cargo_lock_git_deps = vec![
+            "some-crate-0.1.0".to_owned(),
+            "other-crate-0.2.0".to_owned(),
+        ];
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        assert!(
+            out.contains("cargoLock.outputHashes = {"),
+            "expected outputHashes block in:\n{}",
+            out
+        );
+        assert!(
+            out.contains("\"some-crate-0.1.0\" = \"sha256-"),
+            "expected some-crate-0.1.0 entry in:\n{}",
+            out
+        );
+        assert!(
+            out.contains("\"other-crate-0.2.0\" = \"sha256-"),
+            "expected other-crate-0.2.0 entry in:\n{}",
             out
         );
     }

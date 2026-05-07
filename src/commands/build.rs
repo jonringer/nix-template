@@ -51,6 +51,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
     // `local_go_vendor_null`: Go local mode with vendor/ uses vendorHash = null
     // `local_python_format`: Python format auto-detected from pyproject.toml
     let mut local_use_cargo_lock_file = false;
+    let mut local_cargo_lock_git_deps: Vec<String> = Vec::new();
     let mut local_go_vendor_null = false;
     let mut local_python_format: Option<String> = None;
 
@@ -79,11 +80,31 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
             match candidate.template {
                 crate::types::Template::rust => {
                     local_use_cargo_lock_file = true;
+                    // Scan Cargo.lock for git dependencies that need outputHashes
+                    let lock_path = cwd.join("Cargo.lock");
+                    if let Ok(lock_content) = std::fs::read_to_string(&lock_path) {
+                        local_cargo_lock_git_deps =
+                            crate::deps::rust::parse_cargo_lock_git_deps(&lock_content);
+                        if !local_cargo_lock_git_deps.is_empty() {
+                            eprintln!(
+                                "Detected {} git dependencies in Cargo.lock requiring outputHashes",
+                                local_cargo_lock_git_deps.len()
+                            );
+                        }
+                    }
                 }
                 crate::types::Template::go => {
                     if cwd.join("vendor").is_dir() {
                         eprintln!("Detected vendor/ directory; using vendorHash = null");
                         local_go_vendor_null = true;
+                    }
+                }
+                crate::types::Template::ruby => {
+                    if !cwd.join("gemset.nix").exists() {
+                        eprintln!(
+                            "Warning: gemset.nix not found. Run 'bundix' to generate it \
+                             (required by bundlerApp)."
+                        );
                     }
                 }
                 crate::types::Template::python_package | crate::types::Template::python_application => {
@@ -202,6 +223,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
     // Apply local development builder variants detected above.
     if local_use_cargo_lock_file {
         info.use_cargo_lock_file = true;
+        info.cargo_lock_git_deps = local_cargo_lock_git_deps;
     }
     if local_go_vendor_null {
         info.vendor_hash = crate::types::VENDOR_HASH_NULL.to_owned();
