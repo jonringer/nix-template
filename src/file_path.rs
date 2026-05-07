@@ -113,9 +113,14 @@ pub fn nix_file_paths(
 
     // if it's a directory, we need to default to using the default.nix which `import` expects
     // Path.is_dir() appears to return false if the directory doesn't exist, so stringify and assert if path ends in '/'
-    if path.to_str().unwrap().ends_with("/") {
-      path_buf.push("default.nix");
-      eprintln!("Directory was passed as [PATH], defaulting to {:?}", path_buf.display());
+    if path.as_os_str().to_string_lossy().ends_with("/") {
+        // Validate that the path doesn't contain parent directory components (..)
+        // This prevents path traversal attacks
+        if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+            eprintln!("Warning: Path contains '..' components, which may be unsafe");
+        }
+        path_buf.push("default.nix");
+        eprintln!("Directory was passed as [PATH], defaulting to {:?}", path_buf.display());
     }
 
     (path_buf, PathBuf::from(""))
