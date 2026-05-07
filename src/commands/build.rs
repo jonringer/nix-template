@@ -66,6 +66,8 @@ pub fn run(
     let mut local_go_module_path = String::new();
     let mut local_python_format: Option<String> = None;
     let mut local_python_propagated_deps: Vec<String> = Vec::new();
+    let mut local_php_extensions: Option<Vec<String>> = None;
+    let mut local_php_version: Option<String> = None;
 
     let (detected_candidates, inferred_deps) = if is_init_mode {
         let cwd = std::env::current_dir().unwrap_or_default();
@@ -127,6 +129,23 @@ pub fn run(
                     eprintln!("Detected Python build format: {}", fmt);
                     local_python_format = Some(fmt);
                 }
+                crate::types::Template::Php(_) => {
+                    // Detect PHP extensions from composer.json
+                    let composer_json = cwd.join("composer.json");
+                    if composer_json.exists() {
+                        let extensions = crate::deps::php::detect_php_extensions(&composer_json);
+                        if !extensions.is_empty() {
+                            eprintln!("Detected PHP extensions: {}", extensions.join(", "));
+                        }
+                        local_php_extensions = Some(extensions);
+
+                        // Detect PHP version requirement
+                        if let Some(version) = crate::deps::php::detect_php_version(&composer_json) {
+                            eprintln!("Detected PHP version: {}", version);
+                            local_php_version = Some(version);
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -146,6 +165,15 @@ pub fn run(
                 crate::types::Template::Ruby => {
                     crate::deps::ruby::infer_ruby_dependencies_from_path(&cwd)
                         .unwrap_or_else(|| (Vec::new(), Vec::new()))
+                }
+                crate::types::Template::Php(_) => {
+                    // Infer PHP dependencies from composer.json
+                    let composer_json = cwd.join("composer.json");
+                    if composer_json.exists() {
+                        crate::deps::php::infer_native_dependencies(&composer_json)
+                    } else {
+                        (Vec::new(), Vec::new())
+                    }
                 }
                 crate::types::Template::Python(_) => {
                     local_python_propagated_deps =
@@ -254,6 +282,37 @@ pub fn run(
     }
     if !local_python_propagated_deps.is_empty() {
         info.propagated_build_inputs = local_python_propagated_deps;
+    }
+    // Update PHP config with detected extensions and version
+    if let Some(php_config) = info.template.php_config_mut() {
+        if let Some(extensions) = local_php_extensions {
+            php_config.extensions = extensions;
+        }
+        if let Some(version) = local_php_version {
+            php_config.version = Some(version);
+        }
+    }
+
+    // PHP detection for explicit mode (when not in init mode but running from local dir)
+    if !is_init_mode && info.template.is_php() {
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let composer_json = cwd.join("composer.json");
+        if composer_json.exists() {
+            let extensions = crate::deps::php::detect_php_extensions(&composer_json);
+            if !extensions.is_empty() {
+                eprintln!("Detected PHP extensions: {}", extensions.join(", "));
+                if let Some(php_config) = info.template.php_config_mut() {
+                    php_config.extensions = extensions;
+                }
+            }
+
+            if let Some(version) = crate::deps::php::detect_php_version(&composer_json) {
+                eprintln!("Detected PHP version: {}", version);
+                if let Some(php_config) = info.template.php_config_mut() {
+                    php_config.version = Some(version);
+                }
+            }
+        }
     }
 
     // ----------------------------------------------------------------

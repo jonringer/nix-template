@@ -83,7 +83,7 @@ Generated a rust nix expression at /home/jon/projects/nixpkgs/pkgs/by-name/ni/ni
 Use the `auto` template to automatically detect project type from source code:
 ```bash
 $ nix-template auto --from-url github.com/user/project
-# Automatically detects if it's Rust, Go, Python, UV, npm, pnpm, .NET, or Ruby
+# Automatically detects if it's Rust, Go, Python, UV, npm, pnpm, PHP, .NET, or Ruby
 ```
 
 ### Available Template Variants
@@ -94,6 +94,11 @@ $ nix-template auto --from-url github.com/user/project
 - `rust` - Rust packages (rustPlatform.buildRustPackage)
 - `go` - Go modules (buildGoModule)
 - `npm` / `pnpm` - Node.js packages
+- `php` - PHP packages with Composer (php.buildComposerProject2)
+  - Uses generic `php` attribute (auto-tracks nixpkgs default version)
+  - Automatically detects PHP extensions from `composer.json`
+  - Generates `php.buildEnv` wrapper when extensions are required
+  - Detects version requirements (e.g., `"php": "^8.2"`) to use specific versions when needed
 - `dotnet` - .NET packages
 - `ruby` - Ruby gems
 - `mkshell` - Development shells
@@ -117,6 +122,7 @@ $ nix-template auto --from-url github.com/user/project
 Automatically infers dependencies for supported languages:
 - **Rust**: Scans `Cargo.toml` and `Cargo.lock` for native dependencies
 - **Go**: Detects CGO directives and maps to nixpkgs inputs
+- **PHP**: Detects extensions (`ext-*`) and native libraries from `composer.json`
 - **Ruby**: Maps gems from `Gemfile.lock` to nixpkgs dependencies
 - **CMake/Meson**: Parses build files for common dependencies
 - **Python**: Fetches dependencies from PyPI metadata

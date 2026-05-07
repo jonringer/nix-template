@@ -37,6 +37,8 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         ("pnpm-lock.yaml", Template::pnpm(), "pnpm-lock.yaml"),
         ("package-lock.json", Template::npm(), "package-lock.json"),
         // Note: package.json is handled separately as a fallback (see below)
+        ("composer.lock", Template::php(), "composer.lock"),
+        ("composer.json", Template::php(), "composer.json"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
         ("Gemfile", Template::Ruby, "Gemfile"),
         ("meson.build", Template::stdenv(), "meson.build"),
@@ -78,6 +80,15 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
             if is_python_application(source_path) {
                 candidate.template = Template::python_application();
             }
+            break;
+        }
+    }
+
+    // PHP warning: if PHP was detected but composer.lock is missing, warn about reproducibility.
+    for candidate in &candidates {
+        if candidate.template.is_php() && !source_path.join("composer.lock").exists() {
+            eprintln!("Warning: composer.lock not found - build may not be reproducible");
+            eprintln!("         Run 'composer update' to generate composer.lock");
             break;
         }
     }
