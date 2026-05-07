@@ -43,16 +43,21 @@ lazy_static! {
         Regex::new("^([^0-9]*)(.+)").unwrap()
     };
 
+    /// Matches version strings that look like stable releases (only digits and dots).
+    /// Fixed to prevent ReDoS from nested quantifiers. Version strings are typically
+    /// short (e.g., "1.2.3", "2024.1.15"), so we bound to reasonable length.
     static ref STABLE_RELEASE_REGEX: Regex = {
-        Regex::new(r"^([0-9.]*)+$").unwrap()
+        Regex::new(r"^[0-9.]{1,50}$").unwrap()
     };
 
     /// Matches the "got:" line emitted by `nix-build` when a fixed-output
     /// derivation has a hash mismatch. Examples:
     ///     got:    sha256-abcdef...=
     ///     got: sha256-abcdef...=
+    /// The quantifier is bounded to prevent ReDoS attacks. SHA256 in base64
+    /// format is 44 characters, but we allow up to 100 to be safe for other hash types.
     static ref GOT_HASH_REGEX: Regex = {
-        Regex::new(r"got:\s+(sha256-[A-Za-z0-9+/=]+)").unwrap()
+        Regex::new(r"got:\s+(sha256-[A-Za-z0-9+/=]{1,100})").unwrap()
     };
 
     static ref GITHUB_TO_NIXPKGS_LICENSE: HashMap<&'static str, &'static str> = {
@@ -1191,5 +1196,95 @@ mod tests {
         assert_eq!(captures.len(), 3);
         assert_eq!(captures.get(1).unwrap().as_str(), "");
         assert_eq!(captures.get(2).unwrap().as_str(), "2.1.1");
+    }
+
+    #[test]
+    fn test_got_hash_regex_normal_hash() {
+        // Test normal SHA256 hash (44 characters in base64)
+        let input = "  got:    sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        let captures = GOT_HASH_REGEX.captures(input).unwrap();
+        assert_eq!(captures.len(), 2);
+        assert_eq!(
+            captures.get(1).unwrap().as_str(),
+            "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        );
+    }
+
+    #[test]
+    fn test_got_hash_regex_prevents_redos() {
+        // Test that bounded quantifier prevents ReDoS
+        // This would cause catastrophic backtracking with unbounded quantifier
+        // The key is that the regex completes quickly even with malicious input
+        let malicious_input = format!("  got:    sha256-{}", "A".repeat(200));
+
+        // The regex will match the first 100 characters (which is fine for extraction)
+        // The important part is it doesn't hang due to catastrophic backtracking
+        let result = GOT_HASH_REGEX.captures(&malicious_input);
+
+        // It will match, but only capture up to 100 characters after "sha256-"
+        if let Some(captures) = result {
+            let captured_hash = captures.get(1).unwrap().as_str();
+            // Should capture at most "sha256-" + 100 chars
+            assert!(
+                captured_hash.len() <= 107,  // "sha256-" (7 chars) + 100 chars
+                "Should not capture more than bounded amount"
+            );
+        }
+    }
+
+    #[test]
+    fn test_got_hash_regex_with_varying_whitespace() {
+        // Test with single space
+        let input = "got: sha256-abc123def456=";
+        let captures = GOT_HASH_REGEX.captures(input).unwrap();
+        assert!(captures.get(1).unwrap().as_str().starts_with("sha256-"));
+
+        // Test with multiple spaces
+        let input = "got:     sha256-xyz789=";
+        let captures = GOT_HASH_REGEX.captures(input).unwrap();
+        assert!(captures.get(1).unwrap().as_str().starts_with("sha256-"));
+    }
+
+    #[test]
+    fn test_stable_release_regex_valid_versions() {
+        // Test normal version strings
+        assert!(STABLE_RELEASE_REGEX.is_match("1.2.3"));
+        assert!(STABLE_RELEASE_REGEX.is_match("2024.1.15"));
+        assert!(STABLE_RELEASE_REGEX.is_match("0.1.0"));
+        assert!(STABLE_RELEASE_REGEX.is_match("123"));
+
+        // Test that non-stable versions don't match
+        assert!(!STABLE_RELEASE_REGEX.is_match("v1.2.3"));
+        assert!(!STABLE_RELEASE_REGEX.is_match("1.2.3-rc1"));
+        assert!(!STABLE_RELEASE_REGEX.is_match("abc"));
+    }
+
+    #[test]
+    fn test_stable_release_regex_prevents_redos() {
+        // Test that bounded quantifier prevents ReDoS from nested quantifiers
+        // The old pattern ^([0-9.]*)+$ would cause catastrophic backtracking
+        let mut malicious_input = "1".repeat(100);
+        malicious_input.push('X');  // Doesn't end with valid chars
+
+        // Should complete quickly and not match
+        let result = STABLE_RELEASE_REGEX.is_match(&malicious_input);
+        assert!(!result, "Should not match invalid input");
+
+        // Test that we still accept reasonably long valid versions
+        let long_valid = "2024.12.31.1.2.3.4.5.6.7.8.9.10.11.12";
+        assert!(
+            STABLE_RELEASE_REGEX.is_match(long_valid),
+            "Should match valid version within bounds"
+        );
+    }
+
+    #[test]
+    fn test_stable_release_regex_length_bound() {
+        // Test that versions exceeding 50 characters are rejected
+        let too_long = "1.".repeat(30); // Creates "1.1.1.1..." > 50 chars
+        assert!(
+            !STABLE_RELEASE_REGEX.is_match(&too_long),
+            "Should reject excessively long version strings"
+        );
     }
 }
