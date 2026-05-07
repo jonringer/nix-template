@@ -155,6 +155,12 @@ fn validate_gitea_repo(repo: &types::GiteaRepo) -> Result<()> {
     Ok(())
 }
 
+/// Validates all components of a PyPI repo for use in commands/URLs.
+fn validate_pypi_repo(repo: &types::PypiRepo) -> Result<()> {
+    validate_url_component(&repo.project, "PyPI project")?;
+    Ok(())
+}
+
 /// Validates version and tag_prefix components.
 fn validate_version_components(version: &str, tag_prefix: &str) -> Result<()> {
     validate_url_component(version, "version")?;
@@ -248,10 +254,12 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> 
 
         let captures = GITHUB_URL_REGEX.captures(url).unwrap();
 
-        return Ok(Github(types::GithubRepo {
+        let github_repo = types::GithubRepo {
             owner: captures.get(1).unwrap().as_str().to_owned(),
             repo: captures.get(2).unwrap().as_str().to_owned(),
-        }));
+        };
+        validate_github_repo(&github_repo)?;
+        return Ok(Github(github_repo));
     } else if url.starts_with("pypi.org") {
         if !PYPI_URL_REGEX.is_match(url) {
             return Err(anyhow!(
@@ -261,9 +269,11 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> 
 
         let captures = PYPI_URL_REGEX.captures(url).unwrap();
 
-        return Ok(Pypi(types::PypiRepo {
+        let pypi_repo = types::PypiRepo {
             project: captures.get(1).unwrap().as_str().to_owned(),
-        }));
+        };
+        validate_pypi_repo(&pypi_repo)?;
+        return Ok(Pypi(pypi_repo));
     } else if url.starts_with("gitlab.com") {
         if !GITLAB_URL_REGEX.is_match(url) {
             return Err(anyhow!(
@@ -283,22 +293,26 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> 
         let owner = path_parts[0].to_owned();
         let repo = path_parts[path_parts.len() - 1].to_owned();
 
-        return Ok(Gitlab(types::GitlabRepo {
+        let gitlab_repo = types::GitlabRepo {
             domain: "gitlab.com".to_owned(),
             project_path,
             owner,
             repo,
-        }));
+        };
+        validate_gitlab_repo(&gitlab_repo)?;
+        return Ok(Gitlab(gitlab_repo));
     } else if GITEA_HOSTS.iter().any(|host| url.starts_with(host)) {
         let captures = GITEA_URL_REGEX.captures(url).ok_or_else(|| {
             anyhow!("Error: please provide a gitea url of shape '<domain>/<owner>/<repo>'")
         })?;
 
-        return Ok(Gitea(types::GiteaRepo {
+        let gitea_repo = types::GiteaRepo {
             domain: captures.name("domain").unwrap().as_str().to_owned(),
             owner: captures.name("owner").unwrap().as_str().to_owned(),
             repo: captures.name("repo").unwrap().as_str().to_owned(),
-        }));
+        };
+        validate_gitea_repo(&gitea_repo)?;
+        return Ok(Gitea(gitea_repo));
     } else {
         // Try to auto-detect the platform for unknown domains
         let captures = GITEA_URL_REGEX.captures(url).ok_or_else(|| {
@@ -314,22 +328,26 @@ fn validate_and_parse_url(url: &str, original_url: &str) -> Result<types::Repo> 
         match detect_forge_platform(domain) {
             Some("gitea") => {
                 eprintln!("Detected Gitea instance at {}", domain);
-                Ok(Gitea(types::GiteaRepo {
+                let gitea_repo = types::GiteaRepo {
                     domain: domain.to_owned(),
                     owner,
                     repo,
-                }))
+                };
+                validate_gitea_repo(&gitea_repo)?;
+                Ok(Gitea(gitea_repo))
             }
             Some("gitlab") => {
                 eprintln!("Detected GitLab instance at {}", domain);
                 // For detected GitLab instances, construct the project_path
                 let project_path = format!("{}/{}", owner, repo);
-                Ok(Gitlab(types::GitlabRepo {
+                let gitlab_repo = types::GitlabRepo {
                     domain: domain.to_owned(),
                     project_path: project_path.clone(),
                     owner,
                     repo,
-                }))
+                };
+                validate_gitlab_repo(&gitlab_repo)?;
+                Ok(Gitlab(gitlab_repo))
             }
             _ => Err(anyhow!(
                 "{} is not a recognized forge platform. Could not detect Gitea or GitLab API at {}. Only github.com, gitlab.com, pypi.org, and self-hosted Gitea/GitLab instances are supported.",
