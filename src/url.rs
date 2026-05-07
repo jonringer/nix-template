@@ -1163,11 +1163,11 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
 /// caller so the user can inspect it on failure.
 fn tempfile_dir() -> Option<std::path::PathBuf> {
     let base = std::env::temp_dir();
-    let nanos = std::time::SystemTime::now()
+    let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .ok()?
-        .as_nanos();
-    let dir = base.join(format!("nix-template-prefetch-{}", nanos));
+        .as_secs();
+    let dir = base.join(format!("nix-template-prefetch-{}", timestamp));
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir)
 }
