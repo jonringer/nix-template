@@ -55,6 +55,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
     let mut local_go_vendor_null = false;
     let mut local_go_module_path = String::new();
     let mut local_python_format: Option<String> = None;
+    let mut local_python_propagated_deps: Vec<String> = Vec::new();
 
     let (detected_candidates, inferred_deps) = if is_init_mode {
         let cwd = std::env::current_dir().unwrap_or_default();
@@ -135,6 +136,10 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
                 crate::types::Template::ruby => {
                     crate::deps::ruby::infer_ruby_dependencies_from_path(&cwd)
                         .unwrap_or_else(|| (Vec::new(), Vec::new()))
+                }
+                crate::types::Template::python_package | crate::types::Template::python_application => {
+                    local_python_propagated_deps = crate::deps::python::infer_python_dependencies_from_path(&cwd);
+                    (Vec::new(), Vec::new())
                 }
                 _ => (Vec::new(), Vec::new()),
             }
@@ -237,6 +242,9 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
     }
     if let Some(fmt) = local_python_format {
         info.python_format = fmt;
+    }
+    if !local_python_propagated_deps.is_empty() {
+        info.propagated_build_inputs = local_python_propagated_deps;
     }
 
     // ----------------------------------------------------------------
