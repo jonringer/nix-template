@@ -1,3 +1,5 @@
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::Path;
 
 /// Attempt to canonicalize a path for display, falling back to the original
@@ -26,14 +28,10 @@ pub fn display_path_pub(path: &Path) -> std::path::PathBuf {
 
 /// Helper to write a generated artifact, refusing to clobber any pre-existing file.
 /// Creates parent directories as needed.
+///
+/// Uses atomic create_new to prevent TOCTOU race conditions and symlink attacks.
 pub fn write_new(path: &Path, content: &str, label: &str) {
-    if path.exists() {
-        eprintln!(
-            "Refusing to overwrite existing file: {}",
-            path.display()
-        );
-        std::process::exit(1);
-    }
+    // Create parent directories first
     if let Some(parent) = path.parent() {
         if parent.to_str() != Some("") && !parent.exists() {
             println!("Creating directory: {}", parent.display());
@@ -42,9 +40,31 @@ pub fn write_new(path: &Path, content: &str, label: &str) {
             });
         }
     }
-    std::fs::write(path, content).unwrap_or_else(|_| {
-        panic!("Was unable to write to file: {}", path.display())
-    });
+
+    // Use create_new for atomic check-and-create operation
+    // This prevents TOCTOU race conditions and symlink attacks
+    match OpenOptions::new()
+        .write(true)
+        .create_new(true)  // Atomic: fails if file exists
+        .open(path)
+    {
+        Ok(mut file) => {
+            file.write_all(content.as_bytes()).unwrap_or_else(|e| {
+                panic!("Was unable to write to file '{}': {}", path.display(), e)
+            });
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            eprintln!(
+                "Refusing to overwrite existing file: {}",
+                path.display()
+            );
+            std::process::exit(1);
+        }
+        Err(e) => {
+            panic!("Was unable to create file '{}': {}", path.display(), e);
+        }
+    }
+
     println!(
         "Generated {} at {}",
         label,
