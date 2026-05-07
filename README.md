@@ -83,8 +83,35 @@ Generated a rust nix expression at /home/jon/projects/nixpkgs/pkgs/by-name/ni/ni
 Use the `auto` template to automatically detect project type from source code:
 ```bash
 $ nix-template auto --from-url github.com/user/project
-# Automatically detects if it's Rust, Go, Python, npm, pnpm, .NET, or Ruby
+# Automatically detects if it's Rust, Go, Python, UV, npm, pnpm, .NET, or Ruby
 ```
+
+### Available Template Variants
+
+**Standard Templates:**
+- `stdenv` / `stdenvNoCC` - Generic stdenv-based builds
+- `python_package` / `python_application` - Python packages (buildPythonPackage/buildPythonApplication)
+- `rust` - Rust packages (rustPlatform.buildRustPackage)
+- `go` - Go modules (buildGoModule)
+- `npm` / `pnpm` - Node.js packages
+- `dotnet` - .NET packages
+- `ruby` - Ruby gems
+- `mkshell` - Development shells
+- `module` - NixOS modules
+- `test` - NixOS integration tests
+
+**Modern Packaging Variants:**
+- `uv` - Python projects using UV package manager (detected via `uv.lock`)
+  - **Note**: UV projects work best with flake-based workflows. Initialize with:
+    ```bash
+    nix flake init -t github:pyproject-nix/uv2nix#hello-world
+    ```
+- `rust_crane` - Rust builds with incremental caching via crane
+  - Better incremental builds and caching than buildRustPackage
+  - See: https://crane.dev/
+- `go_gomod2nix` - Go builds with better dependency sharing
+  - Uses gomod2nix.toml for dependency management
+  - See: https://github.com/nix-community/gomod2nix
 
 ### Dependency Inference
 Automatically infers dependencies for supported languages:

@@ -22,9 +22,21 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
                 ("buildPythonApplication", "buildPythonApplication", None)
             }
         },
+        // UV template uses uv2nix for modern Python packaging
+        Template::Uv => ("uv2nix", "uv2nix.buildPythonPackage", None),
         Template::Mkshell => ("pkgs ? import <nixpkgs> {}", "with pkgs;\n\nmkShell", None),
-        Template::Go(_) => ("buildGoModule", "buildGoModule", None),
-        Template::Rust(_) => ("rustPlatform", "rustPlatform.buildRustPackage", None),
+        Template::Go(config) => match config.variant {
+            crate::types::GoVariant::Module => ("buildGoModule", "buildGoModule", None),
+            crate::types::GoVariant::Gomod2nix => {
+                ("buildGoApplication", "buildGoApplication", None)
+            }
+        },
+        Template::Rust(config) => match config.variant {
+            crate::types::RustVariant::Package => {
+                ("rustPlatform", "rustPlatform.buildRustPackage", None)
+            }
+            crate::types::RustVariant::Crane => ("crane", "crane.buildPackage", None),
+        },
         Template::Node(config) => match config.variant {
             crate::types::NodeVariant::Npm => (
                 "buildNpmPackage",
@@ -116,6 +128,8 @@ fn addtional_pkg_attr_headers(template: &Template) -> &'static str {
 
 fn build_inputs(info: &ExpressionInfo) -> String {
     match &info.template {
+        // UV template: guidance for uv2nix-based projects
+        Template::Uv => "  # TODO: UV projects work best with flake-based workflows.\n  # Initialize with: nix flake init -t github:pyproject-nix/uv2nix#hello-world\n  # Or see: https://pyproject-nix.github.io/uv2nix/".to_owned(),
         // Python applications don't carry a Python-import smoke test the way
         // libraries do; their entry points are exercised at runtime.
         Template::Python(config) if config.variant == crate::types::PythonVariant::Application =>
@@ -124,7 +138,22 @@ fn build_inputs(info: &ExpressionInfo) -> String {
         Template::Python(_) => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
 
   @doc:pythonImportsCheck@pythonImportsCheck = [ \"@pname-import-check@\" ];".to_owned(),
-        Template::Rust(_) => {
+        Template::Rust(config) => match config.variant {
+            crate::types::RustVariant::Crane => {
+                // Crane-based builds
+                let native = if info.native_build_inputs.is_empty() {
+                    String::new()
+                } else {
+                    "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+                };
+                format!(
+                    "  # Crane uses Cargo.lock automatically via cleanCargoSource\n  # See: https://crane.dev/\n  # TODO: Customize crane build phases as needed{native}
+
+  @doc:buildDependencies@buildInputs = [@build_inputs@ ];",
+                    native = native,
+                )
+            }
+            crate::types::RustVariant::Package => {
             // Conditionally render `nativeBuildInputs` only when inferred,
             // to keep the output tidy for projects without system deps.
             let native = if info.native_build_inputs.is_empty() {
@@ -159,8 +188,30 @@ fn build_inputs(info: &ExpressionInfo) -> String {
                 cargo_block = cargo_block,
                 native = native,
             )
-        }
-        Template::Go(_) => {
+            }
+        },
+        Template::Go(config) => match config.variant {
+            crate::types::GoVariant::Gomod2nix => {
+                // gomod2nix-based builds
+                let native = if info.native_build_inputs.is_empty() {
+                    String::new()
+                } else {
+                    "\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+                };
+                let build = if info.build_inputs.is_empty() {
+                    String::new()
+                } else {
+                    "\n  buildInputs = [@build_inputs@ ];".to_owned()
+                };
+                format!(
+                    "  # gomod2nix uses gomod2nix.toml (run 'gomod2nix generate')
+  # See: https://github.com/nix-community/gomod2nix
+  # TODO: Ensure gomod2nix.toml is generated and committed{native}{build}",
+                    native = native,
+                    build = build,
+                )
+            }
+            crate::types::GoVariant::Module => {
             // Mirror the Rust path: only emit nativeBuildInputs / buildInputs
             // attributes when CGO inference produced something. Empty
             // attributes would just be noise users have to delete.
@@ -200,7 +251,8 @@ fn build_inputs(info: &ExpressionInfo) -> String {
                 build = build,
                 ldflags = ldflags,
             )
-        }
+            }
+        },
         Template::Node(config) => {
             match config.variant {
                 crate::types::NodeVariant::Npm => {
