@@ -106,6 +106,40 @@ pub fn parse_cargo_lock(cargo_lock: &str) -> Vec<String> {
     names.into_iter().collect()
 }
 
+/// Extract git dependency URLs from a `Cargo.lock` file.
+///
+/// When `cargoLock.lockFile` is used in nixpkgs, any `[[package]]` whose
+/// `source` starts with `"git+"` needs a corresponding entry in
+/// `cargoLock.outputHashes` because crates.io doesn't publish checksums for
+/// git sources.
+///
+/// Returns a deduplicated, sorted list of `"name-version"` keys that need
+/// output hashes.
+pub fn parse_cargo_lock_git_deps(cargo_lock: &str) -> Vec<String> {
+    let parsed: Value = match cargo_lock.parse() {
+        Ok(v) => v,
+        Err(e) => {
+            debug!(target: LOG_TARGET, "failed to parse Cargo.lock for git deps: {}", e);
+            return Vec::new();
+        }
+    };
+
+    let mut git_deps: BTreeSet<String> = BTreeSet::new();
+    if let Some(Value::Array(packages)) = parsed.get("package") {
+        for pkg in packages {
+            let source = pkg.get("source").and_then(|v| v.as_str()).unwrap_or("");
+            if source.starts_with("git+") {
+                let name = pkg.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("");
+                if !name.is_empty() && !version.is_empty() {
+                    git_deps.insert(format!("{}-{}", name, version));
+                }
+            }
+        }
+    }
+    git_deps.into_iter().collect()
+}
+
 /// Parse the given `Cargo.toml` text and return a deduplicated list of
 /// direct dependency names (from `[dependencies]`, `[build-dependencies]`,
 /// `[dev-dependencies]` is intentionally *excluded* since it's only used
@@ -513,5 +547,47 @@ version = "0.3.0"
             "pkg-config should be deduplicated, got: {:?}",
             nbi
         );
+    }
+
+    #[test]
+    fn parse_cargo_lock_git_deps_extracts_git_sources() {
+        let lock = r#"
+[[package]]
+name = "demo"
+version = "0.1.0"
+
+[[package]]
+name = "some-git-crate"
+version = "0.3.0"
+source = "git+https://github.com/user/repo?rev=abc123#abc123def456"
+
+[[package]]
+name = "registry-crate"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abcd1234"
+
+[[package]]
+name = "another-git"
+version = "0.1.0"
+source = "git+https://github.com/user/other#def789"
+"#;
+        let git_deps = parse_cargo_lock_git_deps(lock);
+        assert_eq!(git_deps, vec!["another-git-0.1.0", "some-git-crate-0.3.0"]);
+    }
+
+    #[test]
+    fn parse_cargo_lock_git_deps_empty_when_no_git() {
+        let lock = r#"
+[[package]]
+name = "demo"
+version = "0.1.0"
+
+[[package]]
+name = "serde"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+"#;
+        assert!(parse_cargo_lock_git_deps(lock).is_empty());
     }
 }

@@ -294,6 +294,7 @@ DEPENDENCIES
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),
             use_cargo_lock_file: false,
+            cargo_lock_git_deps: Vec::new(),
             python_format: "setuptools".to_owned(),
         };
 

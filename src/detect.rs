@@ -200,7 +200,7 @@ pub fn detect_python_format(source_path: &Path) -> String {
                 "flit_core" | "flit" => return "flit".to_owned(),
                 "poetry-core" | "poetry" => return "poetry".to_owned(),
                 "hatchling" | "hatch" => return "hatchling".to_owned(),
-                "maturin" => return "setuptools".to_owned(),
+                "maturin" => return "pyproject".to_owned(),
                 "setuptools" => return "setuptools".to_owned(),
                 _ => {}
             }
@@ -535,14 +535,14 @@ mod tests {
     }
 
     #[test]
-    fn detect_format_maturin_maps_to_setuptools() {
+    fn detect_format_maturin_maps_to_pyproject() {
         let dir = make_source_dir(&["pyproject.toml"]);
         fs::write(
             dir.path().join("pyproject.toml"),
             "[build-system]\nrequires = [\"maturin>=1.0\"]\n",
         )
         .unwrap();
-        assert_eq!(detect_python_format(dir.path()), "setuptools");
+        assert_eq!(detect_python_format(dir.path()), "pyproject");
     }
 
     #[test]

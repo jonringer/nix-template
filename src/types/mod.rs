@@ -203,6 +203,10 @@ pub struct ExpressionInfo {
     /// When true, the Rust template renders `cargoLock.lockFile = ./Cargo.lock;`
     /// instead of `cargoHash = "...";`. Automatically set in local mode.
     pub use_cargo_lock_file: bool,
+    /// Git dependency keys (`"name-version"`) from `Cargo.lock` that need
+    /// `cargoLock.outputHashes` entries. Only populated when
+    /// `use_cargo_lock_file` is true.
+    pub cargo_lock_git_deps: Vec<String>,
     /// Python build system format, detected from pyproject.toml or defaulted.
     /// One of: "setuptools", "pyproject", "flit", "poetry", "hatchling".
     pub python_format: String,
