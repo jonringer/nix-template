@@ -293,6 +293,8 @@ DEPENDENCIES
             domain: "".to_owned(),
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),
+            use_cargo_lock_file: false,
+            python_format: "setuptools".to_owned(),
         };
 
         let success = infer_dependencies(&mut info);
