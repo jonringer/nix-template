@@ -1,7 +1,15 @@
-use crate::{cli, expression, file_path::NixDirLayout, interactive, output, types::{Template, UserConfig}};
+use crate::{
+    cli, expression,
+    file_path::NixDirLayout,
+    interactive, output,
+    types::{Template, UserConfig},
+};
 
-pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_config: Option<&UserConfig>) {
-
+pub fn run(
+    matches: &clap::ArgMatches,
+    _xdg_dirs: &xdg::BaseDirectories,
+    user_config: Option<&UserConfig>,
+) {
     // ----------------------------------------------------------------
     // Init mode detection: --init-flake and --init-npins are special
     // modes that initialize the current directory as a Nix project.
@@ -35,10 +43,12 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
         std::env::current_dir()
             .ok()
             .and_then(|cwd| cwd.file_name().map(|n| n.to_owned()))
-            .and_then(|n| n.to_str().map(|s| {
-                // Convert to kebab-case: lowercase, replace _ and spaces with -
-                s.to_lowercase().replace('_', "-").replace(' ', "-")
-            }))
+            .and_then(|n| {
+                n.to_str().map(|s| {
+                    // Convert to kebab-case: lowercase, replace _ and spaces with -
+                    s.to_lowercase().replace('_', "-").replace(' ', "-")
+                })
+            })
             .unwrap_or_else(|| "my-project".to_owned())
     } else {
         String::new()
@@ -112,7 +122,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
                         );
                     }
                 }
-                crate::types::Template::Python(_) | crate::types::Template::Python(_) => {
+                crate::types::Template::Python(_) => {
                     let fmt = crate::detect::detect_python_format(&cwd);
                     eprintln!("Detected Python build format: {}", fmt);
                     local_python_format = Some(fmt);
@@ -137,8 +147,9 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
                     crate::deps::ruby::infer_ruby_dependencies_from_path(&cwd)
                         .unwrap_or_else(|| (Vec::new(), Vec::new()))
                 }
-                crate::types::Template::Python(_) | crate::types::Template::Python(_) => {
-                    local_python_propagated_deps = crate::deps::python::infer_python_dependencies_from_path(&cwd);
+                crate::types::Template::Python(_) => {
+                    local_python_propagated_deps =
+                        crate::deps::python::infer_python_dependencies_from_path(&cwd);
                     (Vec::new(), Vec::new())
                 }
                 _ => (Vec::new(), Vec::new()),
@@ -182,7 +193,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
                 detected_candidates,
                 Some(directory_name.clone()),
                 Some(inferred_deps),
-                true,  // is_local_init
+                true, // is_local_init
             )
         } else {
             interactive::run_interactive_mode(None, user_config)
@@ -190,10 +201,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
 
         match interactive_result {
             Ok(interactive_data) => {
-                cli::build_expression_info_from_interactive(
-                    interactive_data,
-                    user_config,
-                )
+                cli::build_expression_info_from_interactive(interactive_data, user_config)
             }
             Err(e) => {
                 eprintln!("Interactive mode cancelled or failed: {}", e);
@@ -210,7 +218,8 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
             cli_info.fetcher = crate::types::Fetcher::local;
 
             // Use detected template if not explicitly set
-            if cli_info.template == crate::types::Template::Auto && !detected_candidates.is_empty() {
+            if cli_info.template == crate::types::Template::Auto && !detected_candidates.is_empty()
+            {
                 cli_info.template = detected_candidates[0].template.clone();
             }
 
@@ -273,8 +282,8 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
     //   - Never when --by-name is in play (it has its own canonical
     //     placement under nixpkgs).
     let nixpkgs_layout_active = matches.is_present("by-name");
-    let use_structured_layout = !nixpkgs_layout_active
-        && (init_npins || (init_flake && no_path_given));
+    let use_structured_layout =
+        !nixpkgs_layout_active && (init_npins || (init_flake && no_path_given));
 
     // Compute the structured layout up front so every downstream
     // step (path rewrite, overlay, top-level wrappers, flake) can
@@ -364,11 +373,7 @@ for the npins wrapper."
                 .unwrap_or("default.nix");
             Some((
                 flake_path,
-                expression::generate_flake_nix(
-                    &info.template,
-                    output_filename,
-                    directory_name,
-                ),
+                expression::generate_flake_nix(&info.template, output_filename, directory_name),
             ))
         }
     } else {
@@ -376,14 +381,12 @@ for the npins wrapper."
     };
 
     // ----- overlay.nix payload (structured layout only) -----
-    let overlay_payload: Option<(std::path::PathBuf, String)> = layout
-        .as_ref()
-        .map(|l| {
-            (
-                l.overlay_path.clone(),
-                expression::generate_overlay_nix(&info.template, &info.pname),
-            )
-        });
+    let overlay_payload: Option<(std::path::PathBuf, String)> = layout.as_ref().map(|l| {
+        (
+            l.overlay_path.clone(),
+            expression::generate_overlay_nix(&info.template, &info.pname),
+        )
+    });
 
     // ----- top-level default.nix payload (structured layout only) -----
     // Emitted whenever --init-npins is in play, so that non-flake
@@ -445,10 +448,8 @@ for the npins wrapper."
                 .unwrap_or("package.nix")
                 .to_string();
 
-            let wrapper_content = expression::generate_npins_wrapper_default_nix(
-                &info.template,
-                &package_basename,
-            );
+            let wrapper_content =
+                expression::generate_npins_wrapper_default_nix(&info.template, &package_basename);
 
             Some((
                 npins_dir,
@@ -486,15 +487,9 @@ for the npins wrapper."
             legacy_wrapper,
         )) = &npins_payload
         {
-            println!(
-                "\n# ===== {} =====\n",
-                npins_default_path.display()
-            );
+            println!("\n# ===== {} =====\n", npins_default_path.display());
             println!("{}", npins_default_content);
-            println!(
-                "\n# ===== {} =====\n",
-                npins_sources_path.display()
-            );
+            println!("\n# ===== {} =====\n", npins_sources_path.display());
             println!("{}", npins_sources_content);
             if let Some((wrapper_path, wrapper_content)) = legacy_wrapper {
                 println!("\n# ===== {} =====\n", wrapper_path.display());
@@ -568,13 +563,14 @@ for the npins wrapper."
                 .parent()
                 .map(|p| {
                     let s = p.display().to_string();
-                    if s.is_empty() { ".".to_string() } else { s }
+                    if s.is_empty() {
+                        ".".to_string()
+                    } else {
+                        s
+                    }
                 })
                 .unwrap_or_else(|| ".".into());
-            println!(
-                "  1. cd into {} (if not already there)",
-                project_dir
-            );
+            println!("  1. cd into {} (if not already there)", project_dir);
             println!("  2. Pin nixpkgs:  npins add channel --name nixpkgs nixpkgs-unstable");
             println!("  3. Build:        nix-build");
             println!();

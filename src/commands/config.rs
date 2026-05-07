@@ -48,7 +48,6 @@ pub fn run(
     }
 
     // write config
-    std::fs::write(&config_path, toml::to_string(&user_config).unwrap()).unwrap_or_else(
-        |_| panic!("Was unable to write to file: {}", &config_path.display()),
-    );
+    std::fs::write(&config_path, toml::to_string(&user_config).unwrap())
+        .unwrap_or_else(|_| panic!("Was unable to write to file: {}", &config_path.display()));
 }

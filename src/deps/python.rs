@@ -26,9 +26,7 @@ const LOG_TARGET: &str = "nix-template::python_deps";
 /// equivalent (PEP 503). nixpkgs conventionally lowercases and uses
 /// hyphens, though some older packages use underscores.
 fn normalise_pypi_name(name: &str) -> String {
-    name.to_lowercase()
-        .replace('_', "-")
-        .replace('.', "-")
+    name.to_lowercase().replace('_', "-").replace('.', "-")
 }
 
 /// Static overrides for PyPI names whose nixpkgs attribute diverges
@@ -92,7 +90,9 @@ fn extract_package_name(dep_spec: &str) -> &str {
     let s = dep_spec.trim();
     // Name ends at the first version specifier, extra marker, or whitespace
     let end = s
-        .find(|c: char| c == '>' || c == '<' || c == '=' || c == '!' || c == ';' || c == '[' || c == ' ')
+        .find(|c: char| {
+            c == '>' || c == '<' || c == '=' || c == '!' || c == ';' || c == '[' || c == ' '
+        })
         .unwrap_or(s.len());
     s[..end].trim()
 }
@@ -201,7 +201,7 @@ pub fn infer_python_dependencies_from_path(source_path: &Path) -> Vec<String> {
 /// Infer `propagatedBuildInputs` from a materialised remote source.
 pub fn infer_python_dependencies(info: &crate::types::ExpressionInfo) -> Vec<String> {
     match info.template {
-        crate::types::Template::Python(_) | crate::types::Template::Python(_) => {}
+        crate::types::Template::Python(_) => {}
         _ => return Vec::new(),
     }
 
@@ -351,7 +351,10 @@ name = "myapp"
     fn extract_package_name_variants() {
         assert_eq!(extract_package_name("requests>=2.0"), "requests");
         assert_eq!(extract_package_name("numpy[extra]"), "numpy");
-        assert_eq!(extract_package_name("pandas ; python_version >= '3.8'"), "pandas");
+        assert_eq!(
+            extract_package_name("pandas ; python_version >= '3.8'"),
+            "pandas"
+        );
         assert_eq!(extract_package_name("  click  "), "click");
         assert_eq!(extract_package_name("my-pkg"), "my-pkg");
         assert_eq!(extract_package_name("pkg!=1.0"), "pkg");

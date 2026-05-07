@@ -10,7 +10,7 @@
 //! mapped. Users can edit the generated expression to add anything we
 //! missed.
 
-use crate::types::{ExpressionInfo, Template};
+use crate::types::ExpressionInfo;
 use log::debug;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -249,8 +249,7 @@ fn infer_from_source_path(source_path: &Path) -> Option<(Vec<String>, Vec<String
         }
     };
 
-    let mut crates: BTreeSet<String> =
-        parse_cargo_dependencies(&manifest).into_iter().collect();
+    let mut crates: BTreeSet<String> = parse_cargo_dependencies(&manifest).into_iter().collect();
     debug!(target: LOG_TARGET, "direct dependencies from Cargo.toml: {:?}", crates);
 
     // Best-effort: scan Cargo.lock for transitive crates. Missing lockfile
@@ -532,8 +531,7 @@ version = "0.9.97"
 name = "libssh2-sys"
 version = "0.3.0"
 "#;
-        let mut crates: BTreeSet<String> =
-            parse_cargo_dependencies(manifest).into_iter().collect();
+        let mut crates: BTreeSet<String> = parse_cargo_dependencies(manifest).into_iter().collect();
         crates.extend(parse_cargo_lock(lock));
         let crate_list: Vec<String> = crates.into_iter().collect();
         let (bi, nbi) = map_crates_to_nix(&crate_list);

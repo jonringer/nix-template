@@ -10,11 +10,15 @@ fn test_python_template_basic() {
     let output = cmd
         .args(&[
             "python_package",
-            "-p", "requests",
-            "-v", "2.31.0",
-            "-l", "asl20",
-            "--maintainer", "",
-            "-s",  // --stdout flag
+            "-p",
+            "requests",
+            "-v",
+            "2.31.0",
+            "-l",
+            "asl20",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
         ])
         .output()
         .unwrap();
@@ -47,11 +51,15 @@ fn test_python_template_with_flake_init() {
     let output = cmd
         .args(&[
             "python_package",
-            "-p", "requests",
-            "-v", "2.31.0",
-            "-l", "asl20",
-            "--maintainer", "",
-            "-s",  // --stdout flag
+            "-p",
+            "requests",
+            "-v",
+            "2.31.0",
+            "-l",
+            "asl20",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
             "--init-flake",
         ])
         .output()
@@ -65,13 +73,13 @@ fn test_python_template_with_flake_init() {
     assert!(stdout.contains("# ===== nix/overlay.nix ====="));
 
     // stdout ordering from main.rs is: package → flake → overlay.
-    let after_flake_marker: Vec<&str> =
-        stdout.split("# ===== flake.nix =====").collect();
+    let after_flake_marker: Vec<&str> = stdout.split("# ===== flake.nix =====").collect();
     assert_eq!(after_flake_marker.len(), 2, "Expected a flake.nix marker");
     let package_nix = after_flake_marker[0].trim();
 
-    let after_overlay_marker: Vec<&str> =
-        after_flake_marker[1].split("# ===== nix/overlay.nix =====").collect();
+    let after_overlay_marker: Vec<&str> = after_flake_marker[1]
+        .split("# ===== nix/overlay.nix =====")
+        .collect();
     assert_eq!(after_overlay_marker.len(), 2, "Expected an overlay marker");
     let flake_nix = after_overlay_marker[0].trim();
     let overlay_nix = after_overlay_marker[1].trim();
@@ -119,11 +127,16 @@ fn test_python_template_pypi_fetcher_explicit() {
     let output = cmd
         .args(&[
             "python_package",
-            "-f", "pypi",  // Explicitly specify PyPI fetcher
-            "-p", "requests",
-            "-v", "2.31.0",
-            "-l", "asl20",
-            "--maintainer", "",
+            "-f",
+            "pypi", // Explicitly specify PyPI fetcher
+            "-p",
+            "requests",
+            "-v",
+            "2.31.0",
+            "-l",
+            "asl20",
+            "--maintainer",
+            "",
             "-s",
         ])
         .output()
@@ -134,7 +147,10 @@ fn test_python_template_pypi_fetcher_explicit() {
 
     // Verify fetchPypi is used
     assert!(stdout.contains("fetchPypi"));
-    assert!(!stdout.contains("fetchFromGitHub"), "Should not use GitHub fetcher");
+    assert!(
+        !stdout.contains("fetchFromGitHub"),
+        "Should not use GitHub fetcher"
+    );
 
     insta::assert_snapshot!("python_pypi_explicit_package", stdout);
 }
@@ -147,11 +163,16 @@ fn test_python_template_github_fetcher_override() {
     let output = cmd
         .args(&[
             "python_package",
-            "-f", "github",  // Override with GitHub fetcher
-            "-p", "requests",
-            "-v", "2.31.0",
-            "-l", "asl20",
-            "--maintainer", "",
+            "-f",
+            "github", // Override with GitHub fetcher
+            "-p",
+            "requests",
+            "-v",
+            "2.31.0",
+            "-l",
+            "asl20",
+            "--maintainer",
+            "",
             "-s",
         ])
         .output()
@@ -187,10 +208,14 @@ fn test_python_template_file_writing_with_flake() {
         .current_dir(temp_path)
         .args(&[
             "python_package",
-            "-p", "requests",
-            "-v", "2.31.0",
-            "-l", "asl20",
-            "--maintainer", "",
+            "-p",
+            "requests",
+            "-v",
+            "2.31.0",
+            "-l",
+            "asl20",
+            "--maintainer",
+            "",
             "--init-flake",
             // No -s flag, so it will write files
         ])
@@ -209,7 +234,10 @@ fn test_python_template_file_writing_with_flake() {
         package_nix_path.exists(),
         "nix/package.nix should be created"
     );
-    assert!(overlay_nix_path.exists(), "nix/overlay.nix should be created");
+    assert!(
+        overlay_nix_path.exists(),
+        "nix/overlay.nix should be created"
+    );
     assert!(flake_nix_path.exists(), "flake.nix should be created");
     assert!(
         !top_default_nix_path.exists(),
@@ -263,10 +291,14 @@ fn test_init_npins_stdout() {
     let output = cmd
         .args(&[
             "stdenv",
-            "-p", "hello",
-            "-v", "1.0",
-            "-l", "mit",
-            "--maintainer", "",
+            "-p",
+            "hello",
+            "-v",
+            "1.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
             "-s",
             "--init-npins",
         ])
@@ -316,10 +348,14 @@ fn test_init_npins_writes_three_files_and_renames() {
         .current_dir(temp_path)
         .args(&[
             "stdenv",
-            "-p", "hello",
-            "-v", "1.0",
-            "-l", "mit",
-            "--maintainer", "",
+            "-p",
+            "hello",
+            "-v",
+            "1.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
             "--init-npins",
         ])
         .output()
@@ -328,8 +364,15 @@ fn test_init_npins_writes_three_files_and_renames() {
     assert!(output.status.success(), "Command failed: {:?}", output);
 
     // Package lives under nix/pkgs/<pname>/package.nix
-    let package_nix = temp_path.join("nix").join("pkgs").join("hello").join("package.nix");
-    assert!(package_nix.exists(), "nix/pkgs/hello/package.nix should be created");
+    let package_nix = temp_path
+        .join("nix")
+        .join("pkgs")
+        .join("hello")
+        .join("package.nix");
+    assert!(
+        package_nix.exists(),
+        "nix/pkgs/hello/package.nix should be created"
+    );
 
     // Top-level default.nix wraps the overlay, replacing the legacy npins
     // wrapper that used to live alongside the package file.
@@ -353,8 +396,14 @@ fn test_init_npins_writes_three_files_and_renames() {
     // npins/ scaffold exists at project root.
     let npins_default = temp_path.join("npins").join("default.nix");
     let npins_sources = temp_path.join("npins").join("sources.json");
-    assert!(npins_default.exists(), "npins/default.nix should be created");
-    assert!(npins_sources.exists(), "npins/sources.json should be created");
+    assert!(
+        npins_default.exists(),
+        "npins/default.nix should be created"
+    );
+    assert!(
+        npins_sources.exists(),
+        "npins/sources.json should be created"
+    );
 
     let sources_content = std::fs::read_to_string(&npins_sources).unwrap();
     assert!(sources_content.contains("\"pins\": {}"));
@@ -388,10 +437,14 @@ fn test_init_npins_python_wrapper() {
         .current_dir(temp_path)
         .args(&[
             "python_package",
-            "-p", "requests",
-            "-v", "2.31.0",
-            "-l", "asl20",
-            "--maintainer", "",
+            "-p",
+            "requests",
+            "-v",
+            "2.31.0",
+            "-l",
+            "asl20",
+            "--maintainer",
+            "",
             "--init-npins",
         ])
         .output()
@@ -409,7 +462,9 @@ fn test_init_npins_python_wrapper() {
     // The overlay should use python3Packages.callPackage.
     let overlay = std::fs::read_to_string(temp_path.join("nix").join("overlay.nix")).unwrap();
     assert!(
-        overlay.contains("requests = final.python3Packages.callPackage ./pkgs/requests/package.nix { }"),
+        overlay.contains(
+            "requests = final.python3Packages.callPackage ./pkgs/requests/package.nix { }"
+        ),
         "Python overlay should use python3Packages.callPackage; got:\n{}",
         overlay
     );
@@ -433,10 +488,14 @@ fn test_init_npins_with_init_flake() {
         .current_dir(temp_path)
         .args(&[
             "stdenv",
-            "-p", "hello",
-            "-v", "1.0",
-            "-l", "mit",
-            "--maintainer", "",
+            "-p",
+            "hello",
+            "-v",
+            "1.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
             "--init-npins",
             "--init-flake",
         ])
@@ -448,14 +507,31 @@ fn test_init_npins_with_init_flake() {
     // Structured layout: package + overlay under nix/, flake/default at root,
     // npins/ at root.
     assert!(
-        temp_path.join("nix").join("pkgs").join("hello").join("package.nix").exists(),
+        temp_path
+            .join("nix")
+            .join("pkgs")
+            .join("hello")
+            .join("package.nix")
+            .exists(),
         "nix/pkgs/hello/package.nix should exist"
     );
-    assert!(temp_path.join("nix").join("overlay.nix").exists(), "nix/overlay.nix");
-    assert!(temp_path.join("default.nix").exists(), "top-level default.nix");
+    assert!(
+        temp_path.join("nix").join("overlay.nix").exists(),
+        "nix/overlay.nix"
+    );
+    assert!(
+        temp_path.join("default.nix").exists(),
+        "top-level default.nix"
+    );
     assert!(temp_path.join("flake.nix").exists(), "flake.nix");
-    assert!(temp_path.join("npins").join("default.nix").exists(), "npins/default.nix");
-    assert!(temp_path.join("npins").join("sources.json").exists(), "npins/sources.json");
+    assert!(
+        temp_path.join("npins").join("default.nix").exists(),
+        "npins/default.nix"
+    );
+    assert!(
+        temp_path.join("npins").join("sources.json").exists(),
+        "npins/sources.json"
+    );
 
     // Top-level default.nix imports the overlay applied to npins-pinned nixpkgs.
     let wrapper = std::fs::read_to_string(temp_path.join("default.nix")).unwrap();
@@ -491,10 +567,14 @@ fn test_init_npins_refuses_overwrite() {
         .current_dir(temp_path)
         .args(&[
             "stdenv",
-            "-p", "hello",
-            "-v", "1.0",
-            "-l", "mit",
-            "--maintainer", "",
+            "-p",
+            "hello",
+            "-v",
+            "1.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
             "--init-npins",
         ])
         .output()
@@ -509,8 +589,7 @@ fn test_init_npins_refuses_overwrite() {
     );
 
     // Pre-existing file should be untouched
-    let preserved =
-        std::fs::read_to_string(temp_path.join("npins").join("default.nix")).unwrap();
+    let preserved = std::fs::read_to_string(temp_path.join("npins").join("default.nix")).unwrap();
     assert_eq!(preserved, "# pre-existing npins reader\n");
 }
 
@@ -520,10 +599,14 @@ fn test_npm_template_basic() {
     let output = cmd
         .args(&[
             "npm",
-            "-p", "example",
-            "-v", "1.0.0",
-            "-l", "mit",
-            "--maintainer", "",
+            "-p",
+            "example",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
             "-s",
         ])
         .output()
@@ -547,10 +630,14 @@ fn test_pnpm_template_basic() {
     let output = cmd
         .args(&[
             "pnpm",
-            "-p", "example",
-            "-v", "1.0.0",
-            "-l", "mit",
-            "--maintainer", "",
+            "-p",
+            "example",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
             "-s",
         ])
         .output()
@@ -576,7 +663,8 @@ fn test_dotnet_template_basic() {
     let temp_dir = TempDir::new().unwrap();
     let temp_path = temp_dir.path().join("default.nix");
 
-    let output = Command::cargo_bin("nix-template").unwrap()
+    let output = Command::cargo_bin("nix-template")
+        .unwrap()
         .args(&[
             "dotnet",
             "--pname",
@@ -620,7 +708,8 @@ fn test_ruby_template_basic() {
     let temp_dir = TempDir::new().unwrap();
     let temp_path = temp_dir.path().join("default.nix");
 
-    let output = Command::cargo_bin("nix-template").unwrap()
+    let output = Command::cargo_bin("nix-template")
+        .unwrap()
         .args(&[
             "ruby",
             "--pname",
@@ -644,7 +733,7 @@ fn test_ruby_template_basic() {
     // Verify it contains bundlerApp (NOT finalAttrs pattern)
     assert!(stdout.contains("bundlerApp"));
     assert!(stdout.contains("bundlerApp {"));
-    assert!(!stdout.contains("finalAttrs"));  // Ruby doesn't use finalAttrs
+    assert!(!stdout.contains("finalAttrs")); // Ruby doesn't use finalAttrs
     assert!(stdout.contains("gemdir = ./.;"));
     assert!(stdout.contains("exes = [ \"example\" ];"));
 
@@ -689,7 +778,8 @@ BUNDLED WITH
 
     let output_path = temp_dir.path().join("default.nix");
 
-    let output = Command::cargo_bin("nix-template").unwrap()
+    let output = Command::cargo_bin("nix-template")
+        .unwrap()
         .current_dir(temp_dir.path())
         .args(&[
             "ruby",
@@ -731,10 +821,14 @@ fn test_file_write_shows_success_message() {
     let output = cmd
         .args(&[
             "stdenv",
-            "-p", "test-package",
-            "-v", "1.0.0",
-            "-l", "mit",
-            "--maintainer", "Test User",
+            "-p",
+            "test-package",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "Test User",
             output_path.to_str().unwrap(),
         ])
         .output()
@@ -785,10 +879,14 @@ fn test_write_new_atomic_overwrite_prevention() {
     let output = cmd
         .args(&[
             "stdenv",
-            "-p", "test-overwrite",
-            "-v", "1.0.0",
-            "-l", "mit",
-            "--maintainer", "Test",
+            "-p",
+            "test-overwrite",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "Test",
             output_path.to_str().unwrap(),
         ])
         .output()
@@ -812,8 +910,7 @@ fn test_write_new_atomic_overwrite_prevention() {
     // Original file should be preserved unchanged
     let preserved_content = fs::read_to_string(&output_path).unwrap();
     assert_eq!(
-        preserved_content,
-        "# original content\n",
+        preserved_content, "# original content\n",
         "Original file should not have been modified"
     );
 }
@@ -821,7 +918,7 @@ fn test_write_new_atomic_overwrite_prevention() {
 /// Test that write_new won't follow symlinks to overwrite target files.
 /// This prevents symlink attack scenarios.
 #[test]
-#[cfg(unix)]  // Symlinks work differently on Windows
+#[cfg(unix)] // Symlinks work differently on Windows
 fn test_write_new_prevents_symlink_attacks() {
     use std::os::unix::fs::symlink;
 
@@ -840,10 +937,14 @@ fn test_write_new_prevents_symlink_attacks() {
     let output = cmd
         .args(&[
             "stdenv",
-            "-p", "symlink-test",
-            "-v", "1.0.0",
-            "-l", "mit",
-            "--maintainer", "Test",
+            "-p",
+            "symlink-test",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "Test",
             symlink_path.to_str().unwrap(),
         ])
         .output()
@@ -858,8 +959,7 @@ fn test_write_new_prevents_symlink_attacks() {
     // Important: the target file should remain unchanged
     let preserved_content = fs::read_to_string(&target_file).unwrap();
     assert_eq!(
-        preserved_content,
-        "important data\n",
+        preserved_content, "important data\n",
         "Target file should not have been modified through symlink"
     );
 }
@@ -884,11 +984,15 @@ fn test_corrupted_config_file_doesnt_crash() {
         .env("XDG_CONFIG_HOME", temp_dir.path())
         .args(&[
             "stdenv",
-            "-p", "test-config",
-            "-v", "1.0.0",
-            "-l", "mit",
-            "--maintainer", "Test",
-            "-s",  // Use stdout to avoid file creation
+            "-p",
+            "test-config",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "Test",
+            "-s", // Use stdout to avoid file creation
         ])
         .output()
         .unwrap();
@@ -935,11 +1039,15 @@ fn test_malformed_toml_config_doesnt_crash() {
         .env("XDG_CONFIG_HOME", temp_dir.path())
         .args(&[
             "stdenv",
-            "-p", "test-toml",
-            "-v", "1.0.0",
-            "-l", "mit",
-            "--maintainer", "Test",
-            "-s",  // Use stdout to avoid file creation
+            "-p",
+            "test-toml",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "Test",
+            "-s", // Use stdout to avoid file creation
         ])
         .output()
         .unwrap();
@@ -970,7 +1078,7 @@ fn test_malformed_toml_config_doesnt_crash() {
 /// Test that the program works when config directory cannot be created
 /// (simulated by using a read-only location)
 #[test]
-#[cfg(unix)]  // Unix-specific test using permissions
+#[cfg(unix)] // Unix-specific test using permissions
 fn test_no_config_directory_doesnt_crash() {
     // This test verifies that if XDG setup fails entirely,
     // the program uses fallback and continues
@@ -982,7 +1090,7 @@ fn test_no_config_directory_doesnt_crash() {
     // Make directory read-only
     use std::os::unix::fs::PermissionsExt;
     let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
-    perms.set_mode(0o444);  // Read-only
+    perms.set_mode(0o444); // Read-only
     fs::set_permissions(&readonly_dir, perms).unwrap();
 
     // Try to use the read-only directory as config home
@@ -991,10 +1099,14 @@ fn test_no_config_directory_doesnt_crash() {
         .env("XDG_CONFIG_HOME", &readonly_dir)
         .args(&[
             "stdenv",
-            "-p", "test-readonly",
-            "-v", "1.0.0",
-            "-l", "mit",
-            "--maintainer", "Test",
+            "-p",
+            "test-readonly",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "Test",
             "-s",
         ])
         .output()

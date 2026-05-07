@@ -1,28 +1,47 @@
-use crate::types::{ExpressionInfo, Fetcher, Template, StdenvVariant, VENDOR_HASH_NULL};
+use crate::types::{ExpressionInfo, Fetcher, StdenvVariant, Template, VENDOR_HASH_NULL};
 
 fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
     let (input, derivation, documentation_key): (&str, &str, Option<&str>) = match &info.template {
-        Template::Auto => unreachable!("'auto' template should be resolved before expression generation"),
-        Template::Stdenv(StdenvVariant::Default) => ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation")),
+        Template::Auto => {
+            unreachable!("'auto' template should be resolved before expression generation")
+        }
+        Template::Stdenv(StdenvVariant::Default) => {
+            ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation"))
+        }
         Template::Stdenv(StdenvVariant::NoCC) => (
             "stdenvNoCC",
             "stdenvNoCC.mkDerivation",
             Some("stdenvNoCCMkDerivation"),
         ),
         // Python library packages use buildPythonPackage; applications use buildPythonApplication
-        Template::Python(config) => {
-            match config.variant {
-                crate::types::PythonVariant::Package => ("buildPythonPackage", "buildPythonPackage", None),
-                crate::types::PythonVariant::Application => ("buildPythonApplication", "buildPythonApplication", None),
+        Template::Python(config) => match config.variant {
+            crate::types::PythonVariant::Package => {
+                ("buildPythonPackage", "buildPythonPackage", None)
             }
-        }
+            crate::types::PythonVariant::Application => {
+                ("buildPythonApplication", "buildPythonApplication", None)
+            }
+        },
         Template::Mkshell => ("pkgs ? import <nixpkgs> {}", "with pkgs;\n\nmkShell", None),
         Template::Go(_) => ("buildGoModule", "buildGoModule", None),
         Template::Rust(_) => ("rustPlatform", "rustPlatform.buildRustPackage", None),
-        Template::Node(_) => ("buildNpmPackage", "buildNpmPackage", Some("buildNpmPackage")),
-        Template::Dotnet => ("buildDotnetModule", "buildDotnetModule", Some("buildDotnetModule")),
+        Template::Node(config) => match config.variant {
+            crate::types::NodeVariant::Npm => (
+                "buildNpmPackage",
+                "buildNpmPackage",
+                Some("buildNpmPackage"),
+            ),
+            crate::types::NodeVariant::Pnpm => {
+                ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation"))
+            }
+        },
+        Template::Dotnet => (
+            "buildDotnetModule",
+            "buildDotnetModule",
+            Some("buildDotnetModule"),
+        ),
         Template::Ruby => ("bundlerApp", "bundlerApp", Some("bundlerApp")),
-        Template::Test => ("", "", None),  // Tests aren't a normal expression
+        Template::Test => ("", "", None), // Tests aren't a normal expression
         Template::Module => ("", "", None), // Modules aren't a normal expression
     };
 
@@ -84,27 +103,22 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
     sha256 = \"@src_sha@\";
   };",
         ),
-        Fetcher::local => (
-            "",
-            "  @doc:fetcher@src = ./..;",
-        ),
+        Fetcher::local => ("", "  @doc:fetcher@src = ./..;"),
     }
 }
 
 fn addtional_pkg_attr_headers(template: &Template) -> &'static str {
     match template {
-        Template::Python(_) => {
-            "\n  @doc:pythonFormat@format = \"@python_format@\";"
-        }
+        Template::Python(_) => "\n  @doc:pythonFormat@format = \"@python_format@\";",
         _ => "",
     }
 }
 
 fn build_inputs(info: &ExpressionInfo) -> String {
-    match info.template {
+    match &info.template {
         // Python applications don't carry a Python-import smoke test the way
         // libraries do; their entry points are exercised at runtime.
-        Template::Python(_) =>
+        Template::Python(config) if config.variant == crate::types::PythonVariant::Application =>
             "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];".to_owned(),
         // Python packages (libraries) include pythonImportsCheck for smoke testing
         Template::Python(_) => "  @doc:buildDependencies@propagatedBuildInputs = [@propagated_build_inputs@ ];
@@ -187,11 +201,13 @@ fn build_inputs(info: &ExpressionInfo) -> String {
                 ldflags = ldflags,
             )
         }
-        Template::Node(_) => {
-            "  npmDepsHash = \"@npm_deps_hash@\";".to_owned()
-        }
-        Template::Node(_) => {
-            "  nativeBuildInputs = [
+        Template::Node(config) => {
+            match config.variant {
+                crate::types::NodeVariant::Npm => {
+                    "  npmDepsHash = \"@npm_deps_hash@\";".to_owned()
+                }
+                crate::types::NodeVariant::Pnpm => {
+                    "  nativeBuildInputs = [
     nodejs
     pnpmConfigHook
     pnpm_10
@@ -203,6 +219,8 @@ fn build_inputs(info: &ExpressionInfo) -> String {
     fetcherVersion = 3;
     hash = \"@pnpm_deps_hash@\";
   };".to_owned()
+                }
+            }
         }
         Template::Dotnet => {
             "  projectFile = \"@project_file@\";\n  nugetDeps = ./deps.json;  # Run `nix-build -A package-name.passthru.fetch-deps` to generate".to_owned()
@@ -563,7 +581,11 @@ mod tests {
             "missing buildInputs in:\n{}",
             out
         );
-        assert!(out.contains(", pkg-config"), "header missing pkg-config: {}", out);
+        assert!(
+            out.contains(", pkg-config"),
+            "header missing pkg-config: {}",
+            out
+        );
         assert!(out.contains(", zlib"), "header missing zlib: {}", out);
     }
 
@@ -578,7 +600,11 @@ mod tests {
         info.native_build_inputs = Vec::new();
         let expr = generate_expression(&info);
         let out = info.format(&expr);
-        assert!(out.contains("buildInputs = [ ];"), "missing placeholder in:\n{}", out);
+        assert!(
+            out.contains("buildInputs = [ ];"),
+            "missing placeholder in:\n{}",
+            out
+        );
         assert!(
             !out.contains("nativeBuildInputs"),
             "should not render nativeBuildInputs without input:\n{}",
@@ -634,7 +660,11 @@ mod tests {
         );
         // The function-header should also list both crates so callPackage
         // can wire them through.
-        assert!(out.contains(", pkg-config"), "header missing pkg-config: {}", out);
+        assert!(
+            out.contains(", pkg-config"),
+            "header missing pkg-config: {}",
+            out
+        );
         assert!(out.contains(", openssl"), "header missing openssl: {}", out);
     }
 
@@ -811,7 +841,8 @@ pub fn generate_flake_nix(template: &Template, output_file: &str, directory_name
         ""
     };
 
-    format!(r#"{{
+    format!(
+        r#"{{
   # This should be the directory name
   description = "{directory}";
 
@@ -842,7 +873,11 @@ pub fn generate_flake_nix(template: &Template, output_file: &str, directory_name
       );
     }};
 }}
-"#, directory = directory_name, inner_attr_path = inner_attr_path, output_file = output_file)
+"#,
+        directory = directory_name,
+        inner_attr_path = inner_attr_path,
+        output_file = output_file
+    )
 }
 
 /// Generate the standardized `nix/overlay.nix` file. The overlay calls
@@ -871,9 +906,7 @@ final: prev: {
     }
 
     let call_package = match template {
-        Template::Python(_) => {
-            "final.python3Packages.callPackage"
-        }
+        Template::Python(_) => "final.python3Packages.callPackage",
         _ => "final.callPackage",
     };
 
@@ -897,7 +930,11 @@ final: prev: {{
 /// otherwise it falls back to the `<nixpkgs>` channel. The wrapper
 /// applies `./nix/overlay.nix` and exposes the package attribute so that
 /// `nix-build` from the project root just works.
-pub fn generate_structured_default_nix(template: &Template, pname: &str, with_npins: bool) -> String {
+pub fn generate_structured_default_nix(
+    template: &Template,
+    pname: &str,
+    with_npins: bool,
+) -> String {
     let nixpkgs_import = if with_npins {
         r#"let
   sources = import ./npins;
@@ -952,7 +989,11 @@ pkgs
 /// Generate a flake.nix that references the standardized `./nix/overlay.nix`
 /// rather than a sibling package file. Pairs with the structured layout
 /// produced by `--init-flake` (with nix/ layout) or `--init-npins`.
-pub fn generate_structured_flake_nix(template: &Template, pname: &str, directory_name: &str) -> String {
+pub fn generate_structured_flake_nix(
+    template: &Template,
+    pname: &str,
+    directory_name: &str,
+) -> String {
     if *template == Template::Module {
         // Module-only flake: expose nixosModules instead of packages.
         return format!(

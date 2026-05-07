@@ -22,4 +22,3 @@
 pub mod types;
 
 // Re-export all template types for convenient access
-pub use types::*;

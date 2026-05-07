@@ -77,6 +77,7 @@ pub enum PythonFormat {
 
 impl PythonFormat {
     /// Convert to nixpkgs `format` attribute value.
+    #[allow(dead_code)]
     pub fn as_str(&self) -> &'static str {
         match self {
             PythonFormat::Setuptools => "setuptools",
@@ -305,6 +306,7 @@ impl Template {
     }
 
     /// Get Python config if this is a Python template.
+    #[allow(dead_code)]
     pub fn python_config(&self) -> Option<&PythonConfig> {
         match self {
             Template::Python(config) => Some(config),
@@ -326,6 +328,7 @@ impl Template {
     }
 
     /// Get Rust config if this is a Rust template.
+    #[allow(dead_code)]
     pub fn rust_config(&self) -> Option<&RustConfig> {
         match self {
             Template::Rust(config) => Some(config),
@@ -334,6 +337,7 @@ impl Template {
     }
 
     /// Get mutable Rust config.
+    #[allow(dead_code)]
     pub fn rust_config_mut(&mut self) -> Option<&mut RustConfig> {
         match self {
             Template::Rust(config) => Some(config),
@@ -347,6 +351,7 @@ impl Template {
     }
 
     /// Get Go config if this is a Go template.
+    #[allow(dead_code)]
     pub fn go_config(&self) -> Option<&GoConfig> {
         match self {
             Template::Go(config) => Some(config),
@@ -355,6 +360,7 @@ impl Template {
     }
 
     /// Get mutable Go config.
+    #[allow(dead_code)]
     pub fn go_config_mut(&mut self) -> Option<&mut GoConfig> {
         match self {
             Template::Go(config) => Some(config),
@@ -368,6 +374,7 @@ impl Template {
     }
 
     /// Get Node config if this is a Node template.
+    #[allow(dead_code)]
     pub fn node_config(&self) -> Option<&NodeConfig> {
         match self {
             Template::Node(config) => Some(config),
@@ -376,6 +383,7 @@ impl Template {
     }
 
     /// Get mutable Node config.
+    #[allow(dead_code)]
     pub fn node_config_mut(&mut self) -> Option<&mut NodeConfig> {
         match self {
             Template::Node(config) => Some(config),
@@ -414,7 +422,10 @@ mod tests {
             Template::Stdenv(StdenvVariant::NoCC)
         );
         assert!("python_package".parse::<Template>().unwrap().is_python());
-        assert!("python_application".parse::<Template>().unwrap().is_python());
+        assert!("python_application"
+            .parse::<Template>()
+            .unwrap()
+            .is_python());
         assert!("rust".parse::<Template>().unwrap().is_rust());
         assert!("go".parse::<Template>().unwrap().is_go());
         assert!("npm".parse::<Template>().unwrap().is_node());
@@ -502,10 +513,7 @@ mod tests {
         assert_eq!(PythonFormat::Setuptools.as_str(), "setuptools");
         assert_eq!(PythonFormat::Flit.as_str(), "flit");
         assert_eq!(PythonFormat::from_str("poetry"), PythonFormat::Poetry);
-        assert_eq!(
-            PythonFormat::from_str("HATCHLING"),
-            PythonFormat::Hatchling
-        );
+        assert_eq!(PythonFormat::from_str("HATCHLING"), PythonFormat::Hatchling);
     }
 
     #[test]

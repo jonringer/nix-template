@@ -219,7 +219,11 @@ impl ExpressionInfo {
                 // Deduplicate and sort inputs
                 let unique: std::collections::BTreeSet<_> = inputs.iter().collect();
                 let sorted: Vec<&String> = unique.into_iter().collect();
-                let body = sorted.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n    ");
+                let body = sorted
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n    ");
                 format!("\n    {}\n ", body)
             }
         }
@@ -242,9 +246,15 @@ impl ExpressionInfo {
             .replace("@homepage@", &self.homepage)
             .replace("@license@", &self.license)
             .replace("@maintainer@", &self.maintainer)
-            .replace("@propagated_build_inputs@", &format_inputs(&self.propagated_build_inputs))
+            .replace(
+                "@propagated_build_inputs@",
+                &format_inputs(&self.propagated_build_inputs),
+            )
             .replace("@build_inputs@", &format_inputs(&self.build_inputs))
-            .replace("@native_build_inputs@", &format_inputs(&self.native_build_inputs))
+            .replace(
+                "@native_build_inputs@",
+                &format_inputs(&self.native_build_inputs),
+            )
             .replace("@python_format@", &self.python_format);
 
         if self.include_documentation_links {

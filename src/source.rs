@@ -20,7 +20,9 @@ const LOG_TARGET: &str = "nix-template::source";
 /// the source hash is not yet known.
 pub fn materialise_source(info: &ExpressionInfo) -> Option<PathBuf> {
     if info.src_sha.is_empty()
-        || info.src_sha.starts_with("0000000000000000000000000000000000000000000000000000")
+        || info
+            .src_sha
+            .starts_with("0000000000000000000000000000000000000000000000000000")
     {
         debug!(target: LOG_TARGET, "src_sha not yet known; skipping source materialisation");
         return None;
