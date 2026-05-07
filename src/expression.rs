@@ -1,4 +1,4 @@
-use crate::types::{ExpressionInfo, Fetcher, Template};
+use crate::types::{ExpressionInfo, Fetcher, Template, VENDOR_HASH_NULL};
 
 fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
     let (input, derivation, documentation_key): (&str, &str, Option<&str>) = match info.template {
@@ -96,7 +96,7 @@ fn fetch_block(fetcher: &Fetcher) -> (&'static str, &'static str) {
 fn addtional_pkg_attr_headers(template: &Template) -> &'static str {
     match template {
         Template::python_package | Template::python_application => {
-            "\n  @doc:pythonFormat@format = \"setuptools\";"
+            "\n  @doc:pythonFormat@format = \"@python_format@\";"
         }
         _ => "",
     }
@@ -120,10 +120,20 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             } else {
                 "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
             };
+            // Local development uses cargoLock.lockFile (no hash needed);
+            // remote/nixpkgs packaging uses cargoHash with an SRI hash.
+            // The lockFile path is ../Cargo.lock because the package
+            // expression lives under nix/package.nix in the structured layout.
+            let cargo_block = if info.use_cargo_lock_file {
+                "  cargoLock.lockFile = ../Cargo.lock;".to_owned()
+            } else {
+                "  @doc:cargoHash@cargoHash = \"@cargo_hash@\";".to_owned()
+            };
             format!(
-                "  @doc:cargoHash@cargoHash = \"@cargo_hash@\";{native}
+                "{cargo_block}{native}
 
   @doc:buildDependencies@buildInputs = [@build_inputs@ ];",
+                cargo_block = cargo_block,
                 native = native,
             )
         }
@@ -141,11 +151,19 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             } else {
                 "\n  buildInputs = [@build_inputs@ ];".to_owned()
             };
+            // When vendor/ directory is committed locally, vendorHash = null
+            // (no quotes) tells buildGoModule to skip fetching.
+            let vendor_line = if info.vendor_hash == VENDOR_HASH_NULL {
+                "  @doc:vendorHash@vendorHash = null;".to_owned()
+            } else {
+                "  @doc:vendorHash@vendorHash = \"@vendor_hash@\";".to_owned()
+            };
             format!(
                 "  @doc:buildDependencies@
-  @doc:vendorHash@vendorHash = \"@vendor_hash@\";{native}{build}
+  {vendor_line}{native}{build}
 
   @doc:goSubPackages@subPackages = [ \".\" ];",
+                vendor_line = vendor_line,
                 native = native,
                 build = build,
             )
@@ -415,6 +433,8 @@ mod tests {
             domain: "".to_owned(),
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),
+            use_cargo_lock_file: false,
+            python_format: "setuptools".to_owned(),
         }
     }
 
@@ -457,6 +477,8 @@ mod tests {
             domain: "".to_owned(),
             build_inputs: Vec::new(),
             native_build_inputs: Vec::new(),
+            use_cargo_lock_file: false,
+            python_format: "setuptools".to_owned(),
         }
     }
 
@@ -591,6 +613,63 @@ mod tests {
         // can wire them through.
         assert!(out.contains(", pkg-config"), "header missing pkg-config: {}", out);
         assert!(out.contains(", openssl"), "header missing openssl: {}", out);
+    }
+
+    #[test]
+    fn rust_local_mode_uses_cargo_lock_file() {
+        let mut info = rust_info();
+        info.use_cargo_lock_file = true;
+        info.fetcher = Fetcher::local;
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        assert!(
+            out.contains("cargoLock.lockFile = ../Cargo.lock;"),
+            "expected cargoLock.lockFile in:\n{}",
+            out
+        );
+        assert!(
+            !out.contains("cargoHash"),
+            "should not contain cargoHash when using lockFile:\n{}",
+            out
+        );
+    }
+
+    #[test]
+    fn go_vendor_null_renders_without_quotes() {
+        let mut info = rust_info();
+        info.template = Template::go;
+        info.vendor_hash = "null".to_owned();
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        assert!(
+            out.contains("vendorHash = null;"),
+            "expected vendorHash = null; (no quotes) in:\n{}",
+            out
+        );
+        assert!(
+            !out.contains("vendorHash = \"null\""),
+            "vendorHash = null should not be quoted:\n{}",
+            out
+        );
+    }
+
+    #[test]
+    fn python_format_renders_detected_format() {
+        let mut info = rust_info();
+        info.template = Template::python_package;
+        info.python_format = "flit".to_owned();
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        assert!(
+            out.contains("format = \"flit\";"),
+            "expected format = \"flit\" in:\n{}",
+            out
+        );
+        assert!(
+            !out.contains("setuptools"),
+            "should not contain setuptools when format is flit:\n{}",
+            out
+        );
     }
 }
 

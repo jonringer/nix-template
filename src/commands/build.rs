@@ -44,7 +44,16 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
         String::new()
     };
 
-    // Auto-detect template and infer dependencies from local directory
+    // Auto-detect template, infer dependencies, and detect builder
+    // variants from local directory.
+    //
+    // `local_use_cargo_lock_file`: Rust local mode uses cargoLock.lockFile
+    // `local_go_vendor_null`: Go local mode with vendor/ uses vendorHash = null
+    // `local_python_format`: Python format auto-detected from pyproject.toml
+    let mut local_use_cargo_lock_file = false;
+    let mut local_go_vendor_null = false;
+    let mut local_python_format: Option<String> = None;
+
     let (detected_candidates, inferred_deps) = if is_init_mode {
         let cwd = std::env::current_dir().unwrap_or_default();
 
@@ -62,6 +71,27 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
                         .collect::<Vec<_>>()
                         .join(", ")
                 );
+            }
+        }
+
+        // Detect builder variants for local development
+        if let Some(candidate) = candidates.first() {
+            match candidate.template {
+                crate::types::Template::rust => {
+                    local_use_cargo_lock_file = true;
+                }
+                crate::types::Template::go => {
+                    if cwd.join("vendor").is_dir() {
+                        eprintln!("Detected vendor/ directory; using vendorHash = null");
+                        local_go_vendor_null = true;
+                    }
+                }
+                crate::types::Template::python_package | crate::types::Template::python_application => {
+                    let fmt = crate::detect::detect_python_format(&cwd);
+                    eprintln!("Detected Python build format: {}", fmt);
+                    local_python_format = Some(fmt);
+                }
+                _ => {}
             }
         }
 
@@ -168,6 +198,17 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
 
         cli_info
     };
+
+    // Apply local development builder variants detected above.
+    if local_use_cargo_lock_file {
+        info.use_cargo_lock_file = true;
+    }
+    if local_go_vendor_null {
+        info.vendor_hash = crate::types::VENDOR_HASH_NULL.to_owned();
+    }
+    if let Some(fmt) = local_python_format {
+        info.python_format = fmt;
+    }
 
     // ----------------------------------------------------------------
     // Init-flag bookkeeping. We support three orthogonal init flags:

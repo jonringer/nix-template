@@ -290,6 +290,8 @@ pub fn validate_and_serialize_matches(
         domain: "CHANGE".to_owned(),
         build_inputs: Vec::new(),
         native_build_inputs: Vec::new(),
+        use_cargo_lock_file: false,
+        python_format: "setuptools".to_owned(),
     };
 
     if let Some(url) = matches.value_of("from-url") {
@@ -345,6 +347,25 @@ pub fn validate_and_serialize_matches(
     } else if info.template == Template::auto {
         // --no-detect was specified
         info.template = Template::stdenv;
+    }
+
+    // Python format auto-detection: works in both local and remote modes.
+    // For remote mode, we materialise the source to inspect pyproject.toml.
+    // For local mode without --init-* (which handles this in build.rs),
+    // we inspect the current working directory.
+    if info.template == Template::python_package || info.template == Template::python_application {
+        let format = if matches.is_present("from-url") {
+            // Materialise remote source and detect format
+            if let Some(source_path) = crate::source::materialise_source(&info) {
+                crate::detect::detect_python_format(&source_path)
+            } else {
+                "setuptools".to_owned()
+            }
+        } else {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            crate::detect::detect_python_format(&cwd)
+        };
+        info.python_format = format;
     }
 
     // Dependency hash prefetching is on by default when --from-url is provided.
@@ -463,6 +484,8 @@ pub fn build_expression_info_from_interactive(
         domain: "CHANGE".to_owned(),
         build_inputs: Vec::new(),
         native_build_inputs: Vec::new(),
+        use_cargo_lock_file: false,
+        python_format: "setuptools".to_owned(),
     };
 
     // If URL was provided, fetch metadata

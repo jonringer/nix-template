@@ -1080,6 +1080,8 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         // we want a minimal expression that just exercises src + cargo.
         build_inputs: Vec::new(),
         native_build_inputs: Vec::new(),
+        use_cargo_lock_file: false,
+        python_format: "setuptools".to_owned(),
     };
 
     let probe_expr = crate::expression::generate_expression(&probe_info);

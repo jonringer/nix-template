@@ -200,10 +200,21 @@ pub struct ExpressionInfo {
     /// Inferred build-time tools (rendered into `nativeBuildInputs` for
     /// the `rust` template). Common entries: `pkg-config`, `cmake`.
     pub native_build_inputs: Vec<String>,
+    /// When true, the Rust template renders `cargoLock.lockFile = ./Cargo.lock;`
+    /// instead of `cargoHash = "...";`. Automatically set in local mode.
+    pub use_cargo_lock_file: bool,
+    /// Python build system format, detected from pyproject.toml or defaulted.
+    /// One of: "setuptools", "pyproject", "flit", "poetry", "hatchling".
+    pub python_format: String,
 }
 
 /// Default SRI placeholder used by `lib.fakeHash` in nixpkgs.
 pub const FAKE_SRI_HASH: &str = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+/// Sentinel value for `vendor_hash` that renders as `vendorHash = null;`
+/// (without quotes) in the Go template. Used when a local project has a
+/// committed `vendor/` directory.
+pub const VENDOR_HASH_NULL: &str = "null";
 
 impl ExpressionInfo {
     pub fn format(&self, s: &str) -> String {
@@ -245,7 +256,8 @@ impl ExpressionInfo {
             .replace("@maintainer@", &self.maintainer)
             .replace("@propagated_build_inputs@", &format_inputs(&self.propagated_build_inputs))
             .replace("@build_inputs@", &format_inputs(&self.build_inputs))
-            .replace("@native_build_inputs@", &format_inputs(&self.native_build_inputs));
+            .replace("@native_build_inputs@", &format_inputs(&self.native_build_inputs))
+            .replace("@python_format@", &self.python_format);
 
         if self.include_documentation_links {
             Self::insert_documentation_links(result)

@@ -154,6 +154,63 @@ pub fn detect_template_candidates(info: &ExpressionInfo) -> Vec<Candidate> {
     detect_template_candidates_from_path(&source_path)
 }
 
+/// Detect the Python build system format from `pyproject.toml`.
+///
+/// Parses `[build-system].requires` to identify the build backend and returns
+/// the corresponding nixpkgs `format` value. Falls back to `"setuptools"` when
+/// detection fails or no pyproject.toml is present.
+pub fn detect_python_format(source_path: &Path) -> String {
+    let pyproject_path = source_path.join("pyproject.toml");
+    if !pyproject_path.is_file() {
+        return "setuptools".to_owned();
+    }
+
+    let content = match std::fs::read_to_string(&pyproject_path) {
+        Ok(c) => c,
+        Err(_) => return "setuptools".to_owned(),
+    };
+
+    let parsed = match content.parse::<toml::Value>() {
+        Ok(v) => v,
+        Err(_) => return "setuptools".to_owned(),
+    };
+
+    // Look at [build-system].requires
+    let requires = parsed
+        .get("build-system")
+        .and_then(|bs| bs.get("requires"))
+        .and_then(|r| r.as_array());
+
+    let requires = match requires {
+        Some(r) => r,
+        None => {
+            // pyproject.toml exists but no [build-system] section
+            return "pyproject".to_owned();
+        }
+    };
+
+    // Check each requirement against known backends
+    for req in requires {
+        if let Some(s) = req.as_str() {
+            let lower = s.to_lowercase();
+            // Extract package name (before any version specifier)
+            let pkg = lower.split(&['>', '<', '=', '!', ';', '['][..]).next().unwrap_or("");
+            let pkg = pkg.trim();
+            match pkg {
+                "flit_core" | "flit" => return "flit".to_owned(),
+                "poetry-core" | "poetry" => return "poetry".to_owned(),
+                "hatchling" | "hatch" => return "hatchling".to_owned(),
+                "maturin" => return "setuptools".to_owned(),
+                "setuptools" => return "setuptools".to_owned(),
+                _ => {}
+            }
+        }
+    }
+
+    // [build-system].requires exists but no known backend matched
+    "pyproject".to_owned()
+}
+
 /// Determine whether a Python project is an application (has entry points /
 /// scripts) or a library (no scripts).
 fn is_python_application(source: &Path) -> bool {
@@ -431,5 +488,77 @@ mod tests {
         assert_eq!(candidates[0].template, Template::ruby);
         // Gemfile.lock has higher priority than Gemfile
         assert_eq!(candidates[0].reason, "Gemfile.lock");
+    }
+
+    #[test]
+    fn detect_format_setuptools() {
+        let dir = make_source_dir(&["pyproject.toml"]);
+        fs::write(
+            dir.path().join("pyproject.toml"),
+            "[build-system]\nrequires = [\"setuptools>=61.0\"]\n",
+        )
+        .unwrap();
+        assert_eq!(detect_python_format(dir.path()), "setuptools");
+    }
+
+    #[test]
+    fn detect_format_flit() {
+        let dir = make_source_dir(&["pyproject.toml"]);
+        fs::write(
+            dir.path().join("pyproject.toml"),
+            "[build-system]\nrequires = [\"flit_core>=3.2\"]\n",
+        )
+        .unwrap();
+        assert_eq!(detect_python_format(dir.path()), "flit");
+    }
+
+    #[test]
+    fn detect_format_poetry() {
+        let dir = make_source_dir(&["pyproject.toml"]);
+        fs::write(
+            dir.path().join("pyproject.toml"),
+            "[build-system]\nrequires = [\"poetry-core>=1.0.0\"]\n",
+        )
+        .unwrap();
+        assert_eq!(detect_python_format(dir.path()), "poetry");
+    }
+
+    #[test]
+    fn detect_format_hatchling() {
+        let dir = make_source_dir(&["pyproject.toml"]);
+        fs::write(
+            dir.path().join("pyproject.toml"),
+            "[build-system]\nrequires = [\"hatchling\"]\n",
+        )
+        .unwrap();
+        assert_eq!(detect_python_format(dir.path()), "hatchling");
+    }
+
+    #[test]
+    fn detect_format_maturin_maps_to_setuptools() {
+        let dir = make_source_dir(&["pyproject.toml"]);
+        fs::write(
+            dir.path().join("pyproject.toml"),
+            "[build-system]\nrequires = [\"maturin>=1.0\"]\n",
+        )
+        .unwrap();
+        assert_eq!(detect_python_format(dir.path()), "setuptools");
+    }
+
+    #[test]
+    fn detect_format_no_build_system_returns_pyproject() {
+        let dir = make_source_dir(&["pyproject.toml"]);
+        fs::write(
+            dir.path().join("pyproject.toml"),
+            "[project]\nname = \"mypackage\"\n",
+        )
+        .unwrap();
+        assert_eq!(detect_python_format(dir.path()), "pyproject");
+    }
+
+    #[test]
+    fn detect_format_no_pyproject_returns_setuptools() {
+        let dir = make_source_dir(&["setup.py"]);
+        assert_eq!(detect_python_format(dir.path()), "setuptools");
     }
 }
