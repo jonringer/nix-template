@@ -169,14 +169,24 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             } else {
                 "  @doc:vendorHash@vendorHash = \"@vendor_hash@\";".to_owned()
             };
+            // Suggest ldflags when the Go module path is known (local mode).
+            let ldflags = if info.go_module_path.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "\n\n  # ldflags = [ \"-X {module}/main.version=${{finalAttrs.version}}\" ];",
+                    module = info.go_module_path,
+                )
+            };
             format!(
                 "  @doc:buildDependencies@
   {vendor_line}{native}{build}
 
-  @doc:goSubPackages@subPackages = [ \".\" ];",
+  @doc:goSubPackages@subPackages = [ \".\" ];{ldflags}",
                 vendor_line = vendor_line,
                 native = native,
                 build = build,
+                ldflags = ldflags,
             )
         }
         Template::npm => {
@@ -446,6 +456,7 @@ mod tests {
             native_build_inputs: Vec::new(),
             use_cargo_lock_file: false,
             cargo_lock_git_deps: Vec::new(),
+            go_module_path: String::new(),
             python_format: "setuptools".to_owned(),
         }
     }
@@ -491,6 +502,7 @@ mod tests {
             native_build_inputs: Vec::new(),
             use_cargo_lock_file: false,
             cargo_lock_git_deps: Vec::new(),
+            go_module_path: String::new(),
             python_format: "setuptools".to_owned(),
         }
     }
@@ -671,6 +683,35 @@ mod tests {
         assert!(
             out.contains("\"other-crate-0.2.0\" = \"sha256-"),
             "expected other-crate-0.2.0 entry in:\n{}",
+            out
+        );
+    }
+
+    #[test]
+    fn go_local_mode_with_module_path_suggests_ldflags() {
+        let mut info = rust_info();
+        info.template = Template::go;
+        info.fetcher = Fetcher::local;
+        info.go_module_path = "github.com/user/myapp".to_owned();
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        assert!(
+            out.contains("# ldflags = [ \"-X github.com/user/myapp/main.version="),
+            "expected commented ldflags suggestion in:\n{}",
+            out
+        );
+    }
+
+    #[test]
+    fn go_remote_mode_no_ldflags() {
+        let mut info = rust_info();
+        info.template = Template::go;
+        info.go_module_path = String::new();
+        let expr = generate_expression(&info);
+        let out = info.format(&expr);
+        assert!(
+            !out.contains("ldflags"),
+            "should not contain ldflags when module path is unknown:\n{}",
             out
         );
     }
@@ -979,6 +1020,21 @@ pub fn generate_structured_flake_nix(template: &Template, pname: &str, directory
         {{
           {pname} = {attr_path};
           default = self.packages.${{system}}.{pname};
+        }}
+      );
+
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs {{
+            inherit system;
+            overlays = [ self.overlays.default ];
+          }};
+        in
+        {{
+          default = pkgs.mkShell {{
+            inputsFrom = [ self.packages.${{system}}.default ];
+          }};
         }}
       );
     }};

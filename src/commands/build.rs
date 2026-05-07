@@ -53,6 +53,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
     let mut local_use_cargo_lock_file = false;
     let mut local_cargo_lock_git_deps: Vec<String> = Vec::new();
     let mut local_go_vendor_null = false;
+    let mut local_go_module_path = String::new();
     let mut local_python_format: Option<String> = None;
 
     let (detected_candidates, inferred_deps) = if is_init_mode {
@@ -97,6 +98,9 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
                     if cwd.join("vendor").is_dir() {
                         eprintln!("Detected vendor/ directory; using vendorHash = null");
                         local_go_vendor_null = true;
+                    }
+                    if let Some(module) = crate::deps::go::parse_go_mod_module(&cwd) {
+                        local_go_module_path = module;
                     }
                 }
                 crate::types::Template::ruby => {
@@ -227,6 +231,9 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
     }
     if local_go_vendor_null {
         info.vendor_hash = crate::types::VENDOR_HASH_NULL.to_owned();
+    }
+    if !local_go_module_path.is_empty() {
+        info.go_module_path = local_go_module_path;
     }
     if let Some(fmt) = local_python_format {
         info.python_format = fmt;
