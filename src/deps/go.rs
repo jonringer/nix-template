@@ -307,6 +307,7 @@ fn walk(root: &Path, dir: &Path, acc: &mut CgoDirectives) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(e) => {
+            eprintln!("Warning: cannot read directory {}: {}", dir.display(), e);
             debug!(target: LOG_TARGET, "cannot read {}: {}", dir.display(), e);
             return;
         }
@@ -336,6 +337,7 @@ fn walk(root: &Path, dir: &Path, acc: &mut CgoDirectives) {
                     acc.ld_libs.extend(directives.ld_libs);
                 }
                 Err(e) => {
+                    eprintln!("Warning: cannot read file {}: {}", path.display(), e);
                     debug!(target: LOG_TARGET, "cannot read {}: {}", path.display(), e);
                 }
             }
