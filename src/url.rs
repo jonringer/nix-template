@@ -1037,7 +1037,7 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
 
     // Only Rust, Go, npm, and pnpm packages need dependency hash prefetching.
     match info.template {
-        Template::rust | Template::go | Template::npm | Template::pnpm => (),
+        Template::Rust(_) | Template::Go(_) | Template::Node(_) | Template::Node(_) => (),
         _ => return None,
     }
 
@@ -1047,7 +1047,7 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
     if info.use_cargo_lock_file {
         return None;
     }
-    if info.template == Template::go && info.vendor_hash == types::VENDOR_HASH_NULL {
+    if info.template.is_go() && info.vendor_hash == types::VENDOR_HASH_NULL {
         return None;
     }
 
@@ -1122,11 +1122,13 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         }
     }
 
-    let kind = match info.template {
-        Template::rust => "cargoHash",
-        Template::go => "vendorHash",
-        Template::npm => "npmDepsHash",
-        Template::pnpm => "pnpmDeps hash",
+    let kind = match &info.template {
+        Template::Rust(_) => "cargoHash",
+        Template::Go(_) => "vendorHash",
+        Template::Node(config) => match config.variant {
+            crate::types::NodeVariant::Npm => "npmDepsHash",
+            crate::types::NodeVariant::Pnpm => "pnpmDepsHash",
+        },
         _ => unreachable!(),
     };
     eprintln!("Prefetching {} for {} (this may take a while)...", kind, &info.pname);

@@ -401,7 +401,7 @@ pub fn infer_go_dependencies_from_path(source_path: &Path) -> Option<(Vec<String
 /// Top-level entry point for remote sources: materialise the source into the
 /// Nix store, then delegate to the core inference logic.
 pub fn infer_go_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Vec<String>)> {
-    if info.template != Template::go {
+    if !info.template.is_go() {
         return None;
     }
 

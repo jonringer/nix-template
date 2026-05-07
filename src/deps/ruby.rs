@@ -274,7 +274,7 @@ DEPENDENCIES
             license: "mit".to_owned(),
             maintainer: "me".to_owned(),
             fetcher: Fetcher::github,
-            template: Template::ruby,
+            template: Template::Ruby,
             path_to_write: PathBuf::new(),
             top_level_path: temp_dir.clone(),
             include_documentation_links: false,

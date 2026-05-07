@@ -240,7 +240,7 @@ pub fn validate_and_serialize_matches(
 
     if matches.is_present("by-name") {
         match arg_to_type::<Template>(matches.value_of("TEMPLATE")) {
-            Template::module | Template::test | Template::mkshell => {
+            Template::Module | Template::Test | Template::Mkshell => {
                 assert(false, "--by-name cannot be used with the 'module', 'test', or 'mkshell' templates");
             }
             _ => {}
@@ -303,7 +303,7 @@ pub fn validate_and_serialize_matches(
 
     // Auto-detect template when "auto" is selected (either explicitly or as
     // default). Uses remote source (--from-url) or local directory (CWD).
-    if info.template == Template::auto && !matches.is_present("no-detect") {
+    if info.template == Template::Auto && !matches.is_present("no-detect") {
         let candidates = if matches.is_present("from-url") {
             // Remote detection: materialise source from URL
             crate::detect::detect_template_candidates(&info)
@@ -316,7 +316,7 @@ pub fn validate_and_serialize_matches(
         match candidates.len() {
             0 => {
                 eprintln!("nix-template: no build system detected; defaulting to stdenv");
-                info.template = Template::stdenv;
+                info.template = Template::Stdenv(crate::types::StdenvVariant::Default);
             }
             1 => {
                 eprintln!(
@@ -346,17 +346,17 @@ pub fn validate_and_serialize_matches(
                 }
             }
         }
-    } else if info.template == Template::auto {
+    } else if info.template == Template::Auto {
         // --no-detect was specified
-        info.template = Template::stdenv;
+        info.template = Template::Stdenv(crate::types::StdenvVariant::Default);
     }
 
     // Python format auto-detection: works in both local and remote modes.
     // For remote mode, we materialise the source to inspect pyproject.toml.
     // For local mode without --init-* (which handles this in build.rs),
     // we inspect the current working directory.
-    if info.template == Template::python_package || info.template == Template::python_application {
-        let format = if matches.is_present("from-url") {
+    if info.template.is_python() {
+        let format_str = if matches.is_present("from-url") {
             // Materialise remote source and detect format
             if let Some(source_path) = crate::source::materialise_source(&info) {
                 crate::detect::detect_python_format(&source_path)
@@ -367,7 +367,11 @@ pub fn validate_and_serialize_matches(
             let cwd = std::env::current_dir().unwrap_or_default();
             crate::detect::detect_python_format(&cwd)
         };
-        info.python_format = format;
+        // Update the format in the Python config
+        if let Some(config) = info.template.python_config_mut() {
+            config.format = crate::types::PythonFormat::from_str(&format_str);
+        }
+        info.python_format = format_str;
     }
 
     // Dependency hash prefetching is on by default when --from-url is provided.
@@ -376,11 +380,13 @@ pub fn validate_and_serialize_matches(
         && !matches.is_present("skip-vendor-hashes");
     if should_prefetch_hashes {
         if let Some(hash) = prefetch_dependency_hash(&info) {
-            match info.template {
-                Template::rust => info.cargo_hash = hash,
-                Template::go => info.vendor_hash = hash,
-                Template::npm => info.npm_deps_hash = hash,
-                Template::pnpm => info.pnpm_deps_hash = hash,
+            match &info.template {
+                Template::Rust(_) => info.cargo_hash = hash,
+                Template::Go(_) => info.vendor_hash = hash,
+                Template::Node(config) => match config.variant {
+                    crate::types::NodeVariant::Npm => info.npm_deps_hash = hash,
+                    crate::types::NodeVariant::Pnpm => info.pnpm_deps_hash = hash,
+                },
                 _ => {}
             }
         }
@@ -391,31 +397,31 @@ pub fn validate_and_serialize_matches(
     let infer_enabled = matches.is_present("from-url")
         && !matches.is_present("skip-infer-deps");
     if infer_enabled {
-        match info.template {
-            Template::rust => {
+        match &info.template {
+            Template::Rust(_) => {
                 if let Some((build, native)) = infer_rust_dependencies(&info) {
                     info.build_inputs = build;
                     info.native_build_inputs = native;
                 }
             }
-            Template::go => {
+            Template::Go(_) => {
                 if let Some((build, native)) = infer_go_dependencies(&info) {
                     info.build_inputs = build;
                     info.native_build_inputs = native;
                 }
             }
-            Template::ruby => {
+            Template::Ruby => {
                 ruby::infer_dependencies(&mut info);
             }
-            Template::stdenv | Template::stdenvNoCC => {
+            Template::Stdenv(_) => {
                 buildsystem::infer_buildsystem_dependencies(&mut info);
             }
-            Template::dotnet => {
+            Template::Dotnet => {
                 if let Some(project_file) = infer_dotnet_project_file(&info) {
                     info.project_file = project_file;
                 }
             }
-            Template::python_package | Template::python_application => {
+            Template::Python(_) => {
                 let deps = crate::deps::python::infer_python_dependencies(&info);
                 if !deps.is_empty() {
                     info.propagated_build_inputs = deps;
@@ -507,9 +513,9 @@ pub fn build_expression_info_from_interactive(
     // Skip for Rust when using cargoLock.lockFile (no hash needed).
     if !skip_vendor_hashes && !info.use_cargo_lock_file {
         if let Some(hash) = prefetch_dependency_hash(&info) {
-            match info.template {
-                Template::rust => info.cargo_hash = hash,
-                Template::go => info.vendor_hash = hash,
+            match &info.template {
+                Template::Rust(_) => info.cargo_hash = hash,
+                Template::Go(_) => info.vendor_hash = hash,
                 _ => {}
             }
         }
@@ -520,31 +526,31 @@ pub fn build_expression_info_from_interactive(
         info.build_inputs = build;
         info.native_build_inputs = native;
     } else if infer_deps {
-        match info.template {
-            Template::rust => {
+        match &info.template {
+            Template::Rust(_) => {
                 if let Some((build, native)) = infer_rust_dependencies(&info) {
                     info.build_inputs = build;
                     info.native_build_inputs = native;
                 }
             }
-            Template::go => {
+            Template::Go(_) => {
                 if let Some((build, native)) = infer_go_dependencies(&info) {
                     info.build_inputs = build;
                     info.native_build_inputs = native;
                 }
             }
-            Template::ruby => {
+            Template::Ruby => {
                 ruby::infer_dependencies(&mut info);
             }
-            Template::stdenv | Template::stdenvNoCC => {
+            Template::Stdenv(_) => {
                 buildsystem::infer_buildsystem_dependencies(&mut info);
             }
-            Template::dotnet => {
+            Template::Dotnet => {
                 if let Some(project_file) = infer_dotnet_project_file(&info) {
                     info.project_file = project_file;
                 }
             }
-            Template::python_package | Template::python_application => {
+            Template::Python(_) => {
                 let deps = crate::deps::python::infer_python_dependencies(&info);
                 if !deps.is_empty() {
                     info.propagated_build_inputs = deps;

@@ -80,7 +80,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
         // Detect builder variants for local development
         if let Some(candidate) = candidates.first() {
             match candidate.template {
-                crate::types::Template::rust => {
+                crate::types::Template::Rust(_) => {
                     local_use_cargo_lock_file = true;
                     // Scan Cargo.lock for git dependencies that need outputHashes
                     let lock_path = cwd.join("Cargo.lock");
@@ -95,7 +95,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
                         }
                     }
                 }
-                crate::types::Template::go => {
+                crate::types::Template::Go(_) => {
                     if cwd.join("vendor").is_dir() {
                         eprintln!("Detected vendor/ directory; using vendorHash = null");
                         local_go_vendor_null = true;
@@ -104,7 +104,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
                         local_go_module_path = module;
                     }
                 }
-                crate::types::Template::ruby => {
+                crate::types::Template::Ruby => {
                     if !cwd.join("gemset.nix").exists() {
                         eprintln!(
                             "Warning: gemset.nix not found. Run 'bundix' to generate it \
@@ -112,7 +112,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
                         );
                     }
                 }
-                crate::types::Template::python_package | crate::types::Template::python_application => {
+                crate::types::Template::Python(_) | crate::types::Template::Python(_) => {
                     let fmt = crate::detect::detect_python_format(&cwd);
                     eprintln!("Detected Python build format: {}", fmt);
                     local_python_format = Some(fmt);
@@ -125,19 +125,19 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
         // We try both template-specific inference AND build system inference
         let mut deps = if let Some(candidate) = candidates.first() {
             match candidate.template {
-                crate::types::Template::rust => {
+                crate::types::Template::Rust(_) => {
                     crate::deps::rust::infer_rust_dependencies_from_path(&cwd)
                         .unwrap_or_else(|| (Vec::new(), Vec::new()))
                 }
-                crate::types::Template::go => {
+                crate::types::Template::Go(_) => {
                     crate::deps::go::infer_go_dependencies_from_path(&cwd)
                         .unwrap_or_else(|| (Vec::new(), Vec::new()))
                 }
-                crate::types::Template::ruby => {
+                crate::types::Template::Ruby => {
                     crate::deps::ruby::infer_ruby_dependencies_from_path(&cwd)
                         .unwrap_or_else(|| (Vec::new(), Vec::new()))
                 }
-                crate::types::Template::python_package | crate::types::Template::python_application => {
+                crate::types::Template::Python(_) | crate::types::Template::Python(_) => {
                     local_python_propagated_deps = crate::deps::python::infer_python_dependencies_from_path(&cwd);
                     (Vec::new(), Vec::new())
                 }
@@ -210,7 +210,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
             cli_info.fetcher = crate::types::Fetcher::local;
 
             // Use detected template if not explicitly set
-            if cli_info.template == crate::types::Template::auto && !detected_candidates.is_empty() {
+            if cli_info.template == crate::types::Template::Auto && !detected_candidates.is_empty() {
                 cli_info.template = detected_candidates[0].template.clone();
             }
 
@@ -293,7 +293,7 @@ pub fn run(matches: &clap::ArgMatches, _xdg_dirs: &xdg::BaseDirectories, user_co
     // For module templates the package_path is unused; we redirect
     // info.path_to_write to the module file under nix/modules/.
     if let Some(ref l) = layout {
-        if info.template == Template::module {
+        if info.template == Template::Module {
             if let Some(ref module_path) = l.module_path {
                 info.path_to_write = module_path.clone();
             }
