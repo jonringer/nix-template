@@ -431,7 +431,7 @@ for the npins wrapper."
         println!(
             "Generated a {} nix expression at {}",
             &info.template,
-            &path.canonicalize().unwrap().display()
+            &output::display_path_pub(path).display()
         );
 
         // Write overlay.nix (structured layout only). Done before

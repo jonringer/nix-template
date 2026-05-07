@@ -718,3 +718,52 @@ BUNDLED WITH
     assert!(!content.contains("libxml2"));
     assert!(!content.contains("postgresql"));
 }
+
+/// Test that file writes successfully complete and show success messages
+/// without crashing due to canonicalize failures.
+/// This is a regression test for the post-write canonicalize crash bug.
+#[test]
+fn test_file_write_shows_success_message() {
+    let temp_dir = TempDir::new().unwrap();
+    let output_path = temp_dir.path().join("test_package.nix");
+
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "stdenv",
+            "-p", "test-package",
+            "-v", "1.0.0",
+            "-l", "mit",
+            "--maintainer", "Test User",
+            output_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    // Command should succeed
+    assert!(
+        output.status.success(),
+        "Command failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // File should be created
+    assert!(
+        output_path.exists(),
+        "Output file was not created at {:?}",
+        output_path
+    );
+
+    // Success message should be printed (not crash before printing)
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("Generated") && stdout.contains("test_package.nix"),
+        "Success message not found in stdout: {}",
+        stdout
+    );
+
+    // Verify file has valid content
+    let content = fs::read_to_string(&output_path).unwrap();
+    assert!(content.contains("stdenv.mkDerivation"));
+    assert!(content.contains("test-package"));
+}
