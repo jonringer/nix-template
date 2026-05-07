@@ -201,7 +201,7 @@ pub fn infer_python_dependencies_from_path(source_path: &Path) -> Vec<String> {
 /// Infer `propagatedBuildInputs` from a materialised remote source.
 pub fn infer_python_dependencies(info: &crate::types::ExpressionInfo) -> Vec<String> {
     match info.template {
-        crate::types::Template::python_package | crate::types::Template::python_application => {}
+        crate::types::Template::Python(_) | crate::types::Template::Python(_) => {}
         _ => return Vec::new(),
     }
 

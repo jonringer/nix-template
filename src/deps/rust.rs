@@ -297,7 +297,7 @@ pub fn infer_rust_dependencies_from_path(source_path: &Path) -> Option<(Vec<Stri
 /// Top-level entry point for remote sources: materialise the source into the
 /// Nix store, then delegate to the core inference logic.
 pub fn infer_rust_dependencies(info: &ExpressionInfo) -> Option<(Vec<String>, Vec<String>)> {
-    if info.template != Template::rust {
+    if !info.template.is_rust() {
         return None;
     }
 

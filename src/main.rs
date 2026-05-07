@@ -10,6 +10,7 @@ mod file_path;
 mod interactive;
 mod output;
 mod source;
+mod templates;
 mod types;
 mod url;
 

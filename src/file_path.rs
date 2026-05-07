@@ -65,7 +65,7 @@ impl NixDirLayout {
         // Use simple nix/package.nix layout for local project initialization
         let package_path = nix_dir.join("package.nix");
         let overlay_path = nix_dir.join("overlay.nix");
-        let module_path = if *template == Template::module {
+        let module_path = if *template == Template::Module {
             Some(nix_dir.join("modules").join(pname).join("default.nix"))
         } else {
             None

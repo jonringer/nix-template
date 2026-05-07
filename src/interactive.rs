@@ -389,18 +389,18 @@ pub fn prompt_template_type(default: Option<Template>) -> Result<Template> {
     let template_name = selection.split_whitespace().next().unwrap();
 
     Ok(match template_name {
-        "stdenv" => Template::stdenv,
-        "stdenvNoCC" => Template::stdenvNoCC,
-        "python-package" => Template::python_package,
-        "python-application" => Template::python_application,
-        "rust" => Template::rust,
-        "go" => Template::go,
-        "npm" => Template::npm,
-        "pnpm" => Template::pnpm,
-        "mkshell" => Template::mkshell,
-        "module" => Template::module,
-        "test" => Template::test,
-        _ => Template::stdenv,
+        "stdenv" => Template::stdenv(),
+        "stdenvNoCC" => Template::stdenv_nocc(),
+        "python-package" => Template::python_package(),
+        "python-application" => Template::python_application(),
+        "rust" => Template::rust(),
+        "go" => Template::go(),
+        "npm" => Template::npm(),
+        "pnpm" => Template::pnpm(),
+        "mkshell" => Template::Mkshell,
+        "module" => Template::Module,
+        "test" => Template::Test,
+        _ => Template::stdenv(),
     })
 }
 
@@ -968,7 +968,7 @@ pub fn run_interactive_mode_with_defaults(
     } else if url_with_metadata.is_some() {
         // Use fetcher from URL metadata
         metadata.fetcher
-    } else if template == Template::python_package || template == Template::python_application {
+    } else if template.is_python() {
         Fetcher::pypi
     } else {
         Fetcher::github
@@ -997,8 +997,8 @@ pub fn run_interactive_mode_with_defaults(
         "nix/package.nix"
     } else {
         match template {
-            Template::mkshell => "shell.nix",
-            Template::test => "test.nix",
+            Template::Mkshell => "shell.nix",
+            Template::Test => "test.nix",
             _ => "default.nix",
         }
     };
@@ -1015,7 +1015,7 @@ pub fn run_interactive_mode_with_defaults(
 
     // Hash prefetching is enabled by default for Rust/Go templates when we have a real source.
     // Ask if the user wants to skip it (opt-out behavior).
-    let skip_vendor_hashes = if matches!(template, Template::rust | Template::go)
+    let skip_vendor_hashes = if matches!(template, Template::Rust(_) | Template::Go(_))
         && url_with_metadata.is_some()
     {
         Confirm::new("Skip automatic cargoHash/vendorHash computation? (runs nix-build by default)")
@@ -1033,10 +1033,10 @@ pub fn run_interactive_mode_with_defaults(
     // In init mode, dependencies are already inferred, so just use true.
     let infer_deps = if is_local_init && inferred_deps.is_some() {
         true  // Already inferred in init mode
-    } else if (template == Template::rust || template == Template::go)
+    } else if (template.is_rust() || template.is_go())
         && url_with_metadata.is_some()
     {
-        let prompt_text = if template == Template::rust {
+        let prompt_text = if template.is_rust() {
             "Infer system dependencies from Cargo.toml/Cargo.lock?"
         } else {
             "Infer system dependencies from CGO directives in *.go files?"

@@ -14,6 +14,9 @@ pub use gh_repo_response::*;
 pub use gitlab_response::*;
 pub use pypi::*;
 
+// Re-export template types from the templates module for backward compatibility
+pub use crate::templates::types::*;
+
 lazy_static! {
     static ref DOCUMENTATION_LINKS: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
@@ -82,30 +85,8 @@ lazy_static! {
     static ref DOC_LINKS_REGEX: Regex = Regex::new(r"@doc:(\w+)@").unwrap();
 }
 
-// `stdenvNoCC` is the C-compiler-less variant of `stdenv`. It follows the
-// same workflow as `stdenv` (same default install path, same fetcher
-// surface) but renders `stdenvNoCC.mkDerivation` for packages that don't
-// compile code — fonts, pure data, shell-script wrappers, etc.
-arg_enum! {
-    #[allow(non_camel_case_types)]
-    #[derive(Debug, PartialEq, Clone)]
-    pub enum Template {
-        auto,
-        stdenv,
-        stdenvNoCC,
-        python_package,
-        python_application,
-        module,
-        mkshell,
-        go,
-        rust,
-        npm,
-        pnpm,
-        dotnet,
-        ruby,
-        test,
-    }
-}
+// Template types have been moved to the template module.
+// The new hierarchical Template enum is now re-exported above.
 
 arg_enum! {
     #[allow(non_camel_case_types)]
