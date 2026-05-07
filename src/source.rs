@@ -73,14 +73,30 @@ pub fn materialise_source(info: &ExpressionInfo) -> Option<PathBuf> {
     let output = match output {
         Ok(o) if o.status.success() => o,
         Ok(o) => {
-            debug!(
-                target: LOG_TARGET,
-                "nix-build failed: {}",
-                String::from_utf8_lossy(&o.stderr)
-            );
+            // Provide detailed information about why the command failed
+            match o.status.code() {
+                Some(code) => {
+                    eprintln!("Warning: nix-build exited with code {}", code);
+                    debug!(
+                        target: LOG_TARGET,
+                        "nix-build failed with exit code {}: {}",
+                        code,
+                        String::from_utf8_lossy(&o.stderr)
+                    );
+                }
+                None => {
+                    eprintln!("Warning: nix-build was killed by a signal");
+                    debug!(
+                        target: LOG_TARGET,
+                        "nix-build killed by signal: {}",
+                        String::from_utf8_lossy(&o.stderr)
+                    );
+                }
+            }
             return None;
         }
         Err(e) => {
+            eprintln!("Warning: failed to invoke nix-build: {}", e);
             debug!(target: LOG_TARGET, "failed to invoke nix-build: {}", e);
             return None;
         }
