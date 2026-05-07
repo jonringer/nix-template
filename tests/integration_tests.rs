@@ -1131,3 +1131,89 @@ fn test_no_config_directory_doesnt_crash() {
     perms.set_mode(0o755);
     fs::set_permissions(&readonly_dir, perms).unwrap();
 }
+
+/// Test basic PHP template generation
+#[test]
+fn test_php_template_basic() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "php",
+            "-p",
+            "laravel",
+            "-v",
+            "10.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's a PHP Composer derivation
+    assert!(stdout.contains("php.buildComposerProject2"));
+    assert!(stdout.contains("vendorHash"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("php_basic_template", stdout);
+}
+
+/// Test PHP template with extensions detected from composer.json
+#[test]
+fn test_php_template_with_extensions() {
+    let temp_dir = TempDir::new().unwrap();
+    let temp_path = temp_dir.path();
+
+    // Create a composer.json with PHP extension requirements
+    let composer_json = r#"{
+    "name": "test/app",
+    "require": {
+        "php": "^8.3",
+        "ext-pdo": "*",
+        "ext-mysqli": "*",
+        "ext-gd": "*"
+    }
+}"#;
+    fs::write(temp_path.join("composer.json"), composer_json).unwrap();
+    fs::write(temp_path.join("composer.lock"), "{}").unwrap();
+
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .current_dir(&temp_path)
+        .args(&[
+            "php",
+            "-p",
+            "test-app",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag (no --init-flake to avoid temp dir in snapshot)
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify PHP extension wrapper is generated
+    // Note: When version is detected from composer.json, it will be php83.buildEnv
+    // Otherwise it will be php.buildEnv
+    assert!(stdout.contains("php83.buildEnv") || stdout.contains("php.buildEnv"));
+    assert!(stdout.contains("extensions ="));
+    assert!(stdout.contains("pdo"));
+    assert!(stdout.contains("mysqli"));
+    assert!(stdout.contains("gd"));
+    assert!(stdout.contains("php.buildComposerProject2"));
+    assert!(stdout.contains("vendorHash"));
+
+    // Snapshot the entire output
+    insta::assert_snapshot!("php_with_extensions_template", stdout);
+}

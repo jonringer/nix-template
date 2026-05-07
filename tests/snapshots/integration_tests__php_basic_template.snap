@@ -1,0 +1,29 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, php
+, fetchFromGitHub
+}:
+
+php.buildComposerProject2 (finalAttrs: {
+  pname = "laravel";
+  version = "10.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "laravel";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/laravel";
+    license = licenses.mit;
+    maintainers = with maintainers; [  ];
+  };
+})

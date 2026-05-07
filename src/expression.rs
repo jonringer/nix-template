@@ -47,6 +47,11 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
                 ("stdenv", "stdenv.mkDerivation", Some("stdenvMkDerivation"))
             }
         },
+        Template::Php(_) => (
+            "php",
+            "php.buildComposerProject2",
+            Some("buildComposerProject2"),
+        ),
         Template::Dotnet => (
             "buildDotnetModule",
             "buildDotnetModule",
@@ -277,6 +282,24 @@ fn build_inputs(info: &ExpressionInfo) -> String {
         Template::Dotnet => {
             "  projectFile = \"@project_file@\";\n  nugetDeps = ./deps.json;  # Run `nix-build -A package-name.passthru.fetch-deps` to generate".to_owned()
         }
+        Template::Php(_) => {
+            // Conditionally render buildInputs only when inferred
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+            format!(
+                "  @doc:vendorHash@vendorHash = \"@vendor_hash@\";{native}{build}",
+                native = native,
+                build = build,
+            )
+        }
         Template::Ruby => {
             // Conditionally render build inputs only when inferred
             let native = if info.native_build_inputs.is_empty() {
@@ -422,6 +445,58 @@ mkShell rec {
                 header = header,
                 dh_helper = dh_block,
                 pname = &info.pname,
+                build_inputs = build_inputs(info),
+                meta = meta_content,
+            ))
+        }
+        Template::Php(config) if !config.extensions.is_empty() => {
+            // PHP with extensions needs a let block to build custom PHP with extensions
+            let (dh_input, _) = derivation_helper(info);
+            let (f_input, f_block) = fetch_block(&info.fetcher);
+            let meta_content = if info.include_meta { meta() } else { "" };
+
+            let mut inputs = vec![String::from("lib"), dh_input];
+            if !f_input.is_empty() {
+                inputs.push(f_input.to_string());
+            }
+            inputs.extend(info.native_build_inputs.iter().map(|s| s.to_owned()));
+            inputs.extend(info.build_inputs.iter().map(|s| s.to_owned()));
+
+            // Deduplicate inputs
+            let mut seen = std::collections::HashSet::new();
+            inputs.retain(|s| seen.insert(s.clone()));
+
+            let header = format!("{{ {input_list}\n}}:", input_list = inputs.join("\n, "));
+
+            // Generate extension list for php.buildEnv
+            let extensions_list = config.extensions.join("\n      ");
+
+            info.format(&format!(
+                "{header}
+
+let
+  php = {php_base}.buildEnv {{
+    extensions = ({{ enabled, all }}: enabled ++ (with all; [
+      {extensions}
+    ]));
+  }};
+in
+php.buildComposerProject2 (finalAttrs: {{
+  pname = \"{pname}\";
+  version = \"{version}\";
+
+{f_block}
+
+{build_inputs}
+{meta}
+}})
+",
+                header = header,
+                php_base = config.version.as_ref().map(|v| format!("php{}", v)).unwrap_or_else(|| "php".to_string()),
+                extensions = extensions_list,
+                pname = &info.pname,
+                version = &info.version,
+                f_block = f_block,
                 build_inputs = build_inputs(info),
                 meta = meta_content,
             ))

@@ -25,6 +25,8 @@ pub enum Template {
     Go(GoConfig),
     /// Node.js package (npm or pnpm)
     Node(NodeConfig),
+    /// PHP package (buildComposerProject2)
+    Php(PhpConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -164,6 +166,15 @@ pub enum NodeVariant {
     Pnpm,
 }
 
+/// PHP template configuration: version and extensions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PhpConfig {
+    /// PHP version to use (e.g., "81", "82", "83")
+    pub version: Option<String>,
+    /// PHP extensions detected from composer.json ext-* requirements
+    pub extensions: Vec<String>,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -179,6 +190,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "go_gomod2nix",
     "npm",
     "pnpm",
+    "php",
     "dotnet",
     "ruby",
     "mkshell",
@@ -259,6 +271,14 @@ impl Template {
         })
     }
 
+    /// Create a default PHP template.
+    pub fn php() -> Self {
+        Template::Php(PhpConfig {
+            version: None,  // Use generic 'php' attribute by default
+            extensions: Vec::new(),
+        })
+    }
+
     /// Create a default stdenv template.
     pub fn stdenv() -> Self {
         Template::Stdenv(StdenvVariant::Default)
@@ -306,6 +326,10 @@ impl Template {
             "pnpm" => Ok(Template::Node(NodeConfig {
                 variant: NodeVariant::Pnpm,
             })),
+            "php" => Ok(Template::Php(PhpConfig {
+                version: None,  // Use generic 'php' attribute by default
+                extensions: Vec::new(),
+            })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -338,6 +362,7 @@ impl Template {
                 NodeVariant::Npm => "npm",
                 NodeVariant::Pnpm => "pnpm",
             },
+            Template::Php(_) => "php",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -433,6 +458,29 @@ impl Template {
     pub fn node_config_mut(&mut self) -> Option<&mut NodeConfig> {
         match self {
             Template::Node(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a PHP template.
+    pub fn is_php(&self) -> bool {
+        matches!(self, Template::Php(_))
+    }
+
+    /// Get PHP config if this is a PHP template.
+    #[allow(dead_code)]
+    pub fn php_config(&self) -> Option<&PhpConfig> {
+        match self {
+            Template::Php(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable PHP config.
+    #[allow(dead_code)]
+    pub fn php_config_mut(&mut self) -> Option<&mut PhpConfig> {
+        match self {
+            Template::Php(config) => Some(config),
             _ => None,
         }
     }
@@ -572,6 +620,32 @@ mod tests {
         assert_eq!(
             tmpl.go_config().unwrap().module_path.as_deref(),
             Some("github.com/user/repo")
+        );
+    }
+
+    #[test]
+    fn php_template_parsing() {
+        let tmpl: Template = "php".parse().unwrap();
+        assert!(tmpl.is_php());
+        assert_eq!(tmpl.to_cli_str(), "php");
+        assert_eq!(tmpl.php_config().unwrap().version, None);  // Uses generic 'php' by default
+        assert!(tmpl.php_config().unwrap().extensions.is_empty());
+    }
+
+    #[test]
+    fn php_config_access() {
+        let mut tmpl: Template = "php".parse().unwrap();
+        assert!(tmpl.is_php());
+        assert_eq!(tmpl.php_config().unwrap().version, None);  // Default is None (uses generic 'php')
+
+        // Mutate version and extensions
+        tmpl.php_config_mut().unwrap().version = Some("82".to_string());
+        tmpl.php_config_mut().unwrap().extensions = vec!["pdo".to_string(), "gd".to_string()];
+
+        assert_eq!(tmpl.php_config().unwrap().version, Some("82".to_string()));
+        assert_eq!(
+            tmpl.php_config().unwrap().extensions,
+            vec!["pdo".to_string(), "gd".to_string()]
         );
     }
 }
