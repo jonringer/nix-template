@@ -74,6 +74,12 @@ lazy_static! {
         );
         m
     };
+
+    // Regex for removing documentation placeholder markers
+    static ref DOC_REGEX: Regex = Regex::new(r"@doc:.*@").unwrap();
+
+    // Regex for extracting documentation link keys
+    static ref DOC_LINKS_REGEX: Regex = Regex::new(r"@doc:(\w+)@").unwrap();
 }
 
 // `stdenvNoCC` is the C-compiler-less variant of `stdenv`. It follows the
@@ -244,24 +250,20 @@ impl ExpressionInfo {
         if self.include_documentation_links {
             Self::insert_documentation_links(result)
         } else {
-            Regex::new(r"@doc:.*@")
-                .unwrap()
-                .replace_all(&result, "")
-                .to_string()
+            DOC_REGEX.replace_all(&result, "").to_string()
         }
     }
 
     fn insert_documentation_links(s: String) -> String {
-        let re = Regex::new(r"@doc:(\w+)@").unwrap();
-
-        re.replace_all(&s, |caps: &Captures| {
-            let key = &caps[1];
-            format!(
-                "# See the guide for more information: {}",
-                DOCUMENTATION_LINKS.get(key).unwrap_or(&"").to_string()
-            )
-        })
-        .to_string()
+        DOC_LINKS_REGEX
+            .replace_all(&s, |caps: &Captures| {
+                let key = &caps[1];
+                format!(
+                    "# See the guide for more information: {}",
+                    DOCUMENTATION_LINKS.get(key).unwrap_or(&"").to_string()
+                )
+            })
+            .to_string()
     }
 }
 
