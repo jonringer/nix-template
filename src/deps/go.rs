@@ -373,6 +373,26 @@ fn infer_from_source_path(source_path: &Path) -> Option<(Vec<String>, Vec<String
 
 /// Infer Go dependencies from a local path (for --init-flake/--init-npins).
 /// This skips the materialisation step and directly scans the given path.
+/// Extract the module path from a `go.mod` file.
+///
+/// Parses the `module` directive (e.g., `module github.com/user/repo`) and
+/// returns the full module path. Used to generate `ldflags` for embedding
+/// version information at build time.
+pub fn parse_go_mod_module(source_path: &Path) -> Option<String> {
+    let go_mod_path = source_path.join("go.mod");
+    let content = std::fs::read_to_string(&go_mod_path).ok()?;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("module ") {
+            let module = trimmed["module ".len()..].trim();
+            if !module.is_empty() {
+                return Some(module.to_owned());
+            }
+        }
+    }
+    None
+}
+
 pub fn infer_go_dependencies_from_path(source_path: &Path) -> Option<(Vec<String>, Vec<String>)> {
     eprintln!("Scanning local Go sources for CGO directives...");
     infer_from_source_path(source_path)
@@ -567,5 +587,25 @@ func Foo() {}
         assert!(d.pkg_config_tokens.contains("libssl"));
         assert!(!d.pkg_config_tokens.contains("libsqlite3"));
         assert!(!d.ld_libs.contains("pcap"));
+    }
+
+    #[test]
+    fn parse_go_mod_module_extracts_path() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("go.mod"),
+            "module github.com/user/myapp\n\ngo 1.21\n",
+        )
+        .unwrap();
+        assert_eq!(
+            parse_go_mod_module(dir.path()),
+            Some("github.com/user/myapp".to_owned())
+        );
+    }
+
+    #[test]
+    fn parse_go_mod_module_none_when_missing() {
+        let dir = tempfile::TempDir::new().unwrap();
+        assert_eq!(parse_go_mod_module(dir.path()), None);
     }
 }

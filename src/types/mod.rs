@@ -207,6 +207,9 @@ pub struct ExpressionInfo {
     /// `cargoLock.outputHashes` entries. Only populated when
     /// `use_cargo_lock_file` is true.
     pub cargo_lock_git_deps: Vec<String>,
+    /// Go module path from `go.mod` (e.g. `github.com/user/repo`).
+    /// Used to suggest `ldflags` for version embedding. Empty when unknown.
+    pub go_module_path: String,
     /// Python build system format, detected from pyproject.toml or defaulted.
     /// One of: "setuptools", "pyproject", "flit", "poetry", "hatchling".
     pub python_format: String,

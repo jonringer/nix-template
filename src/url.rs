@@ -1092,6 +1092,7 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         native_build_inputs: Vec::new(),
         use_cargo_lock_file: false,
         cargo_lock_git_deps: Vec::new(),
+        go_module_path: String::new(),
         python_format: "setuptools".to_owned(),
     };
 

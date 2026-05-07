@@ -292,6 +292,7 @@ pub fn validate_and_serialize_matches(
         native_build_inputs: Vec::new(),
         use_cargo_lock_file: false,
         cargo_lock_git_deps: Vec::new(),
+        go_module_path: String::new(),
         python_format: "setuptools".to_owned(),
     };
 
@@ -487,6 +488,7 @@ pub fn build_expression_info_from_interactive(
         native_build_inputs: Vec::new(),
         use_cargo_lock_file: false,
         cargo_lock_git_deps: Vec::new(),
+        go_module_path: String::new(),
         python_format: "setuptools".to_owned(),
     };
 
