@@ -475,10 +475,11 @@ pub fn fill_github_info(repo: &types::GithubRepo, info: &mut types::ExpressionIn
                 &repo.owner, &repo.repo, &info.tag_prefix, &info.version
             ))
             .output();
-        let output = std::str::from_utf8(&sha256_cmd.unwrap().stdout)
-            .unwrap()
-            .trim()
-            .to_owned();
+        let output = String::from_utf8_lossy(
+            &sha256_cmd.expect("failed to run 'nix-prefetch-url'").stdout,
+        )
+        .trim()
+        .to_owned();
         info.src_sha = to_sri(&output);
     } else {
         eprintln!(
