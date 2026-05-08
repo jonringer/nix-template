@@ -53,6 +53,8 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         ("mix.exs", Template::elixir(), "mix.exs"),
         ("pubspec.lock", Template::dart(), "pubspec.lock"),
         ("pubspec.yaml", Template::dart(), "pubspec.yaml"),
+        ("stack.yaml", Template::haskell(), "stack.yaml"),
+        ("cabal.project", Template::haskell(), "cabal.project"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
         ("Gemfile", Template::Ruby, "Gemfile"),
         ("meson.build", Template::stdenv(), "meson.build"),
@@ -205,6 +207,48 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
         }
     }
 
+    // Haskell detection: scan for *.cabal files
+    // These files have dynamic names (e.g., myproject.cabal), so we need to scan the directory.
+    // This runs after checking for stack.yaml and cabal.project, so we add *.cabal as a fallback.
+    let has_haskell = candidates.iter().any(|c| c.template.is_haskell());
+
+    if !has_haskell {
+        if find_cabal_file(source_path).is_some() {
+            candidates.push(Candidate {
+                template: Template::haskell(),
+                reason: "*.cabal",
+            });
+        }
+    }
+
+    // Haskell sub-classification: detect build system (Stack vs Cabal) and parse .cabal for executable/library
+    for candidate in candidates.iter_mut() {
+        if candidate.template.is_haskell() {
+            use crate::deps::haskell;
+
+            // Detect build system: Stack if stack.yaml exists, otherwise Cabal
+            let build_system = if source_path.join("stack.yaml").exists() {
+                crate::templates::types::HaskellBuildSystem::Stack
+            } else {
+                crate::templates::types::HaskellBuildSystem::Cabal
+            };
+
+            // Find and parse .cabal file to detect if it's an executable or library
+            let is_executable = if let Some(cabal_path) = find_cabal_file(source_path) {
+                haskell::is_executable_package(&cabal_path)
+            } else {
+                true // Default to executable if no .cabal file found
+            };
+
+            candidate.template = Template::Haskell(crate::templates::types::HaskellConfig {
+                build_system,
+                ghc_version: None, // Will be inferred from cabal.project or stack.yaml if needed
+                is_executable,
+            });
+            break;
+        }
+    }
+
     candidates
 }
 
@@ -221,6 +265,23 @@ fn find_dotnet_project_file(source_path: &Path) -> Option<&'static str> {
                     "fsproj" => return Some("*.fsproj"),
                     "sln" => return Some("*.sln"),
                     _ => {}
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Scan a directory for Haskell .cabal files.
+/// Returns the path to the first .cabal file found, or None.
+fn find_cabal_file(source_path: &Path) -> Option<std::path::PathBuf> {
+    use std::fs;
+
+    if let Ok(entries) = fs::read_dir(source_path) {
+        for entry in entries.flatten() {
+            if let Some(ext) = entry.path().extension().and_then(|s| s.to_str()) {
+                if ext == "cabal" {
+                    return Some(entry.path());
                 }
             }
         }
