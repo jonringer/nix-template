@@ -17,6 +17,11 @@
     - Added `pnpm` template for pnpm-based packages using fetchPnpmDeps with stdenv.mkDerivation
     - Added `dotnet` template for .NET packages using buildDotnetModule
     - Added `ruby` template for Ruby applications using bundlerApp
+    - Added `php` template for Composer-based PHP projects using buildComposerProject2
+    - Added `maven` template for Maven-based Java projects using buildMavenPackage
+    - Added `elixir` template for Mix-based Elixir applications using mixRelease/buildMix
+    - Added `gradle` template for Gradle-based Java/Kotlin projects using gradle.fetchDeps
+    - Added `dart` template for Dart applications using buildDartApplication
     - Added `auto` template type for automatic project type detection
   - CLI Flags:
     - Added `--by-name` flag for RFC 140 support (pkgs/by-name directory structure)
@@ -31,6 +36,11 @@
     - Rust: Infers dependencies from Cargo.toml and scans Cargo.lock for crates with native dependencies
     - Go: Infers build inputs from CGO directives in Go source files
     - Ruby: Maps common gems (nokogiri, pg, mysql2, etc.) from Gemfile.lock to nixpkgs dependencies
+    - PHP: Detects PHP extensions from composer.json ext-* requirements and maps common packages to native dependencies
+    - Maven: Infers JDK version from pom.xml properties and maps JDBC drivers to native dependencies
+    - Elixir: Detects variant (Release/Library) from mix.exs and maps Mix packages with NIFs to native dependencies
+    - Gradle: Infers JDK version from gradle.properties and build.gradle, detects Gradle DSL variant (Groovy/Kotlin)
+    - Dart: Parses executables from pubspec.yaml and excludes Flutter projects
     - CMake: Parses find_package() and find_dependency() calls for common dependencies (OpenSSL, ZLIB, Qt, Boost, etc.)
     - Meson: Parses dependency() calls for common dependencies (zlib, openssl, gtk, glib, etc.)
     - Autotools: Detects PKG_CHECK_MODULES in configure.ac and adds pkg-config to nativeBuildInputs
@@ -45,6 +55,11 @@
     - Recognizes pnpm projects (via pnpm-lock.yaml)
     - Recognizes .NET projects (via *.csproj, *.fsproj, or *.sln files)
     - Recognizes Ruby projects (via Gemfile.lock or Gemfile)
+    - Recognizes PHP projects (via composer.lock or composer.json)
+    - Recognizes Maven projects (via pom.xml)
+    - Recognizes Elixir projects (via mix.lock or mix.exs)
+    - Recognizes Gradle projects (via build.gradle, build.gradle.kts, or gradle-deps.json)
+    - Recognizes Dart projects (via pubspec.lock or pubspec.yaml, excludes Flutter projects)
     - Project file inference for dotnet template when using --from-url (automatically detects .csproj, .fsproj, or .sln)
   - Project Structure:
     - Normalized `nix/` directory structure for both flake and npins-based projects
