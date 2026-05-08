@@ -39,6 +39,7 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         // Note: package.json is handled separately as a fallback (see below)
         ("composer.lock", Template::php(), "composer.lock"),
         ("composer.json", Template::php(), "composer.json"),
+        ("pom.xml", Template::maven(), "pom.xml"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
         ("Gemfile", Template::Ruby, "Gemfile"),
         ("meson.build", Template::stdenv(), "meson.build"),

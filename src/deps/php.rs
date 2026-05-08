@@ -12,9 +12,9 @@
 //! the generated expression to add anything we missed.
 
 use log::debug;
+use serde_json::Value;
 use std::collections::BTreeSet;
 use std::path::Path;
-use serde_json::Value;
 
 const LOG_TARGET: &str = "nix-template::php_deps";
 
@@ -79,12 +79,8 @@ fn lookup_extension(normalised: &str) -> Option<&'static str> {
 fn lookup_composer_package(package_name: &str) -> Option<(Vec<&'static str>, Vec<&'static str>)> {
     match package_name {
         // Packages requiring native libraries
-        "ext-imagick" | "imagick/imagick" => {
-            Some((vec!["imagemagick"], vec![]))
-        }
-        "mongodb/mongodb" => {
-            Some((vec!["mongodb"], vec![]))
-        }
+        "ext-imagick" | "imagick/imagick" => Some((vec!["imagemagick"], vec![])),
+        "mongodb/mongodb" => Some((vec!["mongodb"], vec![])),
         "ext-redis" | "predis/predis" => {
             // Redis PHP extension or client - may need redis server for tests
             None // Usually doesn't need native deps in build

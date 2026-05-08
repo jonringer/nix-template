@@ -7,7 +7,7 @@
 //! The mapping is deliberately conservative: only well-known gems are mapped.
 //! Users can edit the generated expression to add anything we missed.
 
-use crate::types::ExpressionInfo;
+use crate::types::{ExpressionInfo, FAKE_SRI_HASH};
 use log::debug;
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -294,6 +294,7 @@ DEPENDENCIES
             cargo_lock_git_deps: Vec::new(),
             go_module_path: String::new(),
             python_format: "setuptools".to_owned(),
+            mvn_hash: FAKE_SRI_HASH.to_owned(),
         };
 
         let success = infer_dependencies(&mut info);

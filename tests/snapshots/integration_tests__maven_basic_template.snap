@@ -1,0 +1,29 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, maven
+, fetchFromGitHub
+}:
+
+maven.buildMavenPackage (finalAttrs: {
+  pname = "spring-boot-app";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "spring-boot-app";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  mvnHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/spring-boot-app";
+    license = licenses.apache20;
+    maintainers = with maintainers; [  ];
+  };
+})

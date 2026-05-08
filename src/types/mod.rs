@@ -194,6 +194,9 @@ pub struct ExpressionInfo {
     /// Python build system format, detected from pyproject.toml or defaulted.
     /// One of: "setuptools", "pyproject", "flit", "poetry", "hatchling".
     pub python_format: String,
+    /// SRI hash of the Maven dependencies (used for `maven` template).
+    /// Defaults to `lib.fakeHash` when unknown.
+    pub mvn_hash: String,
 }
 
 /// Default SRI placeholder used by `lib.fakeHash` in nixpkgs.
@@ -240,6 +243,7 @@ impl ExpressionInfo {
             .replace("@vendor_hash@", &self.vendor_hash)
             .replace("@npm_deps_hash@", &self.npm_deps_hash)
             .replace("@pnpm_deps_hash@", &self.pnpm_deps_hash)
+            .replace("@mvn_hash@", &self.mvn_hash)
             .replace("@project_file@", &self.project_file)
             .replace("@domain@", &self.domain)
             .replace("@description@", &self.description)

@@ -1217,3 +1217,96 @@ fn test_php_template_with_extensions() {
     // Snapshot the entire output
     insta::assert_snapshot!("php_with_extensions_template", stdout);
 }
+
+/// Test basic Maven template generation
+#[test]
+fn test_maven_basic_template() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "maven",
+            "-p",
+            "spring-boot-app",
+            "-v",
+            "1.0.0",
+            "-l",
+            "apache20",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's a Maven derivation
+    assert!(stdout.contains("maven.buildMavenPackage"));
+    assert!(stdout.contains("mvnHash"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("maven_basic_template", stdout);
+}
+
+/// Test Maven template with JDBC dependencies detected from pom.xml
+#[test]
+fn test_maven_template_with_jdbc() {
+    let temp_dir = TempDir::new().unwrap();
+    let temp_path = temp_dir.path();
+
+    // Create a pom.xml with JDBC dependencies
+    let pom_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>test-app</artifactId>
+    <version>1.0.0</version>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.6.0</version>
+        </dependency>
+    </dependencies>
+</project>"#;
+    fs::write(temp_path.join("pom.xml"), pom_xml).unwrap();
+
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .current_dir(&temp_path)
+        .args(&[
+            "maven",
+            "-p",
+            "test-app",
+            "-v",
+            "1.0.0",
+            "-l",
+            "apache20",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify Maven derivation basics
+    assert!(stdout.contains("maven.buildMavenPackage"));
+    assert!(stdout.contains("mvnHash"));
+
+    // Snapshot the entire output (dependencies would be inferred if implemented)
+    insta::assert_snapshot!("maven_with_jdbc_template", stdout);
+}

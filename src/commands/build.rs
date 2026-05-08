@@ -140,7 +140,8 @@ pub fn run(
                         local_php_extensions = Some(extensions);
 
                         // Detect PHP version requirement
-                        if let Some(version) = crate::deps::php::detect_php_version(&composer_json) {
+                        if let Some(version) = crate::deps::php::detect_php_version(&composer_json)
+                        {
                             eprintln!("Detected PHP version: {}", version);
                             local_php_version = Some(version);
                         }
