@@ -1,0 +1,40 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, gradle
+, fetchFromGitHub
+}:
+
+stdenv.mkDerivation (finalAttrs: {
+  pname = "example-app";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "example-app";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  mitmCache = gradle.fetchDeps {
+    inherit pname;
+    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  };
+
+  # WARNING: Manual Gradle builds are less reproducible
+  # Consider using gradle2nix to generate gradle-deps.json
+  # See: https://github.com/tadfisher/gradle2nix
+
+  buildPhase = ''
+    gradle --offline --no-daemon build
+  '';
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/example-app";
+    license = licenses.apache20;
+    maintainers = with maintainers; [  ];
+  };
+})

@@ -40,6 +40,15 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         ("composer.lock", Template::php(), "composer.lock"),
         ("composer.json", Template::php(), "composer.json"),
         ("pom.xml", Template::maven(), "pom.xml"),
+        ("gradle-deps.json", Template::gradle(), "gradle-deps.json"),
+        ("build.gradle.kts", Template::gradle(), "build.gradle.kts"),
+        ("build.gradle", Template::gradle(), "build.gradle"),
+        (
+            "settings.gradle.kts",
+            Template::gradle(),
+            "settings.gradle.kts",
+        ),
+        ("settings.gradle", Template::gradle(), "settings.gradle"),
         ("mix.lock", Template::elixir(), "mix.lock"),
         ("mix.exs", Template::elixir(), "mix.exs"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
@@ -101,6 +110,23 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
         if candidate.template.is_elixir() && !source_path.join("mix.lock").exists() {
             eprintln!("Warning: mix.lock not found - build may not be reproducible");
             eprintln!("         Run 'mix deps.get' to generate mix.lock");
+            break;
+        }
+    }
+
+    // Gradle sub-classification: detect variant, DSL, and JDK version.
+    for candidate in candidates.iter_mut() {
+        if candidate.template.is_gradle() {
+            use crate::deps::gradle;
+            let variant = gradle::detect_gradle_variant(source_path);
+            let dsl = gradle::detect_gradle_dsl(source_path);
+            let jdk_version = gradle::infer_gradle_jdk_version(source_path);
+
+            candidate.template = Template::Gradle(crate::templates::types::GradleConfig {
+                variant,
+                dsl,
+                jdk_version: Some(jdk_version),
+            });
             break;
         }
     }
