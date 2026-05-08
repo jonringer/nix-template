@@ -1,0 +1,28 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, haskellPackages
+, fetchFromGitHub
+}:
+
+# callCabal2nix automatically reads dependencies from the .cabal file
+  # See: https://nixos.org/manual/nixpkgs/stable/#haskell
+  # For more complex builds, consider haskell.nix: https://input-output-hk.github.io/haskell.nix/
+
+(haskellPackages.callCabal2nix "my-haskell-pkg" (
+  fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "my-haskell-pkg";
+    rev = "1.0.0";
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  }
+) { }).overrideAttrs (finalAttrs: {
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/my-haskell-pkg";
+    license = licenses.bsd3;
+    maintainers = with maintainers; [  ];
+  };
+})

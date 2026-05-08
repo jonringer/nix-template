@@ -1523,3 +1523,36 @@ executables:
     // Snapshot the output
     insta::assert_snapshot!("dart_basic_template", stdout);
 }
+
+/// Test basic Haskell template generation
+/// This should generate a Haskell package using callCabal2nix
+#[test]
+fn test_haskell_template_basic() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "haskell",
+            "-p",
+            "my-haskell-pkg",
+            "-v",
+            "1.0.0",
+            "-l",
+            "bsd3",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's a Haskell package derivation
+    assert!(stdout.contains("haskellPackages"));
+    assert!(stdout.contains("callCabal2nix"));
+    assert!(stdout.contains("# callCabal2nix automatically reads dependencies from the .cabal file"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("haskell_basic_template", stdout);
+}

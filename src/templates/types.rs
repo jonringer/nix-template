@@ -35,6 +35,8 @@ pub enum Template {
     Gradle(GradleConfig),
     /// Dart application (buildDartApplication) - non-Flutter only
     Dart(DartConfig),
+    /// Haskell package or application (callCabal2nix)
+    Haskell(HaskellConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -251,6 +253,27 @@ pub struct DartConfig {
     pub dart_version: Option<String>,
 }
 
+/// Haskell template configuration: build system and GHC version.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HaskellConfig {
+    /// Build system: Cabal or Stack
+    pub build_system: HaskellBuildSystem,
+    /// GHC version to use (e.g., "ghc96", "ghc98")
+    /// Inferred from cabal.project or stack.yaml, or defaulted to nixpkgs default
+    pub ghc_version: Option<String>,
+    /// Package type: executable or library (detected from .cabal file)
+    pub is_executable: bool,
+}
+
+/// Haskell build system variant.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum HaskellBuildSystem {
+    /// Cabal build system (*.cabal, cabal.project)
+    Cabal,
+    /// Stack build system (stack.yaml)
+    Stack,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -271,6 +294,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "elixir",
     "gradle",
     "dart",
+    "haskell",
     "dotnet",
     "ruby",
     "mkshell",
@@ -404,6 +428,15 @@ impl Template {
         })
     }
 
+    /// Create a Haskell template (Cabal-based by default).
+    pub fn haskell() -> Self {
+        Template::Haskell(HaskellConfig {
+            build_system: HaskellBuildSystem::Cabal,
+            ghc_version: None,  // Will be inferred or use nixpkgs default
+            is_executable: true, // Default assumption; will be detected from .cabal file
+        })
+    }
+
     /// Create a default stdenv template.
     pub fn stdenv() -> Self {
         Template::Stdenv(StdenvVariant::Default)
@@ -471,6 +504,11 @@ impl Template {
                 executables: Vec::new(),
                 dart_version: None,
             })),
+            "haskell" => Ok(Template::Haskell(HaskellConfig {
+                build_system: HaskellBuildSystem::Cabal,
+                ghc_version: None,
+                is_executable: true,
+            })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -508,6 +546,7 @@ impl Template {
             Template::Elixir(_) => "elixir",
             Template::Gradle(_) => "gradle",
             Template::Dart(_) => "dart",
+            Template::Haskell(_) => "haskell",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -718,6 +757,29 @@ impl Template {
     pub fn dart_config_mut(&mut self) -> Option<&mut DartConfig> {
         match self {
             Template::Dart(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a Haskell template.
+    pub fn is_haskell(&self) -> bool {
+        matches!(self, Template::Haskell(_))
+    }
+
+    /// Get Haskell config if this is a Haskell template.
+    #[allow(dead_code)]
+    pub fn haskell_config(&self) -> Option<&HaskellConfig> {
+        match self {
+            Template::Haskell(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable Haskell config.
+    #[allow(dead_code)]
+    pub fn haskell_config_mut(&mut self) -> Option<&mut HaskellConfig> {
+        match self {
+            Template::Haskell(config) => Some(config),
             _ => None,
         }
     }

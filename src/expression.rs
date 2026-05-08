@@ -73,6 +73,11 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             "buildDartApplication",
             Some("buildDartApplication"),
         ),
+        Template::Haskell(_) => (
+            "haskellPackages",
+            "haskellPackages.callCabal2nix",
+            Some("haskellPackagesCallCabal2nix"),
+        ),
         Template::Dotnet => (
             "buildDotnetModule",
             "buildDotnetModule",
@@ -404,6 +409,22 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             let base = "  # Convert pubspec.lock to JSON format:\n  #   dart pub get\n  #   yq . pubspec.lock > pubspec.lock.json\n  # See: https://nixos.org/manual/nixpkgs/stable/#ssec-dart-applications\n  pubspecLock = lib.importJSON ./pubspec.lock.json;";
             format!("{base}{native}{build}", base = base, native = native, build = build)
         }
+        Template::Haskell(_) => {
+            // Haskell template: callCabal2nix automatically handles dependencies from .cabal file
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+
+            let base = "  # callCabal2nix automatically reads dependencies from the .cabal file\n  # See: https://nixos.org/manual/nixpkgs/stable/#haskell\n  # For more complex builds, consider haskell.nix: https://input-output-hk.github.io/haskell.nix/";
+            format!("{base}{native}{build}", base = base, native = native, build = build)
+        }
         Template::Ruby => {
             // Conditionally render build inputs only when inferred
             let native = if info.native_build_inputs.is_empty() {
@@ -525,6 +546,104 @@ mkShell rec {
 }
 "
         .to_string(),
+        Template::Haskell(_) => {
+            // Haskell template: callCabal2nix has a special syntax
+            let (f_input, _) = fetch_block(&info.fetcher);
+            let meta_content = if info.include_meta { meta() } else { "" };
+            let build_inputs_comment = build_inputs(info);
+
+            let mut inputs = vec![String::from("lib"), String::from("haskellPackages")];
+
+            // Add fetcher input if not local
+            if !f_input.is_empty() {
+                inputs.push(f_input.to_string());
+            }
+
+            // Add inferred system dependencies to function header
+            inputs.extend(info.native_build_inputs.iter().map(|s| s.to_owned()));
+            inputs.extend(info.build_inputs.iter().map(|s| s.to_owned()));
+
+            // Deduplicate inputs
+            let mut seen = std::collections::HashSet::new();
+            inputs.retain(|s| seen.insert(s.clone()));
+
+            let input_list = inputs.join("\n, ");
+            let header = format!("{{ {input_list}\n}}:", input_list = input_list);
+
+            // Create source fetch expression for callCabal2nix (no src = prefix)
+            let src_expr = match &info.fetcher {
+                Fetcher::github => format!(
+                    "fetchFromGitHub {{
+    owner = \"{}\";
+    repo = \"{}\";
+    rev = \"{}\";
+    sha256 = \"{}\";
+  }}",
+                    if info.owner.is_empty() { "CHANGE" } else { &info.owner },
+                    &info.pname,
+                    &info.version,
+                    &info.src_sha
+                ),
+                Fetcher::local => "./.".to_string(),
+                _ => format!("fetchFromGitHub {{\n    owner = \"CHANGE\";\n    repo = \"{}\";\n    rev = \"{}\";\n    sha256 = \"{}\";\n  }}", &info.pname, &info.version, &info.src_sha),
+            };
+
+            // Build the overrides for callCabal2nix
+            let overrides = if !info.native_build_inputs.is_empty() || !info.build_inputs.is_empty() {
+                let native = if !info.native_build_inputs.is_empty() {
+                    format!("\n  nativeBuildInputs = [@native_build_inputs@ ];")
+                } else {
+                    String::new()
+                };
+                let build = if !info.build_inputs.is_empty() {
+                    format!("\n  buildInputs = [@build_inputs@ ];")
+                } else {
+                    String::new()
+                };
+                format!(" {{{}{}}}", native, build)
+            } else {
+                " { }".to_string()
+            };
+
+            // callCabal2nix takes: name, src, and optional buildInputs override
+            let expression = if meta_content.is_empty() {
+                format!(
+                    "{header}
+
+{build_inputs_comment}
+
+haskellPackages.callCabal2nix \"{pname}\" (
+  {src_expr}
+){overrides}
+",
+                    header = header,
+                    pname = &info.pname,
+                    src_expr = src_expr,
+                    overrides = overrides,
+                    build_inputs_comment = build_inputs_comment.trim(),
+                )
+            } else {
+                format!(
+                    "{header}
+
+{build_inputs_comment}
+
+(haskellPackages.callCabal2nix \"{pname}\" (
+  {src_expr}
+){overrides}).overrideAttrs (finalAttrs: {{{meta}
+}})
+",
+                    header = header,
+                    pname = &info.pname,
+                    src_expr = src_expr,
+                    overrides = overrides,
+                    build_inputs_comment = build_inputs_comment.trim(),
+                    meta = meta_content,
+                )
+            };
+
+            info.format(&expression)
+        }
         Template::Ruby => {
             let (_, dh_block) = derivation_helper(info);
             let meta_content = if info.include_meta { meta() } else { "" };
