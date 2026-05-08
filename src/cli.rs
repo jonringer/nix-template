@@ -302,6 +302,7 @@ pub fn validate_and_serialize_matches(
         go_module_path: String::new(),
         python_format: "setuptools".to_owned(),
         mvn_hash: FAKE_SRI_HASH.to_owned(),
+        mix_fod_hash: FAKE_SRI_HASH.to_owned(),
     };
 
     if let Some(url) = matches.value_of("from-url") {
@@ -511,6 +512,7 @@ pub fn build_expression_info_from_interactive(
         go_module_path: String::new(),
         python_format: "setuptools".to_owned(),
         mvn_hash: FAKE_SRI_HASH.to_owned(),
+        mix_fod_hash: FAKE_SRI_HASH.to_owned(),
     };
 
     // If URL was provided, fetch metadata

@@ -57,6 +57,16 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             "maven.buildMavenPackage",
             Some("buildMavenPackage"),
         ),
+        Template::Elixir(config) => match config.variant {
+            crate::types::ElixirVariant::Release => (
+                "beamPackages",
+                "beamPackages.mixRelease",
+                Some("mixRelease"),
+            ),
+            crate::types::ElixirVariant::Library => {
+                ("beamPackages", "beamPackages.buildMix", Some("buildMix"))
+            }
+        },
         Template::Dotnet => (
             "buildDotnetModule",
             "buildDotnetModule",
@@ -322,6 +332,31 @@ fn build_inputs(info: &ExpressionInfo) -> String {
                 native = native,
                 build = build,
             )
+        }
+        Template::Elixir(config) => {
+            // Conditionally render buildInputs only when inferred
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+
+            // mixFodDeps pattern for both Release and Library variants
+            let base = "  mixFodDeps = beamPackages.fetchMixDeps {\n    pname = \"${finalAttrs.pname}-deps\";\n    inherit (finalAttrs) version src;\n    @doc:mixFodHash@hash = \"@mix_fod_hash@\";\n  };";
+
+            match config.variant {
+                crate::types::ElixirVariant::Release => {
+                    format!("{base}{native}{build}", base = base, native = native, build = build)
+                }
+                crate::types::ElixirVariant::Library => {
+                    format!("{base}{native}{build}", base = base, native = native, build = build)
+                }
+            }
         }
         Template::Ruby => {
             // Conditionally render build inputs only when inferred
@@ -625,6 +660,7 @@ mod tests {
             go_module_path: String::new(),
             python_format: "setuptools".to_owned(),
             mvn_hash: "sha256-mvn".to_owned(),
+            mix_fod_hash: "sha256-mix".to_owned(),
         }
     }
 
@@ -672,6 +708,7 @@ mod tests {
             go_module_path: String::new(),
             python_format: "setuptools".to_owned(),
             mvn_hash: "sha256-mvn".to_owned(),
+            mix_fod_hash: "sha256-mix".to_owned(),
         }
     }
 

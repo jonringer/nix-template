@@ -40,6 +40,8 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         ("composer.lock", Template::php(), "composer.lock"),
         ("composer.json", Template::php(), "composer.json"),
         ("pom.xml", Template::maven(), "pom.xml"),
+        ("mix.lock", Template::elixir(), "mix.lock"),
+        ("mix.exs", Template::elixir(), "mix.exs"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
         ("Gemfile", Template::Ruby, "Gemfile"),
         ("meson.build", Template::stdenv(), "meson.build"),
@@ -90,6 +92,15 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
         if candidate.template.is_php() && !source_path.join("composer.lock").exists() {
             eprintln!("Warning: composer.lock not found - build may not be reproducible");
             eprintln!("         Run 'composer update' to generate composer.lock");
+            break;
+        }
+    }
+
+    // Elixir warning: if Elixir was detected but mix.lock is missing, warn about reproducibility.
+    for candidate in &candidates {
+        if candidate.template.is_elixir() && !source_path.join("mix.lock").exists() {
+            eprintln!("Warning: mix.lock not found - build may not be reproducible");
+            eprintln!("         Run 'mix deps.get' to generate mix.lock");
             break;
         }
     }

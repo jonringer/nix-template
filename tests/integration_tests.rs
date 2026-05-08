@@ -1310,3 +1310,35 @@ fn test_maven_template_with_jdbc() {
     // Snapshot the entire output (dependencies would be inferred if implemented)
     insta::assert_snapshot!("maven_with_jdbc_template", stdout);
 }
+
+/// Test basic Elixir template generation (defaults to Release variant)
+#[test]
+fn test_elixir_basic_template() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "elixir",
+            "-p",
+            "phoenix_app",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's an Elixir derivation
+    assert!(stdout.contains("beamPackages.mixRelease")); // Default is Release
+    assert!(stdout.contains("mixFodDeps"));
+    assert!(stdout.contains("beamPackages.fetchMixDeps"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("elixir_basic_template", stdout);
+}

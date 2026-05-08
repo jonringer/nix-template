@@ -1106,6 +1106,7 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         go_module_path: String::new(),
         python_format: "setuptools".to_owned(),
         mvn_hash: FAKE_SRI_HASH.to_owned(),
+        mix_fod_hash: FAKE_SRI_HASH.to_owned(),
     };
 
     let probe_expr = crate::expression::generate_expression(&probe_info);
