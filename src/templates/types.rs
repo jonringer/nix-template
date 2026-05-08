@@ -29,6 +29,8 @@ pub enum Template {
     Php(PhpConfig),
     /// Java/Maven package (buildMavenPackage)
     Maven(MavenConfig),
+    /// Elixir application or library (mixRelease or buildMix)
+    Elixir(ElixirConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -185,6 +187,25 @@ pub struct MavenConfig {
     pub jdk_version: Option<String>,
 }
 
+/// Elixir template configuration: variant and OTP version.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ElixirConfig {
+    /// Variant: Release (mixRelease for Phoenix apps) or Library (buildMix)
+    pub variant: ElixirVariant,
+    /// OTP version (e.g., "27", "26", "25")
+    /// Inferred from .tool-versions or defaulted to nixpkgs default
+    pub otp_version: Option<String>,
+}
+
+/// Elixir package variant: Release (application) or Library.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ElixirVariant {
+    /// mixRelease (for Phoenix apps with releases configuration)
+    Release,
+    /// buildMix (for hex.pm libraries)
+    Library,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -202,6 +223,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "pnpm",
     "php",
     "maven",
+    "elixir",
     "dotnet",
     "ruby",
     "mkshell",
@@ -297,6 +319,27 @@ impl Template {
         })
     }
 
+    /// Create an Elixir Release template (for Phoenix apps).
+    pub fn elixir_release() -> Self {
+        Template::Elixir(ElixirConfig {
+            variant: ElixirVariant::Release,
+            otp_version: None, // Will be inferred from .tool-versions
+        })
+    }
+
+    /// Create an Elixir Library template (for hex.pm packages).
+    pub fn elixir_library() -> Self {
+        Template::Elixir(ElixirConfig {
+            variant: ElixirVariant::Library,
+            otp_version: None,
+        })
+    }
+
+    /// Create a default Elixir template (defaults to Release variant).
+    pub fn elixir() -> Self {
+        Self::elixir_release()
+    }
+
     /// Create a default stdenv template.
     pub fn stdenv() -> Self {
         Template::Stdenv(StdenvVariant::Default)
@@ -351,6 +394,10 @@ impl Template {
             "maven" => Ok(Template::Maven(MavenConfig {
                 jdk_version: None, // Will be inferred from pom.xml
             })),
+            "elixir" => Ok(Template::Elixir(ElixirConfig {
+                variant: ElixirVariant::Release, // Default to Release, can be detected later
+                otp_version: None,
+            })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -385,6 +432,7 @@ impl Template {
             },
             Template::Php(_) => "php",
             Template::Maven(_) => "maven",
+            Template::Elixir(_) => "elixir",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -526,6 +574,29 @@ impl Template {
     pub fn maven_config_mut(&mut self) -> Option<&mut MavenConfig> {
         match self {
             Template::Maven(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is an Elixir template.
+    pub fn is_elixir(&self) -> bool {
+        matches!(self, Template::Elixir(_))
+    }
+
+    /// Get Elixir config if this is an Elixir template.
+    #[allow(dead_code)]
+    pub fn elixir_config(&self) -> Option<&ElixirConfig> {
+        match self {
+            Template::Elixir(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable Elixir config.
+    #[allow(dead_code)]
+    pub fn elixir_config_mut(&mut self) -> Option<&mut ElixirConfig> {
+        match self {
+            Template::Elixir(config) => Some(config),
             _ => None,
         }
     }
@@ -715,5 +786,55 @@ mod tests {
             tmpl.maven_config().unwrap().jdk_version,
             Some("21".to_string())
         );
+    }
+
+    #[test]
+    fn elixir_template_parsing() {
+        let tmpl: Template = "elixir".parse().unwrap();
+        assert!(tmpl.is_elixir());
+        assert_eq!(tmpl.to_cli_str(), "elixir");
+        assert_eq!(
+            tmpl.elixir_config().unwrap().variant,
+            ElixirVariant::Release
+        ); // Default
+        assert_eq!(tmpl.elixir_config().unwrap().otp_version, None);
+    }
+
+    #[test]
+    fn elixir_config_access() {
+        let mut tmpl: Template = "elixir".parse().unwrap();
+        assert!(tmpl.is_elixir());
+        assert_eq!(
+            tmpl.elixir_config().unwrap().variant,
+            ElixirVariant::Release
+        );
+
+        // Mutate variant and otp_version
+        tmpl.elixir_config_mut().unwrap().variant = ElixirVariant::Library;
+        tmpl.elixir_config_mut().unwrap().otp_version = Some("27".to_string());
+
+        assert_eq!(
+            tmpl.elixir_config().unwrap().variant,
+            ElixirVariant::Library
+        );
+        assert_eq!(
+            tmpl.elixir_config().unwrap().otp_version,
+            Some("27".to_string())
+        );
+    }
+
+    #[test]
+    fn elixir_variant_helpers() {
+        let release = Template::elixir_release();
+        assert!(matches!(
+            release.elixir_config().unwrap().variant,
+            ElixirVariant::Release
+        ));
+
+        let library = Template::elixir_library();
+        assert!(matches!(
+            library.elixir_config().unwrap().variant,
+            ElixirVariant::Library
+        ));
     }
 }

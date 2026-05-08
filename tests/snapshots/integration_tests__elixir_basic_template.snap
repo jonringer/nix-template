@@ -1,0 +1,33 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, beamPackages
+, fetchFromGitHub
+}:
+
+beamPackages.mixRelease (finalAttrs: {
+  pname = "phoenix_app";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "phoenix_app";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  mixFodDeps = beamPackages.fetchMixDeps {
+    pname = "${finalAttrs.pname}-deps";
+    inherit (finalAttrs) version src;
+    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  };
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/phoenix_app";
+    license = licenses.mit;
+    maintainers = with maintainers; [  ];
+  };
+})

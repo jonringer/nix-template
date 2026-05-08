@@ -197,6 +197,9 @@ pub struct ExpressionInfo {
     /// SRI hash of the Maven dependencies (used for `maven` template).
     /// Defaults to `lib.fakeHash` when unknown.
     pub mvn_hash: String,
+    /// SRI hash of the Mix dependencies (used for `elixir` template).
+    /// Defaults to `lib.fakeHash` when unknown.
+    pub mix_fod_hash: String,
 }
 
 /// Default SRI placeholder used by `lib.fakeHash` in nixpkgs.
@@ -244,6 +247,7 @@ impl ExpressionInfo {
             .replace("@npm_deps_hash@", &self.npm_deps_hash)
             .replace("@pnpm_deps_hash@", &self.pnpm_deps_hash)
             .replace("@mvn_hash@", &self.mvn_hash)
+            .replace("@mix_fod_hash@", &self.mix_fod_hash)
             .replace("@project_file@", &self.project_file)
             .replace("@domain@", &self.domain)
             .replace("@description@", &self.description)

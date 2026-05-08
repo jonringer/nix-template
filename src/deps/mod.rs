@@ -1,4 +1,5 @@
 pub mod buildsystem;
+pub mod elixir;
 pub mod go;
 pub mod maven;
 pub mod php;
