@@ -1468,3 +1468,58 @@ dependencies {
     // Snapshot the output
     insta::assert_snapshot!("gradle_gradle2nix_template", stdout);
 }
+
+/// Test basic Dart template generation with executables
+#[test]
+fn test_dart_basic_template() {
+    let temp_dir = TempDir::new().unwrap();
+    let temp_path = temp_dir.path();
+
+    // Create a pubspec.yaml with executables
+    let pubspec_yaml = r#"
+name: dart_cli_app
+description: A Dart CLI application
+version: 1.0.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  args: ^2.4.0
+  http: ^0.13.0
+
+executables:
+  myapp: main
+  helper: helper_tool
+"#;
+    fs::write(temp_path.join("pubspec.yaml"), pubspec_yaml).unwrap();
+
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .current_dir(&temp_path)
+        .args(&[
+            "dart",
+            "-p",
+            "dart-cli-app",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's a Dart derivation
+    assert!(stdout.contains("buildDartApplication"));
+    assert!(stdout.contains("pubspecLock"));
+    assert!(stdout.contains("lib.importJSON ./pubspec.lock.json"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("dart_basic_template", stdout);
+}

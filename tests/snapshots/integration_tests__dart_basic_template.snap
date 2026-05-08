@@ -1,0 +1,33 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, buildDartApplication
+, fetchFromGitHub
+}:
+
+buildDartApplication (finalAttrs: {
+  pname = "dart-cli-app";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "dart-cli-app";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  # Convert pubspec.lock to JSON format:
+  #   dart pub get
+  #   yq . pubspec.lock > pubspec.lock.json
+  # See: https://nixos.org/manual/nixpkgs/stable/#ssec-dart-applications
+  pubspecLock = lib.importJSON ./pubspec.lock.json;
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/dart-cli-app";
+    license = licenses.mit;
+    maintainers = with maintainers; [  ];
+  };
+})

@@ -68,6 +68,11 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             }
         },
         Template::Gradle(_) => ("gradle", "stdenv.mkDerivation", Some("stdenvMkDerivation")),
+        Template::Dart(_) => (
+            "buildDartApplication",
+            "buildDartApplication",
+            Some("buildDartApplication"),
+        ),
         Template::Dotnet => (
             "buildDotnetModule",
             "buildDotnetModule",
@@ -382,6 +387,22 @@ fn build_inputs(info: &ExpressionInfo) -> String {
                     format!("{base}{native}{build}", base = base, native = native, build = build)
                 }
             }
+        }
+        Template::Dart(_) => {
+            // Dart template: pub2nix pattern with pubspec.lock.json
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+
+            let base = "  # Convert pubspec.lock to JSON format:\n  #   dart pub get\n  #   yq . pubspec.lock > pubspec.lock.json\n  # See: https://nixos.org/manual/nixpkgs/stable/#ssec-dart-applications\n  pubspecLock = lib.importJSON ./pubspec.lock.json;";
+            format!("{base}{native}{build}", base = base, native = native, build = build)
         }
         Template::Ruby => {
             // Conditionally render build inputs only when inferred
