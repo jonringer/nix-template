@@ -51,6 +51,8 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         ("settings.gradle", Template::gradle(), "settings.gradle"),
         ("mix.lock", Template::elixir(), "mix.lock"),
         ("mix.exs", Template::elixir(), "mix.exs"),
+        ("pubspec.lock", Template::dart(), "pubspec.lock"),
+        ("pubspec.yaml", Template::dart(), "pubspec.yaml"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
         ("Gemfile", Template::Ruby, "Gemfile"),
         ("meson.build", Template::stdenv(), "meson.build"),
@@ -127,6 +129,54 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
                 dsl,
                 jdk_version: Some(jdk_version),
             });
+            break;
+        }
+    }
+
+    // Dart sub-classification: check for Flutter (exclude) and parse executables.
+    // Flutter projects must use buildFlutterApplication instead of buildDartApplication.
+    candidates.retain(|candidate| {
+        if candidate.template.is_dart() {
+            let pubspec_path = source_path.join("pubspec.yaml");
+            if pubspec_path.exists() {
+                use crate::deps::dart;
+
+                // Check for Flutter and exclude if found
+                if dart::is_flutter_project(&pubspec_path) {
+                    eprintln!("Warning: Flutter project detected - skipping Dart template");
+                    eprintln!("         Flutter projects require buildFlutterApplication");
+                    eprintln!(
+                        "         See: https://nixos.org/manual/nixpkgs/stable/#ssec-dart-flutter"
+                    );
+                    return false; // Remove this candidate
+                }
+            }
+        }
+        true // Keep all non-Flutter Dart candidates
+    });
+
+    // Parse Dart executables after Flutter exclusion
+    for candidate in candidates.iter_mut() {
+        if candidate.template.is_dart() {
+            let pubspec_path = source_path.join("pubspec.yaml");
+            if pubspec_path.exists() {
+                use crate::deps::dart;
+                let executables = dart::parse_dart_executables(&pubspec_path);
+
+                candidate.template = Template::Dart(crate::templates::types::DartConfig {
+                    executables,
+                    dart_version: None,
+                });
+            }
+            break;
+        }
+    }
+
+    // Dart warning: if pubspec.lock is missing, warn about reproducibility.
+    for candidate in &candidates {
+        if candidate.template.is_dart() && !source_path.join("pubspec.lock").exists() {
+            eprintln!("Warning: pubspec.lock not found - build may not be reproducible");
+            eprintln!("         Run 'dart pub get' to generate pubspec.lock");
             break;
         }
     }

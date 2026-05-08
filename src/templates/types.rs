@@ -33,6 +33,8 @@ pub enum Template {
     Elixir(ElixirConfig),
     /// Java/Gradle package (gradle.fetchDeps or manual)
     Gradle(GradleConfig),
+    /// Dart application (buildDartApplication) - non-Flutter only
+    Dart(DartConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -238,6 +240,17 @@ pub enum GradleDsl {
     Kotlin,
 }
 
+/// Dart template configuration: executables and dart version.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DartConfig {
+    /// Executables defined in pubspec.yaml (e.g., ["myapp", "tool"])
+    /// Parsed from the executables section
+    pub executables: Vec<String>,
+    /// Dart SDK version constraint from pubspec.yaml
+    /// Not currently used but reserved for future version pinning
+    pub dart_version: Option<String>,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -257,6 +270,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "maven",
     "elixir",
     "gradle",
+    "dart",
     "dotnet",
     "ruby",
     "mkshell",
@@ -382,6 +396,14 @@ impl Template {
         })
     }
 
+    /// Create a Dart template.
+    pub fn dart() -> Self {
+        Template::Dart(DartConfig {
+            executables: Vec::new(), // Will be parsed from pubspec.yaml
+            dart_version: None,      // Reserved for future version pinning
+        })
+    }
+
     /// Create a default stdenv template.
     pub fn stdenv() -> Self {
         Template::Stdenv(StdenvVariant::Default)
@@ -445,6 +467,10 @@ impl Template {
                 dsl: GradleDsl::Groovy,         // Will be detected later
                 jdk_version: None,
             })),
+            "dart" => Ok(Template::Dart(DartConfig {
+                executables: Vec::new(),
+                dart_version: None,
+            })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -481,6 +507,7 @@ impl Template {
             Template::Maven(_) => "maven",
             Template::Elixir(_) => "elixir",
             Template::Gradle(_) => "gradle",
+            Template::Dart(_) => "dart",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -668,6 +695,29 @@ impl Template {
     pub fn gradle_config_mut(&mut self) -> Option<&mut GradleConfig> {
         match self {
             Template::Gradle(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a Dart template.
+    pub fn is_dart(&self) -> bool {
+        matches!(self, Template::Dart(_))
+    }
+
+    /// Get Dart config if this is a Dart template.
+    #[allow(dead_code)]
+    pub fn dart_config(&self) -> Option<&DartConfig> {
+        match self {
+            Template::Dart(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable Dart config.
+    #[allow(dead_code)]
+    pub fn dart_config_mut(&mut self) -> Option<&mut DartConfig> {
+        match self {
+            Template::Dart(config) => Some(config),
             _ => None,
         }
     }
