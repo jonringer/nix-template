@@ -303,6 +303,7 @@ pub fn validate_and_serialize_matches(
         python_format: "setuptools".to_owned(),
         mvn_hash: FAKE_SRI_HASH.to_owned(),
         mix_fod_hash: FAKE_SRI_HASH.to_owned(),
+        gradle_hash: FAKE_SRI_HASH.to_owned(),
     };
 
     if let Some(url) = matches.value_of("from-url") {
@@ -513,6 +514,7 @@ pub fn build_expression_info_from_interactive(
         python_format: "setuptools".to_owned(),
         mvn_hash: FAKE_SRI_HASH.to_owned(),
         mix_fod_hash: FAKE_SRI_HASH.to_owned(),
+        gradle_hash: FAKE_SRI_HASH.to_owned(),
     };
 
     // If URL was provided, fetch metadata
@@ -569,6 +571,21 @@ pub fn build_expression_info_from_interactive(
             }
             _ => {}
         }
+    }
+
+    // Gradle variant/DSL detection always runs (not dependent on infer_deps)
+    if let Template::Gradle(_) = &info.template {
+        use crate::deps::gradle;
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let variant = gradle::detect_gradle_variant(&cwd);
+        let dsl = gradle::detect_gradle_dsl(&cwd);
+        let jdk_version = gradle::infer_gradle_jdk_version(&cwd);
+
+        info.template = Template::Gradle(crate::templates::types::GradleConfig {
+            variant,
+            dsl,
+            jdk_version: Some(jdk_version),
+        });
     }
 
     // Set the paths - use the path directly since we collected it interactively

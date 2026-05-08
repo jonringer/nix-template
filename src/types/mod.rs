@@ -200,6 +200,9 @@ pub struct ExpressionInfo {
     /// SRI hash of the Mix dependencies (used for `elixir` template).
     /// Defaults to `lib.fakeHash` when unknown.
     pub mix_fod_hash: String,
+    /// SRI hash of the Gradle dependencies (used for `gradle` template with Manual variant).
+    /// Defaults to `lib.fakeHash` when unknown.
+    pub gradle_hash: String,
 }
 
 /// Default SRI placeholder used by `lib.fakeHash` in nixpkgs.
@@ -248,6 +251,7 @@ impl ExpressionInfo {
             .replace("@pnpm_deps_hash@", &self.pnpm_deps_hash)
             .replace("@mvn_hash@", &self.mvn_hash)
             .replace("@mix_fod_hash@", &self.mix_fod_hash)
+            .replace("@gradle_hash@", &self.gradle_hash)
             .replace("@project_file@", &self.project_file)
             .replace("@domain@", &self.domain)
             .replace("@description@", &self.description)

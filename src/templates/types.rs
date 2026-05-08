@@ -31,6 +31,8 @@ pub enum Template {
     Maven(MavenConfig),
     /// Elixir application or library (mixRelease or buildMix)
     Elixir(ElixirConfig),
+    /// Java/Gradle package (gradle.fetchDeps or manual)
+    Gradle(GradleConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -206,6 +208,36 @@ pub enum ElixirVariant {
     Library,
 }
 
+/// Gradle template configuration: variant, DSL, and JDK version.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GradleConfig {
+    /// Variant: Gradle2nix (recommended) or Manual (less reproducible)
+    pub variant: GradleVariant,
+    /// DSL: Groovy (build.gradle) or Kotlin (build.gradle.kts)
+    pub dsl: GradleDsl,
+    /// JDK version (e.g., "17", "21")
+    /// Inferred from gradle.properties or defaulted to latest LTS
+    pub jdk_version: Option<String>,
+}
+
+/// Gradle build variant: Gradle2nix or Manual.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum GradleVariant {
+    /// gradle.fetchDeps with gradle-deps.json (requires gradle2nix tool)
+    Gradle2nix,
+    /// Manual stdenv.mkDerivation (less reproducible, not recommended)
+    Manual,
+}
+
+/// Gradle DSL variant: Groovy or Kotlin.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum GradleDsl {
+    /// build.gradle (Groovy DSL)
+    Groovy,
+    /// build.gradle.kts (Kotlin DSL)
+    Kotlin,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -224,6 +256,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "php",
     "maven",
     "elixir",
+    "gradle",
     "dotnet",
     "ruby",
     "mkshell",
@@ -340,6 +373,15 @@ impl Template {
         Self::elixir_release()
     }
 
+    /// Create a Gradle template with Gradle2nix variant.
+    pub fn gradle() -> Self {
+        Template::Gradle(GradleConfig {
+            variant: GradleVariant::Manual, // Default to Manual; detection upgrades to Gradle2nix
+            dsl: GradleDsl::Groovy,         // Will be detected later
+            jdk_version: None,              // Will be inferred from gradle.properties
+        })
+    }
+
     /// Create a default stdenv template.
     pub fn stdenv() -> Self {
         Template::Stdenv(StdenvVariant::Default)
@@ -398,6 +440,11 @@ impl Template {
                 variant: ElixirVariant::Release, // Default to Release, can be detected later
                 otp_version: None,
             })),
+            "gradle" => Ok(Template::Gradle(GradleConfig {
+                variant: GradleVariant::Manual, // Default to Manual; detection upgrades to Gradle2nix
+                dsl: GradleDsl::Groovy,         // Will be detected later
+                jdk_version: None,
+            })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -433,6 +480,7 @@ impl Template {
             Template::Php(_) => "php",
             Template::Maven(_) => "maven",
             Template::Elixir(_) => "elixir",
+            Template::Gradle(_) => "gradle",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -597,6 +645,29 @@ impl Template {
     pub fn elixir_config_mut(&mut self) -> Option<&mut ElixirConfig> {
         match self {
             Template::Elixir(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a Gradle template.
+    pub fn is_gradle(&self) -> bool {
+        matches!(self, Template::Gradle(_))
+    }
+
+    /// Get Gradle config if this is a Gradle template.
+    #[allow(dead_code)]
+    pub fn gradle_config(&self) -> Option<&GradleConfig> {
+        match self {
+            Template::Gradle(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable Gradle config.
+    #[allow(dead_code)]
+    pub fn gradle_config_mut(&mut self) -> Option<&mut GradleConfig> {
+        match self {
+            Template::Gradle(config) => Some(config),
             _ => None,
         }
     }
@@ -836,5 +907,37 @@ mod tests {
             library.elixir_config().unwrap().variant,
             ElixirVariant::Library
         ));
+    }
+
+    #[test]
+    fn gradle_template_parsing() {
+        let tmpl: Template = "gradle".parse().unwrap();
+        assert!(tmpl.is_gradle());
+        assert_eq!(tmpl.to_cli_str(), "gradle");
+        assert_eq!(tmpl.gradle_config().unwrap().variant, GradleVariant::Manual); // Default (detection upgrades to Gradle2nix when gradle-deps.json exists)
+        assert_eq!(tmpl.gradle_config().unwrap().dsl, GradleDsl::Groovy); // Default
+        assert_eq!(tmpl.gradle_config().unwrap().jdk_version, None);
+    }
+
+    #[test]
+    fn gradle_config_access() {
+        let mut tmpl: Template = "gradle".parse().unwrap();
+        assert!(tmpl.is_gradle());
+        assert_eq!(tmpl.gradle_config().unwrap().variant, GradleVariant::Manual);
+
+        // Mutate variant, dsl, and jdk_version
+        tmpl.gradle_config_mut().unwrap().variant = GradleVariant::Gradle2nix;
+        tmpl.gradle_config_mut().unwrap().dsl = GradleDsl::Kotlin;
+        tmpl.gradle_config_mut().unwrap().jdk_version = Some("21".to_string());
+
+        assert_eq!(
+            tmpl.gradle_config().unwrap().variant,
+            GradleVariant::Gradle2nix
+        );
+        assert_eq!(tmpl.gradle_config().unwrap().dsl, GradleDsl::Kotlin);
+        assert_eq!(
+            tmpl.gradle_config().unwrap().jdk_version,
+            Some("21".to_string())
+        );
     }
 }

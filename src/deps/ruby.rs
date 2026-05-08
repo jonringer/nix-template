@@ -296,6 +296,7 @@ DEPENDENCIES
             python_format: "setuptools".to_owned(),
             mvn_hash: FAKE_SRI_HASH.to_owned(),
             mix_fod_hash: FAKE_SRI_HASH.to_owned(),
+            gradle_hash: FAKE_SRI_HASH.to_owned(),
         };
 
         let success = infer_dependencies(&mut info);
