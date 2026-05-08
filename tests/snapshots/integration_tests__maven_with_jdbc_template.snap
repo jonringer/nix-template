@@ -1,0 +1,29 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, maven
+, fetchFromGitHub
+}:
+
+maven.buildMavenPackage (finalAttrs: {
+  pname = "test-app";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "test-app";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  mvnHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/test-app";
+    license = licenses.apache20;
+    maintainers = with maintainers; [  ];
+  };
+})

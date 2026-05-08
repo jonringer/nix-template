@@ -1,5 +1,6 @@
 pub mod buildsystem;
 pub mod go;
+pub mod maven;
 pub mod php;
 pub mod python;
 pub mod ruby;

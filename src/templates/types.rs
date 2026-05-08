@@ -27,6 +27,8 @@ pub enum Template {
     Node(NodeConfig),
     /// PHP package (buildComposerProject2)
     Php(PhpConfig),
+    /// Java/Maven package (buildMavenPackage)
+    Maven(MavenConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -175,6 +177,14 @@ pub struct PhpConfig {
     pub extensions: Vec<String>,
 }
 
+/// Maven template configuration: JDK version.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MavenConfig {
+    /// JDK version to use (e.g., "17", "21")
+    /// Inferred from pom.xml properties or defaulted to latest LTS
+    pub jdk_version: Option<String>,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -191,6 +201,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "npm",
     "pnpm",
     "php",
+    "maven",
     "dotnet",
     "ruby",
     "mkshell",
@@ -274,8 +285,15 @@ impl Template {
     /// Create a default PHP template.
     pub fn php() -> Self {
         Template::Php(PhpConfig {
-            version: None,  // Use generic 'php' attribute by default
+            version: None, // Use generic 'php' attribute by default
             extensions: Vec::new(),
+        })
+    }
+
+    /// Create a default Maven template.
+    pub fn maven() -> Self {
+        Template::Maven(MavenConfig {
+            jdk_version: None, // Will be inferred from pom.xml
         })
     }
 
@@ -327,8 +345,11 @@ impl Template {
                 variant: NodeVariant::Pnpm,
             })),
             "php" => Ok(Template::Php(PhpConfig {
-                version: None,  // Use generic 'php' attribute by default
+                version: None, // Use generic 'php' attribute by default
                 extensions: Vec::new(),
+            })),
+            "maven" => Ok(Template::Maven(MavenConfig {
+                jdk_version: None, // Will be inferred from pom.xml
             })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
@@ -363,6 +384,7 @@ impl Template {
                 NodeVariant::Pnpm => "pnpm",
             },
             Template::Php(_) => "php",
+            Template::Maven(_) => "maven",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -481,6 +503,29 @@ impl Template {
     pub fn php_config_mut(&mut self) -> Option<&mut PhpConfig> {
         match self {
             Template::Php(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a Maven template.
+    pub fn is_maven(&self) -> bool {
+        matches!(self, Template::Maven(_))
+    }
+
+    /// Get Maven config if this is a Maven template.
+    #[allow(dead_code)]
+    pub fn maven_config(&self) -> Option<&MavenConfig> {
+        match self {
+            Template::Maven(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable Maven config.
+    #[allow(dead_code)]
+    pub fn maven_config_mut(&mut self) -> Option<&mut MavenConfig> {
+        match self {
+            Template::Maven(config) => Some(config),
             _ => None,
         }
     }
@@ -628,7 +673,7 @@ mod tests {
         let tmpl: Template = "php".parse().unwrap();
         assert!(tmpl.is_php());
         assert_eq!(tmpl.to_cli_str(), "php");
-        assert_eq!(tmpl.php_config().unwrap().version, None);  // Uses generic 'php' by default
+        assert_eq!(tmpl.php_config().unwrap().version, None); // Uses generic 'php' by default
         assert!(tmpl.php_config().unwrap().extensions.is_empty());
     }
 
@@ -636,7 +681,7 @@ mod tests {
     fn php_config_access() {
         let mut tmpl: Template = "php".parse().unwrap();
         assert!(tmpl.is_php());
-        assert_eq!(tmpl.php_config().unwrap().version, None);  // Default is None (uses generic 'php')
+        assert_eq!(tmpl.php_config().unwrap().version, None); // Default is None (uses generic 'php')
 
         // Mutate version and extensions
         tmpl.php_config_mut().unwrap().version = Some("82".to_string());
@@ -646,6 +691,29 @@ mod tests {
         assert_eq!(
             tmpl.php_config().unwrap().extensions,
             vec!["pdo".to_string(), "gd".to_string()]
+        );
+    }
+
+    #[test]
+    fn maven_template_parsing() {
+        let tmpl: Template = "maven".parse().unwrap();
+        assert!(tmpl.is_maven());
+        assert_eq!(tmpl.to_cli_str(), "maven");
+        assert_eq!(tmpl.maven_config().unwrap().jdk_version, None); // Default inferred from pom.xml
+    }
+
+    #[test]
+    fn maven_config_access() {
+        let mut tmpl: Template = "maven".parse().unwrap();
+        assert!(tmpl.is_maven());
+        assert_eq!(tmpl.maven_config().unwrap().jdk_version, None);
+
+        // Mutate jdk_version
+        tmpl.maven_config_mut().unwrap().jdk_version = Some("21".to_string());
+
+        assert_eq!(
+            tmpl.maven_config().unwrap().jdk_version,
+            Some("21".to_string())
         );
     }
 }

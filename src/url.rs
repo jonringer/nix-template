@@ -1105,6 +1105,7 @@ pub fn prefetch_dependency_hash(info: &types::ExpressionInfo) -> Option<String> 
         cargo_lock_git_deps: Vec::new(),
         go_module_path: String::new(),
         python_format: "setuptools".to_owned(),
+        mvn_hash: FAKE_SRI_HASH.to_owned(),
     };
 
     let probe_expr = crate::expression::generate_expression(&probe_info);

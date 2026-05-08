@@ -52,6 +52,11 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             "php.buildComposerProject2",
             Some("buildComposerProject2"),
         ),
+        Template::Maven(_) => (
+            "maven",
+            "maven.buildMavenPackage",
+            Some("buildMavenPackage"),
+        ),
         Template::Dotnet => (
             "buildDotnetModule",
             "buildDotnetModule",
@@ -296,6 +301,24 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             };
             format!(
                 "  @doc:vendorHash@vendorHash = \"@vendor_hash@\";{native}{build}",
+                native = native,
+                build = build,
+            )
+        }
+        Template::Maven(_) => {
+            // Conditionally render buildInputs only when inferred
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+            format!(
+                "  @doc:mvnHash@mvnHash = \"@mvn_hash@\";{native}{build}",
                 native = native,
                 build = build,
             )
@@ -601,6 +624,7 @@ mod tests {
             cargo_lock_git_deps: Vec::new(),
             go_module_path: String::new(),
             python_format: "setuptools".to_owned(),
+            mvn_hash: "sha256-mvn".to_owned(),
         }
     }
 
@@ -647,6 +671,7 @@ mod tests {
             cargo_lock_git_deps: Vec::new(),
             go_module_path: String::new(),
             python_format: "setuptools".to_owned(),
+            mvn_hash: "sha256-mvn".to_owned(),
         }
     }
 

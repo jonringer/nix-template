@@ -6,7 +6,7 @@
 //! The approach is conservative: only high-confidence, simple patterns
 //! are detected. Complex conditionals and variables are ignored.
 
-use crate::types::ExpressionInfo;
+use crate::types::{ExpressionInfo, FAKE_SRI_HASH};
 use log::debug;
 use regex::Regex;
 use std::collections::BTreeSet;
@@ -448,6 +448,7 @@ find_package(OpenSSL)
             cargo_lock_git_deps: Vec::new(),
             go_module_path: String::new(),
             python_format: "setuptools".to_owned(),
+            mvn_hash: FAKE_SRI_HASH.to_owned(),
         };
 
         let detected = infer_buildsystem_dependencies(&mut info);
