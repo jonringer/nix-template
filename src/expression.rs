@@ -93,6 +93,18 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             "stdenv.mkDerivation",
             Some("stdenvMkDerivation"),
         ),
+        Template::Perl(config) => match config.build_system {
+            crate::types::PerlBuildSystem::Package => (
+                "buildPerlPackage",
+                "buildPerlPackage",
+                Some("buildPerlPackage"),
+            ),
+            crate::types::PerlBuildSystem::Module => (
+                "buildPerlModule",
+                "buildPerlModule",
+                Some("buildPerlModule"),
+            ),
+        },
         Template::Dotnet => (
             "buildDotnetModule",
             "buildDotnetModule",
@@ -486,6 +498,22 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             };
 
             let base = "  # Clojure dependencies are managed via clj-nix for reproducible builds\n  # Run 'clj-nix lock' to generate deps-lock.json\n  # See: https://github.com/jlesquembre/clj-nix\n  # For Leiningen projects, consider using leiningen2nix";
+            format!("{base}{native}{build}", base = base, native = native, build = build)
+        }
+        Template::Perl(_) => {
+            // Perl template: buildPerlPackage/buildPerlModule handle dependencies automatically
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+
+            let base = "  # Perl dependencies are typically handled automatically by buildPerlPackage/buildPerlModule\n  # Additional CPAN modules can be added to propagatedBuildInputs\n  # See: https://nixos.org/manual/nixpkgs/stable/#sec-language-perl";
             format!("{base}{native}{build}", base = base, native = native, build = build)
         }
         Template::Ruby => {
