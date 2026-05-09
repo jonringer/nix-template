@@ -1684,3 +1684,34 @@ fn test_perl_template_basic() {
     // Snapshot the output
     insta::assert_snapshot!("perl_basic_template", stdout);
 }
+
+/// Test basic Lua template generation with buildLuaPackage
+#[test]
+fn test_lua_template_basic() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "lua",
+            "-p",
+            "my-lua-lib",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's a Lua derivation
+    assert!(stdout.contains("buildLuaPackage"));
+    assert!(stdout.contains("# Lua dependencies from .rockspec are handled automatically"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("lua_basic_template", stdout);
+}

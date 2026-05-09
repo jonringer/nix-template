@@ -105,6 +105,18 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
                 Some("buildPerlModule"),
             ),
         },
+        Template::Lua(config) => match config.variant {
+            crate::types::LuaVariant::Package => (
+                "buildLuaPackage",
+                "buildLuaPackage",
+                Some("buildLuaPackage"),
+            ),
+            crate::types::LuaVariant::Application => (
+                "buildLuaApplication",
+                "buildLuaApplication",
+                Some("buildLuaApplication"),
+            ),
+        },
         Template::Dotnet => (
             "buildDotnetModule",
             "buildDotnetModule",
@@ -514,6 +526,22 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             };
 
             let base = "  # Perl dependencies are typically handled automatically by buildPerlPackage/buildPerlModule\n  # Additional CPAN modules can be added to propagatedBuildInputs\n  # See: https://nixos.org/manual/nixpkgs/stable/#sec-language-perl";
+            format!("{base}{native}{build}", base = base, native = native, build = build)
+        }
+        Template::Lua(_) => {
+            // Lua template: buildLuaPackage/buildLuaApplication handle LuaRocks dependencies
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+
+            let base = "  # Lua dependencies from .rockspec are handled automatically by buildLuaPackage/buildLuaApplication\n  # Additional Lua rocks can be added to propagatedBuildInputs\n  # See: https://nixos.org/manual/nixpkgs/stable/#sec-language-lua";
             format!("{base}{native}{build}", base = base, native = native, build = build)
         }
         Template::Ruby => {

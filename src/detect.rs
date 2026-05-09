@@ -229,6 +229,17 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
         }
     }
 
+    // Lua detection: scan for *.rockspec files
+    // LuaRocks packages use rockspec files with dynamic names (e.g., mypackage-1.0-1.rockspec)
+    {
+        if find_rockspec_file(source_path).is_some() {
+            candidates.push(Candidate {
+                template: Template::lua(),
+                reason: "*.rockspec",
+            });
+        }
+    }
+
     // Haskell sub-classification: detect build system (Stack vs Cabal) and parse .cabal for executable/library
     for candidate in candidates.iter_mut() {
         if candidate.template.is_haskell() {
@@ -438,6 +449,23 @@ fn find_opam_file(source_path: &Path) -> Option<std::path::PathBuf> {
             if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
                 if filename == "opam" {
                     return Some(path);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Scan a directory for Lua .rockspec files.
+/// Returns the path to the first .rockspec file found, or None.
+fn find_rockspec_file(source_path: &Path) -> Option<std::path::PathBuf> {
+    use std::fs;
+
+    if let Ok(entries) = fs::read_dir(source_path) {
+        for entry in entries.flatten() {
+            if let Some(ext) = entry.path().extension().and_then(|s| s.to_str()) {
+                if ext == "rockspec" {
+                    return Some(entry.path());
                 }
             }
         }
