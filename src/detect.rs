@@ -57,6 +57,8 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         ("cabal.project", Template::haskell(), "cabal.project"),
         ("dune-project", Template::ocaml(), "dune-project"),
         ("build.sbt", Template::scala(), "build.sbt"),
+        ("deps.edn", Template::clojure(), "deps.edn"),
+        ("project.clj", Template::clojure(), "project.clj"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
         ("Gemfile", Template::Ruby, "Gemfile"),
         ("meson.build", Template::stdenv(), "meson.build"),
@@ -309,6 +311,44 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
             candidate.template = Template::Scala(crate::templates::types::ScalaConfig {
                 scala_version,
                 sbt_version,
+            });
+            break;
+        }
+    }
+
+    // Clojure sub-classification: detect build tool (Deps vs Leiningen) and parse JDK version
+    for candidate in candidates.iter_mut() {
+        if candidate.template.is_clojure() {
+            use crate::deps::clojure;
+
+            // Detect build tool: Deps if deps.edn exists, Leiningen if project.clj exists
+            let build_tool = if source_path.join("deps.edn").exists() {
+                crate::templates::types::ClojureBuildTool::Deps
+            } else {
+                crate::templates::types::ClojureBuildTool::Leiningen
+            };
+
+            // Try to infer JDK version from deps.edn or project.clj
+            let jdk_version = match build_tool {
+                crate::templates::types::ClojureBuildTool::Deps => {
+                    if source_path.join("deps.edn").exists() {
+                        clojure::infer_jdk_version_from_deps(&source_path.join("deps.edn"))
+                    } else {
+                        None
+                    }
+                }
+                crate::templates::types::ClojureBuildTool::Leiningen => {
+                    if source_path.join("project.clj").exists() {
+                        clojure::infer_jdk_version_from_project(&source_path.join("project.clj"))
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            candidate.template = Template::Clojure(crate::templates::types::ClojureConfig {
+                build_tool,
+                jdk_version,
             });
             break;
         }

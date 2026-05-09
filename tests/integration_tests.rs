@@ -1622,3 +1622,34 @@ fn test_scala_template_basic() {
     // Snapshot the output
     insta::assert_snapshot!("scala_basic_template", stdout);
 }
+
+#[test]
+fn test_clojure_template_basic() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "clojure",
+            "-p",
+            "my-clojure-app",
+            "-v",
+            "1.0.0",
+            "-l",
+            "epl10",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's a Clojure derivation
+    assert!(stdout.contains("stdenv.mkDerivation"));
+    assert!(stdout.contains("# Clojure dependencies are managed via clj-nix"));
+    assert!(stdout.contains("clj-nix"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("clojure_basic_template", stdout);
+}

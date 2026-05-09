@@ -41,6 +41,8 @@ pub enum Template {
     Ocaml(OcamlConfig),
     /// Scala/SBT package (sbt-derivation)
     Scala(ScalaConfig),
+    /// Clojure package (deps.edn or Leiningen)
+    Clojure(ClojureConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -299,6 +301,25 @@ pub struct ScalaConfig {
     pub sbt_version: Option<String>,
 }
 
+/// Clojure template configuration: build tool and JDK version.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ClojureConfig {
+    /// Build tool: Deps (CLI tools) or Leiningen
+    pub build_tool: ClojureBuildTool,
+    /// JDK version to use (e.g., "17", "21")
+    /// Inferred from deps.edn or defaulted to latest LTS
+    pub jdk_version: Option<String>,
+}
+
+/// Clojure build tool variant: Deps (CLI tools) or Leiningen.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ClojureBuildTool {
+    /// Clojure CLI tools (deps.edn)
+    Deps,
+    /// Leiningen build tool (project.clj)
+    Leiningen,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -322,6 +343,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "haskell",
     "ocaml",
     "scala",
+    "clojure",
     "dotnet",
     "ruby",
     "mkshell",
@@ -480,6 +502,14 @@ impl Template {
         })
     }
 
+    /// Create a Clojure template (defaults to Deps/CLI tools).
+    pub fn clojure() -> Self {
+        Template::Clojure(ClojureConfig {
+            build_tool: ClojureBuildTool::Deps, // Default to Deps, will be detected later
+            jdk_version: None,                  // Will be inferred or use nixpkgs default
+        })
+    }
+
     /// Create a default stdenv template.
     pub fn stdenv() -> Self {
         Template::Stdenv(StdenvVariant::Default)
@@ -560,6 +590,10 @@ impl Template {
                 scala_version: None,
                 sbt_version: None,
             })),
+            "clojure" => Ok(Template::Clojure(ClojureConfig {
+                build_tool: ClojureBuildTool::Deps,
+                jdk_version: None,
+            })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -600,6 +634,7 @@ impl Template {
             Template::Haskell(_) => "haskell",
             Template::Ocaml(_) => "ocaml",
             Template::Scala(_) => "scala",
+            Template::Clojure(_) => "clojure",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -879,6 +914,29 @@ impl Template {
     pub fn scala_config_mut(&mut self) -> Option<&mut ScalaConfig> {
         match self {
             Template::Scala(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a Clojure template.
+    pub fn is_clojure(&self) -> bool {
+        matches!(self, Template::Clojure(_))
+    }
+
+    /// Get Clojure config if this is a Clojure template.
+    #[allow(dead_code)]
+    pub fn clojure_config(&self) -> Option<&ClojureConfig> {
+        match self {
+            Template::Clojure(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable Clojure config.
+    #[allow(dead_code)]
+    pub fn clojure_config_mut(&mut self) -> Option<&mut ClojureConfig> {
+        match self {
+            Template::Clojure(config) => Some(config),
             _ => None,
         }
     }
