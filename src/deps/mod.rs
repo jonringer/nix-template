@@ -11,6 +11,7 @@ pub mod ocaml;
 pub mod perl;
 pub mod php;
 pub mod python;
+pub mod r;
 pub mod ruby;
 pub mod rust;
 pub mod scala;

@@ -47,6 +47,8 @@ pub enum Template {
     Perl(PerlConfig),
     /// Lua package or application (buildLuaPackage or buildLuaApplication)
     Lua(LuaConfig),
+    /// R package (rPackages.buildRPackage)
+    R,
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -399,6 +401,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "clojure",
     "perl",
     "lua",
+    "r",
     "dotnet",
     "ruby",
     "mkshell",
@@ -671,6 +674,7 @@ impl Template {
                 variant: LuaVariant::Package,
                 version: LuaVersion::Lua54,
             })),
+            "r" => Ok(Template::R),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -714,6 +718,7 @@ impl Template {
             Template::Clojure(_) => "clojure",
             Template::Perl(_) => "perl",
             Template::Lua(_) => "lua",
+            Template::R => "r",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",

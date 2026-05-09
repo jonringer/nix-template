@@ -123,6 +123,11 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             Some("buildDotnetModule"),
         ),
         Template::Ruby => ("bundlerApp", "bundlerApp", Some("bundlerApp")),
+        Template::R => (
+            "rPackages",
+            "rPackages.buildRPackage",
+            Some("buildRPackage"),
+        ),
         Template::Test => ("", "", None), // Tests aren't a normal expression
         Template::Module => ("", "", None), // Modules aren't a normal expression
     };
@@ -561,6 +566,22 @@ fn build_inputs(info: &ExpressionInfo) -> String {
                 native = native,
                 build = build,
             )
+        }
+        Template::R => {
+            // R template: buildRPackage handles R package dependencies from DESCRIPTION
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+
+            let base = "  # R dependencies from DESCRIPTION are handled automatically by buildRPackage\n  # Additional R packages can be added to propagatedBuildInputs\n  # See: https://nixos.org/manual/nixpkgs/stable/#sec-language-r";
+            format!("{base}{native}{build}", base = base, native = native, build = build)
         }
         // stdenv / stdenvNoCC: render `nativeBuildInputs` only when
         // populated (via --native-build-inputs); always render

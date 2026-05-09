@@ -28,6 +28,7 @@
     - Added `clojure` template for Clojure projects using deps.edn or Leiningen with clj-nix
     - Added `perl` template for Perl modules using buildPerlPackage or buildPerlModule
     - Added `lua` template for Lua packages and applications using buildLuaPackage or buildLuaApplication
+    - Added `r` template for R packages using rPackages.buildRPackage
     - Added `auto` template type for automatic project type detection
   - CLI Flags:
     - Added `--by-name` flag for RFC 140 support (pkgs/by-name directory structure)
@@ -53,6 +54,7 @@
     - Clojure: Detects build tool (Deps/Leiningen) from deps.edn or project.clj and infers JDK version from build files
     - Perl: Detects build system (MakeMaker/Module::Build) from Makefile.PL or Build.PL and parses META.json/META.yml for dependencies
     - Lua: Detects variant (Package/Application) and Lua version (5.1-5.4/LuaJIT) from .rockspec files
+    - R: Parses DESCRIPTION file for package metadata, R version requirements, and dependencies (Depends, Imports, LinkingTo)
     - CMake: Parses find_package() and find_dependency() calls for common dependencies (OpenSSL, ZLIB, Qt, Boost, etc.)
     - Meson: Parses dependency() calls for common dependencies (zlib, openssl, gtk, glib, etc.)
     - Autotools: Detects PKG_CHECK_MODULES in configure.ac and adds pkg-config to nativeBuildInputs
@@ -75,6 +77,7 @@
     - Recognizes Haskell projects (via *.cabal, cabal.project, or stack.yaml)
     - Recognizes OCaml projects (via dune-project or *.opam files)
     - Recognizes Scala projects (via build.sbt)
+    - Recognizes R projects (via DESCRIPTION or *.Rproj files)
     - Project file inference for dotnet template when using --from-url (automatically detects .csproj, .fsproj, or .sln)
   - Project Structure:
     - Normalized `nix/` directory structure for both flake and npins-based projects
