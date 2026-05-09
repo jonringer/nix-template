@@ -55,6 +55,7 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         ("pubspec.yaml", Template::dart(), "pubspec.yaml"),
         ("stack.yaml", Template::haskell(), "stack.yaml"),
         ("cabal.project", Template::haskell(), "cabal.project"),
+        ("dune-project", Template::ocaml(), "dune-project"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
         ("Gemfile", Template::Ruby, "Gemfile"),
         ("meson.build", Template::stdenv(), "meson.build"),
@@ -249,6 +250,42 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
         }
     }
 
+    // OCaml detection: scan for *.opam files
+    // These files have dynamic names (e.g., mypackage.opam), so we need to scan the directory.
+    // This runs after checking for dune-project, so we add *.opam as a fallback.
+    let has_ocaml = candidates.iter().any(|c| c.template.is_ocaml());
+
+    if !has_ocaml {
+        if find_opam_file(source_path).is_some() {
+            candidates.push(Candidate {
+                template: Template::ocaml(),
+                reason: "*.opam",
+            });
+        }
+    }
+
+    // OCaml sub-classification: parse package name from dune-project or .opam file
+    for candidate in candidates.iter_mut() {
+        if candidate.template.is_ocaml() {
+            use crate::deps::ocaml;
+
+            // Try to extract package name from dune-project or .opam file
+            let package_name = if source_path.join("dune-project").exists() {
+                ocaml::extract_package_name_from_dune(&source_path.join("dune-project"))
+            } else if let Some(opam_path) = find_opam_file(source_path) {
+                ocaml::extract_package_name_from_opam(&opam_path)
+            } else {
+                None
+            };
+
+            candidate.template = Template::Ocaml(crate::templates::types::OcamlConfig {
+                package_name,
+                ocaml_version: None, // Reserved for future version pinning
+            });
+            break;
+        }
+    }
+
     candidates
 }
 
@@ -282,6 +319,32 @@ fn find_cabal_file(source_path: &Path) -> Option<std::path::PathBuf> {
             if let Some(ext) = entry.path().extension().and_then(|s| s.to_str()) {
                 if ext == "cabal" {
                     return Some(entry.path());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Scan a directory for OCaml .opam files.
+/// Returns the path to the first .opam file found, or None.
+/// Also checks for standalone "opam" file (no extension).
+fn find_opam_file(source_path: &Path) -> Option<std::path::PathBuf> {
+    use std::fs;
+
+    if let Ok(entries) = fs::read_dir(source_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            // Check for *.opam files
+            if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                if ext == "opam" {
+                    return Some(path);
+                }
+            }
+            // Check for standalone "opam" file (no extension)
+            if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
+                if filename == "opam" {
+                    return Some(path);
                 }
             }
         }
