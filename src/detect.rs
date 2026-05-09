@@ -56,6 +56,7 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         ("stack.yaml", Template::haskell(), "stack.yaml"),
         ("cabal.project", Template::haskell(), "cabal.project"),
         ("dune-project", Template::ocaml(), "dune-project"),
+        ("build.sbt", Template::scala(), "build.sbt"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
         ("Gemfile", Template::Ruby, "Gemfile"),
         ("meson.build", Template::stdenv(), "meson.build"),
@@ -281,6 +282,33 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
             candidate.template = Template::Ocaml(crate::templates::types::OcamlConfig {
                 package_name,
                 ocaml_version: None, // Reserved for future version pinning
+            });
+            break;
+        }
+    }
+
+    // Scala sub-classification: parse Scala version from build.sbt and SBT version from project/build.properties
+    for candidate in candidates.iter_mut() {
+        if candidate.template.is_scala() {
+            use crate::deps::scala;
+
+            // Try to extract Scala version from build.sbt
+            let scala_version = if source_path.join("build.sbt").exists() {
+                scala::extract_scala_version(&source_path.join("build.sbt"))
+            } else {
+                None
+            };
+
+            // Try to extract SBT version from project/build.properties
+            let sbt_version = if source_path.join("project").join("build.properties").exists() {
+                scala::extract_sbt_version(&source_path.join("project/build.properties"))
+            } else {
+                None
+            };
+
+            candidate.template = Template::Scala(crate::templates::types::ScalaConfig {
+                scala_version,
+                sbt_version,
             });
             break;
         }

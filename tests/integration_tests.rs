@@ -1589,3 +1589,36 @@ fn test_ocaml_template_basic() {
     // Snapshot the output
     insta::assert_snapshot!("ocaml_basic_template", stdout);
 }
+
+/// Test basic Scala template generation
+/// This should generate a Scala/SBT package using mkDerivation with sbt-derivation pattern
+#[test]
+fn test_scala_template_basic() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "scala",
+            "-p",
+            "my-scala-app",
+            "-v",
+            "1.0.0",
+            "-l",
+            "apache2",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's a Scala/SBT derivation
+    assert!(stdout.contains("stdenv.mkDerivation"));
+    assert!(stdout.contains("# SBT dependencies are fetched using a Fixed Output Derivation"));
+    assert!(stdout.contains("sbt-derivation"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("scala_basic_template", stdout);
+}

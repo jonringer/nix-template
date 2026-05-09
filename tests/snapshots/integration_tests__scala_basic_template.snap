@@ -1,0 +1,31 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, stdenv
+, fetchFromGitHub
+}:
+
+stdenv.mkDerivation (finalAttrs: {
+  pname = "my-scala-app";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "my-scala-app";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  # SBT dependencies are fetched using a Fixed Output Derivation (FOD)
+  # See: https://nixos.wiki/wiki/Scala
+  # For sbt-derivation usage: https://github.com/zaninime/sbt-derivation
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/my-scala-app";
+    license = licenses.apache2;
+    maintainers = with maintainers; [  ];
+  };
+})
