@@ -1,0 +1,31 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, buildPerlPackage
+, fetchFromGitHub
+}:
+
+buildPerlPackage (finalAttrs: {
+  pname = "My-Module";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "My-Module";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  # Perl dependencies are typically handled automatically by buildPerlPackage/buildPerlModule
+  # Additional CPAN modules can be added to propagatedBuildInputs
+  # See: https://nixos.org/manual/nixpkgs/stable/#sec-language-perl
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/My-Module";
+    license = licenses.artistic2;
+    maintainers = with maintainers; [  ];
+  };
+})

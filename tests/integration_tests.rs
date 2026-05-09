@@ -1653,3 +1653,34 @@ fn test_clojure_template_basic() {
     // Snapshot the output
     insta::assert_snapshot!("clojure_basic_template", stdout);
 }
+
+/// Test basic Perl template generation with buildPerlPackage (MakeMaker)
+#[test]
+fn test_perl_template_basic() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "perl",
+            "-p",
+            "My-Module",
+            "-v",
+            "1.0.0",
+            "-l",
+            "artistic2",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's a Perl derivation
+    assert!(stdout.contains("buildPerlPackage"));
+    assert!(stdout.contains("# Perl dependencies are typically handled automatically"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("perl_basic_template", stdout);
+}

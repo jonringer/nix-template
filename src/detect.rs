@@ -59,6 +59,10 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         ("build.sbt", Template::scala(), "build.sbt"),
         ("deps.edn", Template::clojure(), "deps.edn"),
         ("project.clj", Template::clojure(), "project.clj"),
+        ("Makefile.PL", Template::perl(), "Makefile.PL"),
+        ("Build.PL", Template::perl(), "Build.PL"),
+        ("META.json", Template::perl(), "META.json"),
+        ("META.yml", Template::perl(), "META.yml"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
         ("Gemfile", Template::Ruby, "Gemfile"),
         ("meson.build", Template::stdenv(), "meson.build"),
@@ -349,6 +353,27 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
             candidate.template = Template::Clojure(crate::templates::types::ClojureConfig {
                 build_tool,
                 jdk_version,
+            });
+            break;
+        }
+    }
+
+    // Perl sub-classification: detect build system (MakeMaker vs Module::Build)
+    for candidate in candidates.iter_mut() {
+        if candidate.template.is_perl() {
+            // Detect build system: Package if Makefile.PL exists, Module if Build.PL exists
+            // Makefile.PL has higher priority if both exist
+            let build_system = if source_path.join("Makefile.PL").exists() {
+                crate::templates::types::PerlBuildSystem::Package
+            } else if source_path.join("Build.PL").exists() {
+                crate::templates::types::PerlBuildSystem::Module
+            } else {
+                // Default to Package if only META files were detected
+                crate::templates::types::PerlBuildSystem::Package
+            };
+
+            candidate.template = Template::Perl(crate::templates::types::PerlConfig {
+                build_system,
             });
             break;
         }

@@ -43,6 +43,8 @@ pub enum Template {
     Scala(ScalaConfig),
     /// Clojure package (deps.edn or Leiningen)
     Clojure(ClojureConfig),
+    /// Perl module (buildPerlPackage or buildPerlModule)
+    Perl(PerlConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -320,6 +322,22 @@ pub enum ClojureBuildTool {
     Leiningen,
 }
 
+/// Perl template configuration: build system.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PerlConfig {
+    /// Build system: Package (MakeMaker) or Module (Module::Build)
+    pub build_system: PerlBuildSystem,
+}
+
+/// Perl build system variant: Package (MakeMaker) or Module (Module::Build).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum PerlBuildSystem {
+    /// buildPerlPackage (ExtUtils::MakeMaker - Makefile.PL)
+    Package,
+    /// buildPerlModule (Module::Build - Build.PL)
+    Module,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -344,6 +362,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "ocaml",
     "scala",
     "clojure",
+    "perl",
     "dotnet",
     "ruby",
     "mkshell",
@@ -510,6 +529,13 @@ impl Template {
         })
     }
 
+    /// Create a Perl template (defaults to Package/MakeMaker).
+    pub fn perl() -> Self {
+        Template::Perl(PerlConfig {
+            build_system: PerlBuildSystem::Package, // Default to MakeMaker, will be detected later
+        })
+    }
+
     /// Create a default stdenv template.
     pub fn stdenv() -> Self {
         Template::Stdenv(StdenvVariant::Default)
@@ -594,6 +620,9 @@ impl Template {
                 build_tool: ClojureBuildTool::Deps,
                 jdk_version: None,
             })),
+            "perl" => Ok(Template::Perl(PerlConfig {
+                build_system: PerlBuildSystem::Package,
+            })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -635,6 +664,7 @@ impl Template {
             Template::Ocaml(_) => "ocaml",
             Template::Scala(_) => "scala",
             Template::Clojure(_) => "clojure",
+            Template::Perl(_) => "perl",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -937,6 +967,29 @@ impl Template {
     pub fn clojure_config_mut(&mut self) -> Option<&mut ClojureConfig> {
         match self {
             Template::Clojure(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a Perl template.
+    pub fn is_perl(&self) -> bool {
+        matches!(self, Template::Perl(_))
+    }
+
+    /// Get Perl config if this is a Perl template.
+    #[allow(dead_code)]
+    pub fn perl_config(&self) -> Option<&PerlConfig> {
+        match self {
+            Template::Perl(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable Perl config.
+    #[allow(dead_code)]
+    pub fn perl_config_mut(&mut self) -> Option<&mut PerlConfig> {
+        match self {
+            Template::Perl(config) => Some(config),
             _ => None,
         }
     }

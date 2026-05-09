@@ -26,6 +26,7 @@
     - Added `ocaml` template for OCaml packages using buildDunePackage
     - Added `scala` template for Scala/SBT packages using stdenv.mkDerivation with sbt-derivation
     - Added `clojure` template for Clojure projects using deps.edn or Leiningen with clj-nix
+    - Added `perl` template for Perl modules using buildPerlPackage or buildPerlModule
     - Added `auto` template type for automatic project type detection
   - CLI Flags:
     - Added `--by-name` flag for RFC 140 support (pkgs/by-name directory structure)
@@ -49,6 +50,7 @@
     - OCaml: Extracts package name from dune-project or .opam files
     - Scala: Extracts Scala version from build.sbt and SBT version from project/build.properties
     - Clojure: Detects build tool (Deps/Leiningen) from deps.edn or project.clj and infers JDK version from build files
+    - Perl: Detects build system (MakeMaker/Module::Build) from Makefile.PL or Build.PL and parses META.json/META.yml for dependencies
     - CMake: Parses find_package() and find_dependency() calls for common dependencies (OpenSSL, ZLIB, Qt, Boost, etc.)
     - Meson: Parses dependency() calls for common dependencies (zlib, openssl, gtk, glib, etc.)
     - Autotools: Detects PKG_CHECK_MODULES in configure.ac and adds pkg-config to nativeBuildInputs
