@@ -45,6 +45,8 @@ pub enum Template {
     Clojure(ClojureConfig),
     /// Perl module (buildPerlPackage or buildPerlModule)
     Perl(PerlConfig),
+    /// Lua package or application (buildLuaPackage or buildLuaApplication)
+    Lua(LuaConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -338,6 +340,39 @@ pub enum PerlBuildSystem {
     Module,
 }
 
+/// Lua template configuration: variant and version.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LuaConfig {
+    /// Variant: Package (library) or Application (executable)
+    pub variant: LuaVariant,
+    /// Lua version to use
+    pub version: LuaVersion,
+}
+
+/// Lua variant: Package (library) or Application (executable).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum LuaVariant {
+    /// buildLuaPackage (for Lua libraries)
+    Package,
+    /// buildLuaApplication (for Lua applications/executables)
+    Application,
+}
+
+/// Lua version selection.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum LuaVersion {
+    /// Lua 5.1
+    Lua51,
+    /// Lua 5.2
+    Lua52,
+    /// Lua 5.3
+    Lua53,
+    /// Lua 5.4 (default)
+    Lua54,
+    /// LuaJIT
+    LuaJIT,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -363,6 +398,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "scala",
     "clojure",
     "perl",
+    "lua",
     "dotnet",
     "ruby",
     "mkshell",
@@ -536,6 +572,14 @@ impl Template {
         })
     }
 
+    /// Create a Lua template (defaults to Package/Lua 5.4).
+    pub fn lua() -> Self {
+        Template::Lua(LuaConfig {
+            variant: LuaVariant::Package,  // Default to Package, will be detected later
+            version: LuaVersion::Lua54,    // Default to 5.4 (latest stable)
+        })
+    }
+
     /// Create a default stdenv template.
     pub fn stdenv() -> Self {
         Template::Stdenv(StdenvVariant::Default)
@@ -623,6 +667,10 @@ impl Template {
             "perl" => Ok(Template::Perl(PerlConfig {
                 build_system: PerlBuildSystem::Package,
             })),
+            "lua" => Ok(Template::Lua(LuaConfig {
+                variant: LuaVariant::Package,
+                version: LuaVersion::Lua54,
+            })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -665,6 +713,7 @@ impl Template {
             Template::Scala(_) => "scala",
             Template::Clojure(_) => "clojure",
             Template::Perl(_) => "perl",
+            Template::Lua(_) => "lua",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -990,6 +1039,29 @@ impl Template {
     pub fn perl_config_mut(&mut self) -> Option<&mut PerlConfig> {
         match self {
             Template::Perl(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a Lua template.
+    pub fn is_lua(&self) -> bool {
+        matches!(self, Template::Lua(_))
+    }
+
+    /// Get Lua config if this is a Lua template.
+    #[allow(dead_code)]
+    pub fn lua_config(&self) -> Option<&LuaConfig> {
+        match self {
+            Template::Lua(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable Lua config.
+    #[allow(dead_code)]
+    pub fn lua_config_mut(&mut self) -> Option<&mut LuaConfig> {
+        match self {
+            Template::Lua(config) => Some(config),
             _ => None,
         }
     }

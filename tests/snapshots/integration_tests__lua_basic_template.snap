@@ -1,0 +1,31 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, buildLuaPackage
+, fetchFromGitHub
+}:
+
+buildLuaPackage (finalAttrs: {
+  pname = "my-lua-lib";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "my-lua-lib";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  # Lua dependencies from .rockspec are handled automatically by buildLuaPackage/buildLuaApplication
+  # Additional Lua rocks can be added to propagatedBuildInputs
+  # See: https://nixos.org/manual/nixpkgs/stable/#sec-language-lua
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/my-lua-lib";
+    license = licenses.mit;
+    maintainers = with maintainers; [  ];
+  };
+})
