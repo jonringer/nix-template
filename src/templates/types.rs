@@ -39,6 +39,8 @@ pub enum Template {
     Haskell(HaskellConfig),
     /// OCaml package (buildDunePackage)
     Ocaml(OcamlConfig),
+    /// Scala/SBT package (sbt-derivation)
+    Scala(ScalaConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -286,6 +288,17 @@ pub struct OcamlConfig {
     pub ocaml_version: Option<String>,
 }
 
+/// Scala template configuration: Scala version and SBT version.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScalaConfig {
+    /// Scala version (e.g., "2.13.12")
+    /// Inferred from build.sbt if present
+    pub scala_version: Option<String>,
+    /// SBT version (e.g., "1.9.7")
+    /// Read from project/build.properties if present
+    pub sbt_version: Option<String>,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -308,6 +321,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "dart",
     "haskell",
     "ocaml",
+    "scala",
     "dotnet",
     "ruby",
     "mkshell",
@@ -458,6 +472,14 @@ impl Template {
         })
     }
 
+    /// Create a Scala template.
+    pub fn scala() -> Self {
+        Template::Scala(ScalaConfig {
+            scala_version: None, // Will be inferred from build.sbt
+            sbt_version: None,   // Will be read from project/build.properties
+        })
+    }
+
     /// Create a default stdenv template.
     pub fn stdenv() -> Self {
         Template::Stdenv(StdenvVariant::Default)
@@ -534,6 +556,10 @@ impl Template {
                 package_name: None,
                 ocaml_version: None,
             })),
+            "scala" => Ok(Template::Scala(ScalaConfig {
+                scala_version: None,
+                sbt_version: None,
+            })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -573,6 +599,7 @@ impl Template {
             Template::Dart(_) => "dart",
             Template::Haskell(_) => "haskell",
             Template::Ocaml(_) => "ocaml",
+            Template::Scala(_) => "scala",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -829,6 +856,29 @@ impl Template {
     pub fn ocaml_config_mut(&mut self) -> Option<&mut OcamlConfig> {
         match self {
             Template::Ocaml(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is a Scala template.
+    pub fn is_scala(&self) -> bool {
+        matches!(self, Template::Scala(_))
+    }
+
+    /// Get Scala config if this is a Scala template.
+    #[allow(dead_code)]
+    pub fn scala_config(&self) -> Option<&ScalaConfig> {
+        match self {
+            Template::Scala(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable Scala config.
+    #[allow(dead_code)]
+    pub fn scala_config_mut(&mut self) -> Option<&mut ScalaConfig> {
+        match self {
+            Template::Scala(config) => Some(config),
             _ => None,
         }
     }

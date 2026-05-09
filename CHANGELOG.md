@@ -24,6 +24,7 @@
     - Added `dart` template for Dart applications using buildDartApplication
     - Added `haskell` template for Haskell packages using haskellPackages.callCabal2nix
     - Added `ocaml` template for OCaml packages using buildDunePackage
+    - Added `scala` template for Scala/SBT packages using stdenv.mkDerivation with sbt-derivation
     - Added `auto` template type for automatic project type detection
   - CLI Flags:
     - Added `--by-name` flag for RFC 140 support (pkgs/by-name directory structure)
@@ -45,6 +46,7 @@
     - Dart: Parses executables from pubspec.yaml and excludes Flutter projects
     - Haskell: Detects build system (Cabal/Stack) and parses .cabal files to distinguish executables from libraries
     - OCaml: Extracts package name from dune-project or .opam files
+    - Scala: Extracts Scala version from build.sbt and SBT version from project/build.properties
     - CMake: Parses find_package() and find_dependency() calls for common dependencies (OpenSSL, ZLIB, Qt, Boost, etc.)
     - Meson: Parses dependency() calls for common dependencies (zlib, openssl, gtk, glib, etc.)
     - Autotools: Detects PKG_CHECK_MODULES in configure.ac and adds pkg-config to nativeBuildInputs
@@ -66,6 +68,7 @@
     - Recognizes Dart projects (via pubspec.lock or pubspec.yaml, excludes Flutter projects)
     - Recognizes Haskell projects (via *.cabal, cabal.project, or stack.yaml)
     - Recognizes OCaml projects (via dune-project or *.opam files)
+    - Recognizes Scala projects (via build.sbt)
     - Project file inference for dotnet template when using --from-url (automatically detects .csproj, .fsproj, or .sln)
   - Project Structure:
     - Normalized `nix/` directory structure for both flake and npins-based projects

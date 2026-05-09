@@ -83,6 +83,11 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             "buildDunePackage",
             Some("buildDunePackage"),
         ),
+        Template::Scala(_) => (
+            "stdenv",
+            "stdenv.mkDerivation",
+            Some("stdenvMkDerivation"),
+        ),
         Template::Dotnet => (
             "buildDotnetModule",
             "buildDotnetModule",
@@ -444,6 +449,22 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             };
 
             let base = "  # buildDunePackage reads dependencies from dune-project\n  # See: https://nixos.org/manual/nixpkgs/stable/#sec-language-ocaml\n  # For complex dependency management, consider opam-nix: https://github.com/tweag/opam-nix";
+            format!("{base}{native}{build}", base = base, native = native, build = build)
+        }
+        Template::Scala(_) => {
+            // Scala/SBT template: use sbt-derivation pattern with Fixed Output Derivation
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+
+            let base = "  # SBT dependencies are fetched using a Fixed Output Derivation (FOD)\n  # See: https://nixos.wiki/wiki/Scala\n  # For sbt-derivation usage: https://github.com/zaninime/sbt-derivation";
             format!("{base}{native}{build}", base = base, native = native, build = build)
         }
         Template::Ruby => {
