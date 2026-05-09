@@ -1,0 +1,31 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, buildDunePackage
+, fetchFromGitHub
+}:
+
+buildDunePackage (finalAttrs: {
+  pname = "my-ocaml-pkg";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "my-ocaml-pkg";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  # buildDunePackage reads dependencies from dune-project
+  # See: https://nixos.org/manual/nixpkgs/stable/#sec-language-ocaml
+  # For complex dependency management, consider opam-nix: https://github.com/tweag/opam-nix
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/my-ocaml-pkg";
+    license = licenses.mit;
+    maintainers = with maintainers; [  ];
+  };
+})

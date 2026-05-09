@@ -5,6 +5,7 @@ pub mod go;
 pub mod gradle;
 pub mod haskell;
 pub mod maven;
+pub mod ocaml;
 pub mod php;
 pub mod python;
 pub mod ruby;

@@ -1556,3 +1556,36 @@ fn test_haskell_template_basic() {
     // Snapshot the output
     insta::assert_snapshot!("haskell_basic_template", stdout);
 }
+
+/// Test basic OCaml template generation
+/// This should generate an OCaml package using buildDunePackage
+#[test]
+fn test_ocaml_template_basic() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "ocaml",
+            "-p",
+            "my-ocaml-pkg",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "Command failed: {:?}", output);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify it's an OCaml package derivation
+    assert!(stdout.contains("buildDunePackage"));
+    assert!(stdout.contains("# buildDunePackage reads dependencies from dune-project"));
+    assert!(stdout.contains("opam-nix"));
+
+    // Snapshot the output
+    insta::assert_snapshot!("ocaml_basic_template", stdout);
+}

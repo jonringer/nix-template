@@ -37,6 +37,8 @@ pub enum Template {
     Dart(DartConfig),
     /// Haskell package or application (callCabal2nix)
     Haskell(HaskellConfig),
+    /// OCaml package (buildDunePackage)
+    Ocaml(OcamlConfig),
     /// .NET package (buildDotnetModule)
     Dotnet,
     /// Ruby application (bundlerApp)
@@ -274,6 +276,16 @@ pub enum HaskellBuildSystem {
     Stack,
 }
 
+/// OCaml template configuration: package name and OCaml version.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OcamlConfig {
+    /// Package name from dune-project or .opam file
+    pub package_name: Option<String>,
+    /// OCaml version constraint (e.g., ">= 4.14")
+    /// Not currently used but reserved for future version pinning
+    pub ocaml_version: Option<String>,
+}
+
 /// CLI-friendly template names for argument parsing.
 /// These maintain backward compatibility with the original flat structure.
 pub const CLI_TEMPLATES: &[&str] = &[
@@ -295,6 +307,7 @@ pub const CLI_TEMPLATES: &[&str] = &[
     "gradle",
     "dart",
     "haskell",
+    "ocaml",
     "dotnet",
     "ruby",
     "mkshell",
@@ -437,6 +450,14 @@ impl Template {
         })
     }
 
+    /// Create an OCaml template.
+    pub fn ocaml() -> Self {
+        Template::Ocaml(OcamlConfig {
+            package_name: None,   // Will be parsed from dune-project or .opam
+            ocaml_version: None,  // Reserved for future version pinning
+        })
+    }
+
     /// Create a default stdenv template.
     pub fn stdenv() -> Self {
         Template::Stdenv(StdenvVariant::Default)
@@ -509,6 +530,10 @@ impl Template {
                 ghc_version: None,
                 is_executable: true,
             })),
+            "ocaml" => Ok(Template::Ocaml(OcamlConfig {
+                package_name: None,
+                ocaml_version: None,
+            })),
             "dotnet" => Ok(Template::Dotnet),
             "ruby" => Ok(Template::Ruby),
             "mkshell" => Ok(Template::Mkshell),
@@ -547,6 +572,7 @@ impl Template {
             Template::Gradle(_) => "gradle",
             Template::Dart(_) => "dart",
             Template::Haskell(_) => "haskell",
+            Template::Ocaml(_) => "ocaml",
             Template::Dotnet => "dotnet",
             Template::Ruby => "ruby",
             Template::Mkshell => "mkshell",
@@ -780,6 +806,29 @@ impl Template {
     pub fn haskell_config_mut(&mut self) -> Option<&mut HaskellConfig> {
         match self {
             Template::Haskell(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Check if this is an OCaml template.
+    pub fn is_ocaml(&self) -> bool {
+        matches!(self, Template::Ocaml(_))
+    }
+
+    /// Get OCaml config if this is an OCaml template.
+    #[allow(dead_code)]
+    pub fn ocaml_config(&self) -> Option<&OcamlConfig> {
+        match self {
+            Template::Ocaml(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Get mutable OCaml config.
+    #[allow(dead_code)]
+    pub fn ocaml_config_mut(&mut self) -> Option<&mut OcamlConfig> {
+        match self {
+            Template::Ocaml(config) => Some(config),
             _ => None,
         }
     }

@@ -78,6 +78,11 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             "haskellPackages.callCabal2nix",
             Some("haskellPackagesCallCabal2nix"),
         ),
+        Template::Ocaml(_) => (
+            "buildDunePackage",
+            "buildDunePackage",
+            Some("buildDunePackage"),
+        ),
         Template::Dotnet => (
             "buildDotnetModule",
             "buildDotnetModule",
@@ -423,6 +428,22 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             };
 
             let base = "  # callCabal2nix automatically reads dependencies from the .cabal file\n  # See: https://nixos.org/manual/nixpkgs/stable/#haskell\n  # For more complex builds, consider haskell.nix: https://input-output-hk.github.io/haskell.nix/";
+            format!("{base}{native}{build}", base = base, native = native, build = build)
+        }
+        Template::Ocaml(_) => {
+            // OCaml template: buildDunePackage handles dependencies from dune-project
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+
+            let base = "  # buildDunePackage reads dependencies from dune-project\n  # See: https://nixos.org/manual/nixpkgs/stable/#sec-language-ocaml\n  # For complex dependency management, consider opam-nix: https://github.com/tweag/opam-nix";
             format!("{base}{native}{build}", base = base, native = native, build = build)
         }
         Template::Ruby => {
