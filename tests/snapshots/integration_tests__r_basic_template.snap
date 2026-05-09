@@ -1,0 +1,31 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, rPackages
+, fetchFromGitHub
+}:
+
+rPackages.buildRPackage (finalAttrs: {
+  pname = "myRpackage";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "myRpackage";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  # R dependencies from DESCRIPTION are handled automatically by buildRPackage
+  # Additional R packages can be added to propagatedBuildInputs
+  # See: https://nixos.org/manual/nixpkgs/stable/#sec-language-r
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/myRpackage";
+    license = licenses.mit;
+    maintainers = with maintainers; [  ];
+  };
+})

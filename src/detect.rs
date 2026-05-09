@@ -63,6 +63,7 @@ fn indicators() -> Vec<(&'static str, Template, &'static str)> {
         ("Build.PL", Template::perl(), "Build.PL"),
         ("META.json", Template::perl(), "META.json"),
         ("META.yml", Template::perl(), "META.yml"),
+        ("DESCRIPTION", Template::R, "DESCRIPTION"),
         ("Gemfile.lock", Template::Ruby, "Gemfile.lock"),
         ("Gemfile", Template::Ruby, "Gemfile"),
         ("meson.build", Template::stdenv(), "meson.build"),
@@ -236,6 +237,17 @@ pub fn detect_template_candidates_from_path(source_path: &Path) -> Vec<Candidate
             candidates.push(Candidate {
                 template: Template::lua(),
                 reason: "*.rockspec",
+            });
+        }
+    }
+
+    // R detection: scan for *.Rproj files
+    // R projects commonly have .Rproj files (e.g., mypackage.Rproj)
+    {
+        if find_rproj_file(source_path).is_some() {
+            candidates.push(Candidate {
+                template: Template::R,
+                reason: "*.Rproj",
             });
         }
     }
@@ -465,6 +477,23 @@ fn find_rockspec_file(source_path: &Path) -> Option<std::path::PathBuf> {
         for entry in entries.flatten() {
             if let Some(ext) = entry.path().extension().and_then(|s| s.to_str()) {
                 if ext == "rockspec" {
+                    return Some(entry.path());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Scan a directory for R .Rproj files.
+/// Returns the path to the first .Rproj file found, or None.
+fn find_rproj_file(source_path: &Path) -> Option<std::path::PathBuf> {
+    use std::fs;
+
+    if let Ok(entries) = fs::read_dir(source_path) {
+        for entry in entries.flatten() {
+            if let Some(ext) = entry.path().extension().and_then(|s| s.to_str()) {
+                if ext == "Rproj" {
                     return Some(entry.path());
                 }
             }
