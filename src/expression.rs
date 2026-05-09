@@ -88,6 +88,11 @@ fn derivation_helper(info: &ExpressionInfo) -> (String, String) {
             "stdenv.mkDerivation",
             Some("stdenvMkDerivation"),
         ),
+        Template::Clojure(_) => (
+            "stdenv",
+            "stdenv.mkDerivation",
+            Some("stdenvMkDerivation"),
+        ),
         Template::Dotnet => (
             "buildDotnetModule",
             "buildDotnetModule",
@@ -465,6 +470,22 @@ fn build_inputs(info: &ExpressionInfo) -> String {
             };
 
             let base = "  # SBT dependencies are fetched using a Fixed Output Derivation (FOD)\n  # See: https://nixos.wiki/wiki/Scala\n  # For sbt-derivation usage: https://github.com/zaninime/sbt-derivation";
+            format!("{base}{native}{build}", base = base, native = native, build = build)
+        }
+        Template::Clojure(_) => {
+            // Clojure template: use clj-nix for dependency management
+            let native = if info.native_build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  nativeBuildInputs = [@native_build_inputs@ ];".to_owned()
+            };
+            let build = if info.build_inputs.is_empty() {
+                String::new()
+            } else {
+                "\n\n  buildInputs = [@build_inputs@ ];".to_owned()
+            };
+
+            let base = "  # Clojure dependencies are managed via clj-nix for reproducible builds\n  # Run 'clj-nix lock' to generate deps-lock.json\n  # See: https://github.com/jlesquembre/clj-nix\n  # For Leiningen projects, consider using leiningen2nix";
             format!("{base}{native}{build}", base = base, native = native, build = build)
         }
         Template::Ruby => {

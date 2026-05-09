@@ -25,6 +25,7 @@
     - Added `haskell` template for Haskell packages using haskellPackages.callCabal2nix
     - Added `ocaml` template for OCaml packages using buildDunePackage
     - Added `scala` template for Scala/SBT packages using stdenv.mkDerivation with sbt-derivation
+    - Added `clojure` template for Clojure projects using deps.edn or Leiningen with clj-nix
     - Added `auto` template type for automatic project type detection
   - CLI Flags:
     - Added `--by-name` flag for RFC 140 support (pkgs/by-name directory structure)
@@ -47,6 +48,7 @@
     - Haskell: Detects build system (Cabal/Stack) and parses .cabal files to distinguish executables from libraries
     - OCaml: Extracts package name from dune-project or .opam files
     - Scala: Extracts Scala version from build.sbt and SBT version from project/build.properties
+    - Clojure: Detects build tool (Deps/Leiningen) from deps.edn or project.clj and infers JDK version from build files
     - CMake: Parses find_package() and find_dependency() calls for common dependencies (OpenSSL, ZLIB, Qt, Boost, etc.)
     - Meson: Parses dependency() calls for common dependencies (zlib, openssl, gtk, glib, etc.)
     - Autotools: Detects PKG_CHECK_MODULES in configure.ac and adds pkg-config to nativeBuildInputs

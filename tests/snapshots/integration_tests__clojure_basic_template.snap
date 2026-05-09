@@ -1,0 +1,32 @@
+---
+source: tests/integration_tests.rs
+expression: stdout
+---
+{ lib
+, stdenv
+, fetchFromGitHub
+}:
+
+stdenv.mkDerivation (finalAttrs: {
+  pname = "my-clojure-app";
+  version = "1.0.0";
+
+  src = fetchFromGitHub {
+    owner = "CHANGE";
+    repo = "my-clojure-app";
+    rev = finalAttrs.version;
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+
+  # Clojure dependencies are managed via clj-nix for reproducible builds
+  # Run 'clj-nix lock' to generate deps-lock.json
+  # See: https://github.com/jlesquembre/clj-nix
+  # For Leiningen projects, consider using leiningen2nix
+
+  meta = with lib; {
+    description = "CHANGE";
+    homepage = "https://github.com/CHANGE/my-clojure-app";
+    license = licenses.epl10;
+    maintainers = with maintainers; [  ];
+  };
+})

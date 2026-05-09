@@ -1,4 +1,5 @@
 pub mod buildsystem;
+pub mod clojure;
 pub mod dart;
 pub mod elixir;
 pub mod go;
