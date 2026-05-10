@@ -7,6 +7,13 @@
   - Removed legacy `python` template (use `python_package` or `python_application` instead)
   - Removed `--nixpkgs` flag (obsolete), replaced by `--by-name`
   - All templates now use `finalAttrs` pattern instead of `rec` for better override composition
+  - CLI restructured into subcommands:
+    - `nix-template template <TEMPLATE> [PATH]` for generating nix expressions (nixpkgs contributions, standalone use)
+    - `nix-template project flake [TEMPLATE]` for initializing the current directory as a Nix flake project
+    - `nix-template project npins [TEMPLATE]` for initializing with npins dependency management
+    - Combined flake+npins via `project flake --with-npins` or `project npins --with-flake`
+    - `nix-template` with no subcommand enters interactive mode
+    - `template` subcommand accepts a URL as the first positional argument (e.g. `nix-template template https://github.com/user/repo`)
 
 - Additions:
   - Templates:
@@ -33,7 +40,6 @@
   - CLI Flags:
     - Added `--by-name` flag for RFC 140 support (pkgs/by-name directory structure)
     - Added `--binputs` and `--nbinputs` flags to manually specify buildInputs and nativeBuildInputs
-    - Added `--init-npins` flag to initialize npins-based (v0.4.0) projects (alternative to flakes)
     - Added `--skip-vendor-hash` flag to skip automatic vendor hash prefetching
     - Added `--skip-infer-deps` flag to skip automatic dependency inference
   - Fetcher Support:

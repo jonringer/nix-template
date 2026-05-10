@@ -30,6 +30,149 @@ pub fn assert(pred: bool, message: &str) {
     }
 }
 
+/// Args shared by both `template` and `project` subcommands.
+fn shared_args() -> Vec<Arg<'static, 'static>> {
+    vec![
+        Arg::from_usage("-l,--license [license] 'Set license'").default_value("CHANGE"),
+        Arg::from_usage("-m,--maintainer [maintainer] 'Set maintainer'"),
+        Arg::from_usage("--no-meta 'Don't include meta section'"),
+        Arg::from_usage(
+            "-d,--documentation-links 'Add comments linking to relevant sections of the Nixpkgs contributor guide.'",
+        )
+        .takes_value(false),
+        Arg::from_usage("-s,--stdout 'Write expression to stdout, instead of PATH'"),
+        Arg::with_name("build-inputs")
+            .long("build-inputs")
+            .visible_alias("binputs")
+            .takes_value(true)
+            .multiple(true)
+            .number_of_values(1)
+            .use_delimiter(true)
+            .require_delimiter(false)
+            .help("Comma-separated list of nixpkgs attributes to add to buildInputs (and the function header). May be repeated. Combined with any inferred entries; duplicates are removed."),
+        Arg::with_name("native-build-inputs")
+            .long("native-build-inputs")
+            .visible_alias("nbinputs")
+            .takes_value(true)
+            .multiple(true)
+            .number_of_values(1)
+            .use_delimiter(true)
+            .require_delimiter(false)
+            .help("Comma-separated list of nixpkgs attributes to add to nativeBuildInputs (and the function header). May be repeated. Combined with any inferred entries; duplicates are removed."),
+        Arg::from_usage("-v [version] 'Set version of package'").default_value("0.0.1"),
+        Arg::from_usage("-p,--pname [pname] 'Package name to be used in expression'")
+            .default_value("CHANGE"),
+        Arg::from_usage(
+            "--skip-infer-deps 'Skip automatic inference of buildInputs/nativeBuildInputs.'",
+        )
+        .takes_value(false),
+        Arg::from_usage(
+            "--no-detect 'Disable automatic template detection from build system files.'",
+        )
+        .takes_value(false),
+    ]
+}
+
+/// Args only used by the `template` subcommand.
+fn template_args() -> Vec<Arg<'static, 'static>> {
+    vec![
+        Arg::from_usage(
+            "-u,--from-url [url] 'Point to a github repo, and use github api to determine package values'",
+        ),
+        Arg::from_usage("-f,--fetcher [fetcher] 'Fetcher to use'")
+            .possible_values(&Fetcher::variants())
+            .case_insensitive(true)
+            .default_value("github")
+            .default_value_if("TEMPLATE", Some("python_package"), "pypi")
+            .default_value_if("TEMPLATE", Some("python_application"), "pypi"),
+        Arg::from_usage("-r,--nixpkgs-root [path] 'Set root of the nixpkgs directory'")
+            .env("NIXPKGS_ROOT"),
+        Arg::from_usage(
+            "--by-name 'RFC140 layout: write the expression to pkgs/by-name/<shard>/<pname>/package.nix (relative to --nixpkgs-root).'",
+        )
+        .takes_value(false)
+        .conflicts_with("no-meta"),
+        Arg::from_usage(
+            "--skip-vendor-hashes 'Skip automatic computation of cargoHash/vendorHash for rust/go templates.'",
+        )
+        .takes_value(false),
+        Arg::from_usage(
+            "--include-prereleases 'Include prerelease versions when fetching from GitLab or other forges.'",
+        )
+        .takes_value(false),
+    ]
+}
+
+fn build_template_subcommand() -> App<'static, 'static> {
+    let mut cmd = SubCommand::with_name("template")
+        .about("Generate a nix expression for nixpkgs or standalone use")
+        .arg(
+            Arg::from_usage("<TEMPLATE> 'Language or framework template target, or a URL. Use \"auto\" to detect from source.'")
+                .possible_values(&Template::variants())
+                .case_insensitive(true)
+                .default_value("auto"),
+        )
+        .arg(
+            Arg::from_usage("[PATH] 'Directory or file to be written.'")
+                .default_value("default.nix")
+                .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix")
+                .default_value_if("TEMPLATE", Some("test"), "test.nix"),
+        );
+
+    for arg in shared_args().into_iter().chain(template_args()) {
+        cmd = cmd.arg(arg);
+    }
+    cmd
+}
+
+fn build_project_flake_subcommand() -> App<'static, 'static> {
+    let mut cmd = SubCommand::with_name("flake")
+        .about("Initialize current directory as a Nix flake project. Auto-detects project type and infers dependencies from local files.")
+        .arg(
+            Arg::from_usage("[TEMPLATE] 'Language or framework template target. Use \"auto\" to detect from local files.'")
+                .possible_values(&Template::variants())
+                .case_insensitive(true)
+                .default_value("auto"),
+        )
+        .arg(
+            Arg::from_usage("--with-npins 'Also scaffold npins dependency management'")
+                .takes_value(false),
+        );
+
+    for arg in shared_args() {
+        cmd = cmd.arg(arg);
+    }
+    cmd
+}
+
+fn build_project_npins_subcommand() -> App<'static, 'static> {
+    let mut cmd = SubCommand::with_name("npins")
+        .about("Initialize current directory with npins dependency management. Auto-detects project type and infers dependencies from local files. See https://github.com/andir/npins")
+        .arg(
+            Arg::from_usage("[TEMPLATE] 'Language or framework template target. Use \"auto\" to detect from local files.'")
+                .possible_values(&Template::variants())
+                .case_insensitive(true)
+                .default_value("auto"),
+        )
+        .arg(
+            Arg::from_usage("--with-flake 'Also generate flake.nix'")
+                .takes_value(false),
+        );
+
+    for arg in shared_args() {
+        cmd = cmd.arg(arg);
+    }
+    cmd
+}
+
+fn build_project_subcommand() -> App<'static, 'static> {
+    SubCommand::with_name("project")
+        .about("Initialize current directory as a Nix project")
+        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .subcommand(build_project_flake_subcommand())
+        .subcommand(build_project_npins_subcommand())
+}
+
 pub fn build_cli() -> App<'static, 'static> {
     App::new("nix-template")
         .version("0.4.1")
@@ -37,12 +180,6 @@ pub fn build_cli() -> App<'static, 'static> {
         .about("Create common nix expressions")
         .version_short("V")
         .setting(AppSettings::ColoredHelp)
-        // make completions and other subcommands distinct from
-        // default template usage
-        .setting(AppSettings::SubcommandsNegateReqs)
-        // make it so that completions subcommand doesn't
-        // inherit global options
-        .setting(AppSettings::ArgsNegateSubcommands)
         .after_help(
             "ENV VARS:
 
@@ -52,17 +189,23 @@ pub fn build_cli() -> App<'static, 'static> {
 
 EXAMPLES:
 
-# generate an expression and infer dependencies for this package and write it to package.nix
-$ nix-template rust --from-url https://github.com/jonringer/nix-template ./package.nix
+# generate an expression and infer dependencies for this package
+$ nix-template template rust --from-url https://github.com/jonringer/nix-template ./package.nix
+
+# generate a template from a URL (auto-detects template type)
+$ nix-template template https://pypi.org/project/requests/
 
 # generate a boilerplate python package expression with name
-$ nix-template python --pname requests ./pkgs/development/python-modules/requests/default.nix
-
-# generate requests package and infer template and dependencies using url
-$ nix-template --from-url https://pypi.org/project/requests/ ./pkgs/development/python-modules/requests/default.nix
+$ nix-template template python_package --pname requests
 
 # generate a shell.nix in $PWD
-$ nix-template mkshell
+$ nix-template template mkshell
+
+# initialize current directory as a flake project
+$ nix-template project flake
+
+# initialize with npins and also generate flake.nix
+$ nix-template project npins --with-flake
 
 # set maintainer name and location of nixpkgs, only needs to be set once per user
 $ nix-template config name jonringer
@@ -70,102 +213,8 @@ $ nix-template config nixpkgs-root ~/nixpkgs
 
 ",
         )
-        .arg(
-            Arg::from_usage("<TEMPLATE> 'Language or framework template target. Use \"auto\" to detect from source (requires --from-url).'")
-                .possible_values(&Template::variants())
-                .case_insensitive(true)
-                .default_value("auto"),
-        )
-        .arg(
-            Arg::from_usage("[PATH] 'directory or file to be written. In the case of a directory, a default.nix will be created. When used with --by-name, it will be appended to nixpkgs-root to determine path location.'")
-                .default_value("default.nix")
-                .default_value_if("TEMPLATE", Some("mkshell"), "shell.nix")
-                .default_value_if("TEMPLATE", Some("test"), "test.nix"),
-        )
-        .arg(Arg::from_usage(
-            "-u,--from-url [url] 'Point to a github repo, and use github api to determine package values'",
-            ))
-        .arg(Arg::from_usage(
-            "-l,--license [license] 'Set license'",
-            ).default_value("CHANGE"))
-        .arg(Arg::from_usage(
-            "-m,--maintainer [maintainer] 'Set maintainer'",
-            ))
-        .arg(Arg::from_usage(
-            "--no-meta 'Don't include meta section'",
-            ).conflicts_with("by-name"))
-        .arg(Arg::from_usage(
-            "-d,--documentation-links 'Add comments linking to relevant sections of the Nixpkgs contributor guide.'",
-            ).takes_value(false))
-        .arg(Arg::from_usage(
-            "-s,--stdout 'Write expression to stdout, instead of PATH'",
-            ))
-        .arg(Arg::from_usage(
-            "--init-flake 'Initialize current directory as a Nix flake project. Auto-detects project type and infers dependencies from local files. Cannot be used with --from-url.'",
-            ).takes_value(false)
-            .conflicts_with("from-url"))
-        .arg(Arg::from_usage(
-            "--init-npins 'Initialize current directory with npins dependency management. Auto-detects project type and infers dependencies from local files. Generates npins/ scaffold and wrapper default.nix. Combinable with --init-flake. Cannot be used with --from-url. See https://github.com/andir/npins'",
-            ).takes_value(false)
-            .conflicts_with("from-url"))
-        .arg(Arg::from_usage(
-            "--skip-vendor-hashes 'Skip automatic computation of cargoHash/vendorHash for rust/go templates. By default, when --from-url is provided, nix-template runs nix-build with a fake hash to compute the real hash. Requires nix to be installed.'",
-            ).takes_value(false))
-        .arg(Arg::from_usage(
-            "--include-prereleases 'Include prerelease versions when fetching from GitLab or other forges. By default, nix-template filters out versions with -alpha, -beta, -rc, etc.'",
-            ).takes_value(false))
-        .arg(Arg::from_usage(
-            "--skip-infer-deps 'Skip automatic inference of buildInputs/nativeBuildInputs. By default, when --from-url is provided, nix-template materialises the source: for the rust template it parses Cargo.toml/Cargo.lock to detect well-known *-sys crates; for the go template it scans *.go files for `// #cgo` directives to detect pkg-config tokens and -l libraries.'",
-            ).takes_value(false))
-        .arg(Arg::from_usage(
-            "--no-detect 'Disable automatic template detection. By default, when --from-url is provided without an explicit template, nix-template inspects the source tree for build system files (Cargo.toml, go.mod, pyproject.toml, etc.) to auto-select the template.'",
-            ).takes_value(false))
-        .arg(
-            // User-supplied buildInputs. Accepts comma-separated values
-            // and may be repeated, e.g. `--build-inputs zlib,openssl
-            // --binputs sqlite`. Merged with anything inference produced
-            // and deduped before rendering.
-            Arg::with_name("build-inputs")
-                .long("build-inputs")
-                .visible_alias("binputs")
-                .takes_value(true)
-                .multiple(true)
-                .number_of_values(1)
-                .use_delimiter(true)
-                .require_delimiter(false)
-                .help("Comma-separated list of nixpkgs attributes to add to buildInputs (and the function header). May be repeated. Combined with any inferred entries; duplicates are removed."),
-        )
-        .arg(
-            Arg::with_name("native-build-inputs")
-                .long("native-build-inputs")
-                .visible_alias("nbinputs")
-                .takes_value(true)
-                .multiple(true)
-                .number_of_values(1)
-                .use_delimiter(true)
-                .require_delimiter(false)
-                .help("Comma-separated list of nixpkgs attributes to add to nativeBuildInputs (and the function header). May be repeated. Combined with any inferred entries; duplicates are removed."),
-        )
-        .arg(Arg::from_usage(
-            "-v [version] 'Set version of package'",
-            ).default_value("0.0.1"))
-        .arg(Arg::from_usage(
-            "-p,--pname [pname] 'Package name to be used in expression'",
-            ).default_value("CHANGE"))
-        .arg(Arg::from_usage(
-            "-r,--nixpkgs-root [path] 'Set root of the nixpkgs directory'",
-            ).env("NIXPKGS_ROOT"))
-        .arg(Arg::from_usage(
-            "--by-name 'RFC140 layout: write the expression to pkgs/by-name/<shard>/<pname>/package.nix (relative to --nixpkgs-root). The shard is the lowercased first two characters of pname. Packages are auto-discovered, so no all-packages.nix addition line is needed.'",
-        ).takes_value(false))
-        .arg(
-            Arg::from_usage("-f,--fetcher [fetcher] 'Fetcher to use'")
-                .possible_values(&Fetcher::variants())
-                .case_insensitive(true)
-                .default_value("github")
-                .default_value_if("TEMPLATE", Some("python_package"), "pypi")
-                .default_value_if("TEMPLATE", Some("python_application"), "pypi"),
-        )
+        .subcommand(build_template_subcommand())
+        .subcommand(build_project_subcommand())
         .subcommand(
             SubCommand::with_name("completions")
                 .about("Generate shell completion scripts, writes to stdout")
@@ -197,7 +246,7 @@ $ nix-template config nixpkgs-root ~/nixpkgs
 /// Pull every value supplied for an argument that allows comma-separated
 /// and/or repeated values, trim whitespace around each token, and drop
 /// empties. Returns an empty vec when the flag wasn't provided.
-fn collect_input_args(matches: &ArgMatches, name: &str) -> Vec<String> {
+pub fn collect_input_args(matches: &ArgMatches, name: &str) -> Vec<String> {
     matches
         .values_of(name)
         .map(|vs| {
@@ -212,7 +261,7 @@ fn collect_input_args(matches: &ArgMatches, name: &str) -> Vec<String> {
 /// Merge `extra` into `existing` and remove duplicates while preserving
 /// the order of first appearance. Used to combine inferred and
 /// user-supplied input lists without producing repeats.
-fn merge_dedup(existing: &[String], extra: Vec<String>) -> Vec<String> {
+pub fn merge_dedup(existing: &[String], extra: Vec<String>) -> Vec<String> {
     let mut combined: Vec<String> = existing.to_vec();
     combined.extend(extra);
     let mut seen = std::collections::HashSet::new();
@@ -220,11 +269,25 @@ fn merge_dedup(existing: &[String], extra: Vec<String>) -> Vec<String> {
     combined
 }
 
-pub fn validate_and_serialize_matches(
+/// Check if the TEMPLATE positional is actually a URL.
+/// Returns `true` for values starting with `http://` or `https://`.
+pub fn is_url_value(value: &str) -> bool {
+    value.starts_with("http://") || value.starts_with("https://")
+}
+
+pub fn validate_and_serialize_template_matches(
     matches: &ArgMatches,
     user_config: Option<&UserConfig>,
 ) -> ExpressionInfo {
-    let template: Template = arg_to_type(matches.value_of("TEMPLATE"));
+    let template_str = matches.value_of("TEMPLATE").unwrap_or("auto");
+
+    // Check if the TEMPLATE positional is actually a URL
+    let (template, url_from_positional) = if is_url_value(template_str) {
+        (Template::Auto, Some(template_str.to_owned()))
+    } else {
+        (arg_to_type(Some(template_str)), None)
+    };
+
     let fetcher: Fetcher = arg_to_type(matches.value_of("fetcher"));
     let pname: String = arg_to_type(matches.value_of("pname"));
     let version: String = arg_to_type(matches.value_of("v"));
@@ -235,15 +298,16 @@ pub fn validate_and_serialize_matches(
     let include_meta: bool = !matches.is_present("no-meta");
 
     let nixpkgs_layout = matches.is_present("by-name");
+    let has_url = url_from_positional.is_some() || matches.is_present("from-url");
     assert(
         !(nixpkgs_layout
             && matches.value_of("pname") == Some("CHANGE")
-            && matches.value_of("from-url") == None),
+            && !has_url),
         "'-p,--pname' or '-u,--from-url' is required when using the --by-name flag",
     );
 
-    if matches.is_present("by-name") {
-        match arg_to_type::<Template>(matches.value_of("TEMPLATE")) {
+    if nixpkgs_layout {
+        match &template {
             Template::Module | Template::Test | Template::Mkshell => {
                 assert(
                     false,
@@ -306,7 +370,11 @@ pub fn validate_and_serialize_matches(
         gradle_hash: FAKE_SRI_HASH.to_owned(),
     };
 
-    if let Some(url) = matches.value_of("from-url") {
+    // Handle URL: either from positional or from --from-url flag
+    let url = url_from_positional
+        .as_deref()
+        .or_else(|| matches.value_of("from-url"));
+    if let Some(url) = url {
         let include_prereleases = matches.is_present("include-prereleases");
         read_meta_from_url(url, &mut info, include_prereleases);
     }
@@ -314,7 +382,7 @@ pub fn validate_and_serialize_matches(
     // Auto-detect template when "auto" is selected (either explicitly or as
     // default). Uses remote source (--from-url) or local directory (CWD).
     if info.template == Template::Auto && !matches.is_present("no-detect") {
-        let candidates = if matches.is_present("from-url") {
+        let candidates = if url.is_some() {
             // Remote detection: materialise source from URL
             crate::detect::detect_template_candidates(&info)
         } else {
@@ -361,13 +429,9 @@ pub fn validate_and_serialize_matches(
         info.template = Template::Stdenv(crate::types::StdenvVariant::Default);
     }
 
-    // Python format auto-detection: works in both local and remote modes.
-    // For remote mode, we materialise the source to inspect pyproject.toml.
-    // For local mode without --init-* (which handles this in build.rs),
-    // we inspect the current working directory.
+    // Python format auto-detection
     if info.template.is_python() {
-        let format_str = if matches.is_present("from-url") {
-            // Materialise remote source and detect format
+        let format_str = if url.is_some() {
             if let Some(source_path) = crate::source::materialise_source(&info) {
                 crate::detect::detect_python_format(&source_path)
             } else {
@@ -377,17 +441,15 @@ pub fn validate_and_serialize_matches(
             let cwd = std::env::current_dir().unwrap_or_default();
             crate::detect::detect_python_format(&cwd)
         };
-        // Update the format in the Python config
         if let Some(config) = info.template.python_config_mut() {
             config.format = crate::types::PythonFormat::from_str(&format_str);
         }
         info.python_format = format_str;
     }
 
-    // Dependency hash prefetching is on by default when --from-url is provided.
-    // Users can disable via --skip-vendor-hashes.
+    // Dependency hash prefetching
     let should_prefetch_hashes =
-        matches.is_present("from-url") && !matches.is_present("skip-vendor-hashes");
+        url.is_some() && !matches.is_present("skip-vendor-hashes");
     if should_prefetch_hashes {
         if let Some(hash) = prefetch_dependency_hash(&info) {
             match &info.template {
@@ -402,9 +464,8 @@ pub fn validate_and_serialize_matches(
         }
     }
 
-    // Inference is on by default for the rust, go, ruby, stdenv, and stdenvNoCC
-    // templates whenever we have a real source to inspect. Users can disable via `--skip-infer-deps`.
-    let infer_enabled = matches.is_present("from-url") && !matches.is_present("skip-infer-deps");
+    // Dependency inference
+    let infer_enabled = url.is_some() && !matches.is_present("skip-infer-deps");
     if infer_enabled {
         match &info.template {
             Template::Rust(_) => {
@@ -440,28 +501,20 @@ pub fn validate_and_serialize_matches(
         }
     }
 
-    // Merge any user-supplied `--build-inputs` / `--native-build-inputs`
-    // (alias `--binputs` / `--nbinputs`) into the lists. Inferred entries
-    // come first to preserve their order; user entries are appended and
-    // duplicates are stripped.
+    // Merge user-supplied build inputs
     let cli_bi = collect_input_args(matches, "build-inputs");
     let cli_nbi = collect_input_args(matches, "native-build-inputs");
     info.build_inputs = merge_dedup(&info.build_inputs, cli_bi);
     info.native_build_inputs = merge_dedup(&info.native_build_inputs, cli_nbi);
 
     let (path_to_write, top_level_path) =
-        nix_file_paths(&matches, &info.template, &path, &info.pname, &nixpkgs_root);
+        nix_file_paths(nixpkgs_layout, &info.template, &path, &info.pname, &nixpkgs_root);
 
     info.path_to_write = path_to_write.clone();
     info.top_level_path = top_level_path.clone();
 
-    // The path may be rewritten downstream when one of the --init-* flags
-    // triggers the structured nix/ layout. Skip the existence check in
-    // that case; main.rs re-checks each artefact before writing.
-    let init_will_rewrite_path =
-        matches.is_present("init-flake") || matches.is_present("init-npins");
     assert(
-        matches.is_present("stdout") || init_will_rewrite_path || !path_to_write.exists(),
+        matches.is_present("stdout") || !path_to_write.exists(),
         &format!(
             "Cannot write to file '{}', already exists",
             path_to_write.display()
@@ -611,6 +664,7 @@ mod tests {
     fn test_python() {
         let m = build_cli().get_matches_from(vec![
             "nix-template",
+            "template",
             "python_package",
             "-r",
             "/tmp",
@@ -618,60 +672,72 @@ mod tests {
             "-p",
             "requests",
         ]);
-        println!("{:?}", m);
-        assert_eq!(m.value_of("pname"), Some("requests"));
-        assert_eq!(m.value_of("TEMPLATE"), Some("python_package"));
-        assert_eq!(m.value_of("fetcher"), Some("pypi"));
-        assert_eq!(m.value_of("v"), Some("0.0.1"));
-        assert_eq!(m.value_of("pname"), Some("requests"));
-        assert_eq!(m.value_of("license"), Some("CHANGE"));
-        assert_eq!(m.value_of("nixpkgs-root"), Some("/tmp"));
-        assert_eq!(m.is_present("stdout"), false);
-        assert_eq!(m.occurrences_of("PATH"), 0);
-        assert_eq!(m.is_present("by-name"), true);
-        assert!(m.occurrences_of("by-name") >= 1);
-        assert_eq!(m.occurrences_of("from-url"), 0);
+        let tm = m.subcommand_matches("template").unwrap();
+        assert_eq!(tm.value_of("pname"), Some("requests"));
+        assert_eq!(tm.value_of("TEMPLATE"), Some("python_package"));
+        assert_eq!(tm.value_of("fetcher"), Some("pypi"));
+        assert_eq!(tm.value_of("v"), Some("0.0.1"));
+        assert_eq!(tm.value_of("license"), Some("CHANGE"));
+        assert_eq!(tm.value_of("nixpkgs-root"), Some("/tmp"));
+        assert_eq!(tm.is_present("stdout"), false);
+        assert_eq!(tm.occurrences_of("PATH"), 0);
+        assert_eq!(tm.is_present("by-name"), true);
+        assert_eq!(tm.occurrences_of("from-url"), 0);
     }
 
     #[test]
     fn test_url() {
         let m = build_cli().get_matches_from(vec![
             "nix-template",
+            "template",
             "python_package",
             "-u",
             "https://pypi.org/project/requests/",
             "--by-name",
         ]);
-        assert_eq!(m.is_present("stdout"), false);
-        assert_eq!(m.is_present("by-name"), true);
-        assert_eq!(m.occurrences_of("from-url"), 1);
+        let tm = m.subcommand_matches("template").unwrap();
+        assert_eq!(tm.is_present("stdout"), false);
+        assert_eq!(tm.is_present("by-name"), true);
+        assert_eq!(tm.occurrences_of("from-url"), 1);
     }
 
     #[test]
     fn test_mkshell() {
-        let m = build_cli().get_matches_from(vec!["nix-template", "-s", "mkshell"]);
-        assert_eq!(m.is_present("stdout"), true);
-        assert_eq!(m.value_of("TEMPLATE"), Some("mkshell"));
-        assert_eq!(m.value_of("PATH"), Some("shell.nix"));
-        assert_eq!(m.value_of("pname"), Some("CHANGE"));
-        assert_eq!(m.is_present("by-name"), false);
-        assert_eq!(m.occurrences_of("from-url"), 0);
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "template",
+            "-s",
+            "mkshell",
+        ]);
+        let tm = m.subcommand_matches("template").unwrap();
+        assert_eq!(tm.is_present("stdout"), true);
+        assert_eq!(tm.value_of("TEMPLATE"), Some("mkshell"));
+        assert_eq!(tm.value_of("PATH"), Some("shell.nix"));
+        assert_eq!(tm.value_of("pname"), Some("CHANGE"));
+        assert_eq!(tm.is_present("by-name"), false);
+        assert_eq!(tm.occurrences_of("from-url"), 0);
     }
 
     #[test]
     fn test_test() {
-        let m = build_cli().get_matches_from(vec!["nix-template", "test", "-m", "myself"]);
-        assert_eq!(m.value_of("TEMPLATE"), Some("test"));
-        assert_eq!(m.value_of("PATH"), Some("test.nix"));
-        assert_eq!(m.value_of("maintainer"), Some("myself"));
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "template",
+            "test",
+            "-m",
+            "myself",
+        ]);
+        let tm = m.subcommand_matches("template").unwrap();
+        assert_eq!(tm.value_of("TEMPLATE"), Some("test"));
+        assert_eq!(tm.value_of("PATH"), Some("test.nix"));
+        assert_eq!(tm.value_of("maintainer"), Some("myself"));
     }
 
     #[test]
     fn build_inputs_flag_collects_comma_and_repeated() {
-        // Mix repeated `--build-inputs` flags with comma-separated values
-        // and the short `--binputs` alias; we should get a flat list.
         let m = build_cli().get_matches_from(vec![
             "nix-template",
+            "template",
             "stdenv",
             "-p",
             "demo",
@@ -680,7 +746,8 @@ mod tests {
             "--binputs",
             "sqlite",
         ]);
-        let collected = collect_input_args(&m, "build-inputs");
+        let tm = m.subcommand_matches("template").unwrap();
+        let collected = collect_input_args(tm, "build-inputs");
         assert_eq!(collected, vec!["zlib", "openssl", "sqlite"]);
     }
 
@@ -688,13 +755,15 @@ mod tests {
     fn native_build_inputs_flag_alias_works() {
         let m = build_cli().get_matches_from(vec![
             "nix-template",
+            "template",
             "stdenv",
             "-p",
             "demo",
             "--nbinputs",
             "pkg-config,cmake",
         ]);
-        let collected = collect_input_args(&m, "native-build-inputs");
+        let tm = m.subcommand_matches("template").unwrap();
+        let collected = collect_input_args(tm, "native-build-inputs");
         assert_eq!(collected, vec!["pkg-config", "cmake"]);
     }
 
@@ -712,17 +781,17 @@ mod tests {
 
     #[test]
     fn collect_input_args_trims_and_filters() {
-        // Whitespace around tokens and an empty trailing token must be
-        // tolerated.
         let m = build_cli().get_matches_from(vec![
             "nix-template",
+            "template",
             "stdenv",
             "-p",
             "demo",
             "--build-inputs",
             " zlib , openssl,",
         ]);
-        let collected = collect_input_args(&m, "build-inputs");
+        let tm = m.subcommand_matches("template").unwrap();
+        let collected = collect_input_args(tm, "build-inputs");
         assert_eq!(collected, vec!["zlib", "openssl"]);
     }
 
@@ -730,6 +799,7 @@ mod tests {
     fn test_fetcher() {
         let m = build_cli().get_matches_from(vec![
             "nix-template",
+            "template",
             "-f",
             "gitlab",
             "-l",
@@ -737,19 +807,97 @@ mod tests {
             "stdenv",
             "default.nix",
         ]);
-        assert_eq!(m.value_of("license"), Some("mit"));
-        assert_eq!(m.value_of("PATH"), Some("default.nix"));
-        assert_eq!(m.occurrences_of("PATH"), 1);
-        assert_eq!(m.value_of("fetcher"), Some("gitlab"));
+        let tm = m.subcommand_matches("template").unwrap();
+        assert_eq!(tm.value_of("license"), Some("mit"));
+        assert_eq!(tm.value_of("PATH"), Some("default.nix"));
+        assert_eq!(tm.occurrences_of("PATH"), 1);
+        assert_eq!(tm.value_of("fetcher"), Some("gitlab"));
     }
 
     #[test]
-    #[serial] // touching global env, ensure serial runs
+    #[serial]
     fn test_nixpkgs_root_env() {
         use std::env::{remove_var, set_var};
         set_var("NIXPKGS_ROOT", "/testdir/");
-        let m = build_cli().get_matches_from(vec!["nix-template", "--by-name", "-p", "test"]);
-        assert_eq!(m.value_of("nixpkgs-root"), Some("/testdir/"));
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "template",
+            "--by-name",
+            "-p",
+            "test",
+        ]);
+        let tm = m.subcommand_matches("template").unwrap();
+        assert_eq!(tm.value_of("nixpkgs-root"), Some("/testdir/"));
         remove_var("NIXPKGS_ROOT");
+    }
+
+    #[test]
+    fn test_project_flake_subcommand() {
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "project",
+            "flake",
+            "rust",
+            "-p",
+            "myapp",
+        ]);
+        let pm = m.subcommand_matches("project").unwrap();
+        let fm = pm.subcommand_matches("flake").unwrap();
+        assert_eq!(fm.value_of("TEMPLATE"), Some("rust"));
+        assert_eq!(fm.value_of("pname"), Some("myapp"));
+        assert_eq!(fm.is_present("with-npins"), false);
+    }
+
+    #[test]
+    fn test_project_flake_with_npins() {
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "project",
+            "flake",
+            "--with-npins",
+        ]);
+        let pm = m.subcommand_matches("project").unwrap();
+        let fm = pm.subcommand_matches("flake").unwrap();
+        assert_eq!(fm.value_of("TEMPLATE"), Some("auto"));
+        assert_eq!(fm.is_present("with-npins"), true);
+    }
+
+    #[test]
+    fn test_project_npins_subcommand() {
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "project",
+            "npins",
+            "-p",
+            "myapp",
+        ]);
+        let pm = m.subcommand_matches("project").unwrap();
+        let nm = pm.subcommand_matches("npins").unwrap();
+        assert_eq!(nm.value_of("TEMPLATE"), Some("auto"));
+        assert_eq!(nm.value_of("pname"), Some("myapp"));
+        assert_eq!(nm.is_present("with-flake"), false);
+    }
+
+    #[test]
+    fn test_project_npins_with_flake() {
+        let m = build_cli().get_matches_from(vec![
+            "nix-template",
+            "project",
+            "npins",
+            "--with-flake",
+            "rust",
+        ]);
+        let pm = m.subcommand_matches("project").unwrap();
+        let nm = pm.subcommand_matches("npins").unwrap();
+        assert_eq!(nm.value_of("TEMPLATE"), Some("rust"));
+        assert_eq!(nm.is_present("with-flake"), true);
+    }
+
+    #[test]
+    fn test_url_as_positional() {
+        assert!(is_url_value("https://github.com/foo/bar"));
+        assert!(is_url_value("http://example.com"));
+        assert!(!is_url_value("rust"));
+        assert!(!is_url_value("auto"));
     }
 }

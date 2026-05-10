@@ -62,8 +62,15 @@ fn main() {
         ("config", Some(m)) => {
             commands::config::run(m, &xdg_dirs, user_config);
         }
+        ("template", Some(m)) => {
+            commands::template::run(m, &xdg_dirs, user_config.as_ref());
+        }
+        ("project", Some(m)) => {
+            commands::project::run(m, &xdg_dirs, user_config.as_ref());
+        }
         _ => {
-            commands::build::run(&matches, &xdg_dirs, user_config.as_ref());
+            // No subcommand → interactive template mode
+            commands::template::run_interactive(&xdg_dirs, user_config.as_ref());
         }
     }
 }
