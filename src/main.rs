@@ -8,6 +8,7 @@ mod detect;
 mod expression;
 mod file_path;
 mod interactive;
+mod license;
 mod output;
 mod source;
 mod templates;

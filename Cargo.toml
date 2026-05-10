@@ -24,6 +24,7 @@ toml = "^0.5.0"
 reqwest = { version = "^0.11.0", features = [ "json", "blocking"] }
 log = "^0.4"
 anyhow = "^1.0"
+askalono = "0.5"
 version-compare = "^0.0.11"
 inquire = "0.7"
 fuzzy-matcher = "0.3"
