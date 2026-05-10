@@ -155,6 +155,41 @@ $ nix-template --init-flake --pname my-project
 $ nix-template --init-npins --pname my-project
 ```
 
+## Comparison with nix-init
+
+Both `nix-template` and [`nix-init`](https://github.com/nix-community/nix-init) are excellent tools for creating Nix package expressions, but they serve different (though overlapping) use cases:
+
+| Feature | nix-init | nix-template |
+|---------|----------|--------------|
+| **Language Support** | 4 languages (Rust, Python, Go, Generic) | 29 templates (Rust, Python, Go, JavaScript/Node, Java/Maven/Gradle, Scala, Clojure, Haskell, OCaml, Perl, Lua, Ruby, PHP, .NET, Elixir, Dart, R, and more) |
+| **Primary Workflow** | Interactive with fuzzy completions | Flexible: interactive, automated, or boilerplate generation |
+| **Input Source** | URL-based (requires `--from-url`) | URL, local projects, or generic templates |
+| **Dependency Inference** | Rust, Python, Go | 13+ languages + build system detection (CMake, Meson, Autotools) |
+| **Project Initialization** | Not supported | Supported (`--init-flake`, `--init-npins`) |
+| **Hash Prefetching** | Yes (cargoHash, vendorHash via nurl) | Yes (Rust, Go, npm, pnpm) |
+| **RFC 140 Support** | Yes (`pkgs/by-name` structure) | Yes (`--by-name` flag) |
+| **Configuration File** | TOML (XDG config) | TOML (XDG config) |
+| **License Detection** | Yes | Yes (via askalono) |
+| **Build System Detection** | No | Yes (CMake, Meson, Autotools) |
+| **Template Variants** | Standard builders only | Multiple variants (e.g., `rust`/`rust_crane`, `go`/`go_gomod2nix`, `python_package`/`python_application`/`uv`) |
+
+### When to Use Which Tool
+
+**Use nix-init when:**
+- You're packaging Rust, Python, or Go software from a URL
+- You want interactive guidance with fuzzy tab completions
+- You prefer a focused, specialized tool for URL-based packaging
+
+**Use nix-template when:**
+- You're working with languages beyond Rust/Python/Go (Java, Scala, Haskell, Ruby, PHP, Elixir, etc.)
+- You want to initialize a new project with flake or npins setup
+- You're working with local projects or need automatic project type detection
+- You need build system detection (CMake, Meson, Autotools)
+- You want access to modern packaging variants (crane for Rust, gomod2nix for Go, uv for Python)
+- You need comprehensive dependency inference across many languages
+
+Both tools complement each other well in the Nix ecosystem. For Rust/Python/Go packages from URLs, either tool works great. For broader language support or project initialization, nix-template offers more extensive capabilities.
+
 ### Installation
 
 from nixpkgs (unstable, not available in 20.03):

@@ -1746,3 +1746,37 @@ fn test_r_template_basic() {
     // Snapshot the output
     insta::assert_snapshot!("r_basic_template", stdout);
 }
+
+/// Test that --skip-infer-license flag is accepted and doesn't cause errors
+#[test]
+fn test_skip_infer_license_flag() {
+    let mut cmd = Command::cargo_bin("nix-template").unwrap();
+    let output = cmd
+        .args(&[
+            "stdenv",
+            "-p",
+            "test-pkg",
+            "-v",
+            "1.0.0",
+            "-l",
+            "mit",
+            "--maintainer",
+            "",
+            "--skip-infer-license",
+            "-s", // --stdout flag
+        ])
+        .output()
+        .unwrap();
+
+    // Command should succeed with the flag
+    assert!(
+        output.status.success(),
+        "Command with --skip-infer-license failed: {:?}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("stdenv.mkDerivation"));
+    // License should be included in meta section (format may vary by template)
+    assert!(stdout.contains("mit") || stdout.contains("license"));
+}

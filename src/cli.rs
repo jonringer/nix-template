@@ -118,6 +118,9 @@ $ nix-template config nixpkgs-root ~/nixpkgs
             "--skip-infer-deps 'Skip automatic inference of buildInputs/nativeBuildInputs. By default, when --from-url is provided, nix-template materialises the source: for the rust template it parses Cargo.toml/Cargo.lock to detect well-known *-sys crates; for the go template it scans *.go files for `// #cgo` directives to detect pkg-config tokens and -l libraries.'",
             ).takes_value(false))
         .arg(Arg::from_usage(
+            "--skip-infer-license 'Skip automatic license inference from LICENSE files. By default, when --from-url is provided, nix-template scans LICENSE files to detect the license using the askalono library.'",
+            ).takes_value(false))
+        .arg(Arg::from_usage(
             "--no-detect 'Disable automatic template detection. By default, when --from-url is provided without an explicit template, nix-template inspects the source tree for build system files (Cargo.toml, go.mod, pyproject.toml, etc.) to auto-select the template.'",
             ).takes_value(false))
         .arg(
@@ -437,6 +440,30 @@ pub fn validate_and_serialize_matches(
                 }
             }
             _ => {}
+        }
+    }
+
+    // License inference is on by default when --from-url is provided.
+    // Users can disable via `--skip-infer-license` or provide explicit license via `--license`.
+    let should_infer_license = matches.is_present("from-url")
+        && !matches.is_present("skip-infer-license")
+        && info.license == "CHANGE";
+
+    if should_infer_license {
+        eprintln!("Materialising source to scan for LICENSE files...");
+        if let Some(source_path) = crate::source::materialise_source(&info) {
+            match crate::license::infer_license_from_source(&source_path) {
+                Ok(Some(license)) => {
+                    eprintln!("Detected license: {}", license);
+                    info.license = license;
+                }
+                Ok(None) => {
+                    log::debug!("No license detected in source");
+                }
+                Err(e) => {
+                    log::debug!("Failed to infer license: {}", e);
+                }
+            }
         }
     }
 
