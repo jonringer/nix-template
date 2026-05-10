@@ -87,7 +87,7 @@ impl NixDirLayout {
 }
 
 pub fn nix_file_paths(
-    matches: &clap::ArgMatches,
+    by_name: bool,
     template: &Template,
     path: &Path,
     pname: &str,
@@ -97,7 +97,7 @@ pub fn nix_file_paths(
     // Auto-discovered, so no top-level addition line is required (we
     // return an empty top_level path; main.rs uses that to suppress the
     // helper message).
-    if matches.is_present("by-name") {
+    if by_name {
         let shard = by_name_shard(pname);
         let mut file_path = PathBuf::from(&nixpkgs_root);
         file_path.push("pkgs");
@@ -135,13 +135,14 @@ pub fn nix_file_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::{build_cli, validate_and_serialize_matches};
-    use clap::ArgMatches;
+    use crate::cli::{build_cli, validate_and_serialize_template_matches};
     use pretty_assertions::assert_eq;
     use serial_test::serial;
 
-    fn assert_paths(m: ArgMatches, expected: (PathBuf, PathBuf)) {
-        let info = validate_and_serialize_matches(&m, None);
+    fn assert_paths(args: Vec<&str>, expected: (PathBuf, PathBuf)) {
+        let m = build_cli().get_matches_from(args);
+        let tm = m.subcommand_matches("template").unwrap();
+        let info = validate_and_serialize_template_matches(tm, None);
         let actual = (info.path_to_write, info.top_level_path);
 
         assert_eq!(expected, actual);
@@ -158,76 +159,86 @@ mod tests {
     #[test]
     #[serial]
     fn test_by_name_default() {
-        let m = build_cli().get_matches_from(vec![
-            "nix-template",
-            "stdenv",
-            "--by-name",
-            "-r",
-            "/tmp",
-            "-p",
-            "hello",
-        ]);
         let expected = (
             PathBuf::from("/tmp/pkgs/by-name/he/hello/package.nix"),
             PathBuf::from(""),
         );
-        assert_paths(m, expected);
+        assert_paths(
+            vec![
+                "nix-template",
+                "template",
+                "stdenv",
+                "--by-name",
+                "-r",
+                "/tmp",
+                "-p",
+                "hello",
+            ],
+            expected,
+        );
     }
 
     #[test]
     #[serial]
     fn test_by_name_rust() {
-        // by-name should work with non-default templates too
-        let m = build_cli().get_matches_from(vec![
-            "nix-template",
-            "rust",
-            "--by-name",
-            "-r",
-            "/tmp",
-            "-p",
-            "ripgrep",
-        ]);
         let expected = (
             PathBuf::from("/tmp/pkgs/by-name/ri/ripgrep/package.nix"),
             PathBuf::from(""),
         );
-        assert_paths(m, expected);
+        assert_paths(
+            vec![
+                "nix-template",
+                "template",
+                "rust",
+                "--by-name",
+                "-r",
+                "/tmp",
+                "-p",
+                "ripgrep",
+            ],
+            expected,
+        );
     }
 
     #[test]
     #[serial]
     fn test_by_name_uppercase_pname_lowercased_shard() {
-        let m = build_cli().get_matches_from(vec![
-            "nix-template",
-            "stdenv",
-            "--by-name",
-            "-r",
-            "/tmp",
-            "-p",
-            "FooBar",
-        ]);
         let expected = (
             PathBuf::from("/tmp/pkgs/by-name/fo/FooBar/package.nix"),
             PathBuf::from(""),
         );
-        assert_paths(m, expected);
+        assert_paths(
+            vec![
+                "nix-template",
+                "template",
+                "stdenv",
+                "--by-name",
+                "-r",
+                "/tmp",
+                "-p",
+                "FooBar",
+            ],
+            expected,
+        );
     }
 
     #[test]
     #[serial]
     fn test_stdenv_no_cc_by_name() {
-        // stdenvNoCC with --by-name should use RFC140 layout
-        let m = build_cli().get_matches_from(vec![
-            "nix-template",
-            "stdenvNoCC",
-            "--by-name",
-            "-p",
-            "myfont",
-        ]);
         let expected = (
             PathBuf::from("pkgs/by-name/my/myfont/package.nix"),
             PathBuf::from(""),
         );
-        assert_paths(m, expected);
+        assert_paths(
+            vec![
+                "nix-template",
+                "template",
+                "stdenvNoCC",
+                "--by-name",
+                "-p",
+                "myfont",
+            ],
+            expected,
+        );
     }
 }

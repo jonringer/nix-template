@@ -4,21 +4,28 @@ Make creating nix expressions easy. Provide a nice way to create largely boilerp
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/nix-template.svg)](https://repology.org/project/nix-template/versions)
 
-## Current Usage (--from-url, supports GitHub, GitLab, Gitea, and PyPI)
+## Usage
+
+### Generate a nix expression from a URL
 
 ```bash
-$ /home/jon/projects/nix-template/target/release/nix-template rust --from-url github.com/jonringer/nix-template ./package.nix
+$ nix-template template rust --from-url github.com/jonringer/nix-template ./package.nix
 Determining latest release for nix-template
 Determining sha256 for nix-template
 Prefetching cargoHash for nix-template (this may take a while)...
 Determined cargoHash = sha256-cLSGWOyBQLv235TeYqSVg/f0Zmcnpj+RshINN69JYEU=
 Materialising source to inspect Cargo.toml/Cargo.lock...
 Inferred 1 buildInputs (["openssl"]) and 1 nativeBuildInputs (["pkg-config"])
-Generated a rust nix expression at /home/jon/projects/nix-template/package.nix
+Generated a rust nix expression at ./package.nix
 ```
+
+You can also pass a URL directly as the first argument for auto-detection:
+```bash
+$ nix-template template https://github.com/jonringer/nix-template ./package.nix
+```
+
 The resulting file:
-```
-$ cat ./package.nix
+```nix
 { lib
 , rustPlatform
 , fetchFromGitHub
@@ -56,33 +63,43 @@ rustPlatform.buildRustPackage (finalAttrs: {
 })
 ```
 
-## Current Usage (Generically)
+### Add a package to nixpkgs (RFC 140 by-name)
 
 ```bash
 # only need to config once per user
 $ nix-template config name jonringer
-# For use with --by-name
 $ nix-template config nixpkgs-root /home/jon/projects/nixpkgs
 
 # add a package (using RFC 140 by-name structure), inferring template and dependencies
-NIXPKGS_ROOT=/home/jon/projects/nixpkgs /home/jon/projects/nix-template/target/release/nix-template auto --by-name --from-url github.com/jonringer/nix-template
-Determining latest release for nix-template
-Determining sha256 for nix-template
-Materialising source to detect project type...
-nix-template: auto-detected template 'rust' (found Cargo.toml)
-Prefetching cargoHash for nix-template (this may take a while)...
-Determined cargoHash = sha256-cLSGWOyBQLv235TeYqSVg/f0Zmcnpj+RshINN69JYEU=
-Materialising source to inspect Cargo.toml/Cargo.lock...
-Inferred 1 buildInputs (["openssl"]) and 1 nativeBuildInputs (["pkg-config"])
-Generated a rust nix expression at /home/jon/projects/nixpkgs/pkgs/by-name/ni/nix-template/package.nix
+$ nix-template template auto --by-name --from-url github.com/jonringer/nix-template
 ```
+
+### Initialize a local project
+
+```bash
+# Initialize as a flake project (auto-detects project type from local files)
+$ nix-template project flake
+
+# Initialize with npins dependency management
+$ nix-template project npins
+
+# Initialize with both flake and npins
+$ nix-template project flake --with-npins
+
+# Specify a template explicitly
+$ nix-template project flake rust
+```
+
+### Interactive mode
+
+Running `nix-template` with no arguments enters interactive mode, which guides you through template selection and configuration.
 
 ## Key Features
 
 ### Automatic Project Detection
 Use the `auto` template to automatically detect project type from source code:
 ```bash
-$ nix-template auto --from-url github.com/user/project
+$ nix-template template auto --from-url github.com/user/project
 # Automatically detects if it's Rust, Go, Python, UV, npm, pnpm, PHP, .NET, or Ruby
 ```
 
@@ -148,11 +165,12 @@ Supports fetching from:
 ### RFC 140 Support
 Use `--by-name` flag to generate packages using the modern `pkgs/by-name` directory structure.
 
-### Project Templates
+### Project Initialization
 Initialize new projects with flake or npins-based setups (will prompt you for additional information):
 ```bash
-$ nix-template --init-flake --pname my-project
-$ nix-template --init-npins --pname my-project
+$ nix-template project flake
+$ nix-template project npins
+$ nix-template project flake --with-npins
 ```
 
 ### Installation

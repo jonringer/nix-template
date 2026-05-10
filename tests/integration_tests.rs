@@ -2,13 +2,14 @@ use assert_cmd::Command;
 use std::fs;
 use tempfile::TempDir;
 
-/// Test basic Python template generation without --flake-init
+/// Test basic Python template generation
 /// This should generate only a default.nix file
 #[test]
 fn test_python_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "python_package",
             "-p",
             "requests",
@@ -37,88 +38,6 @@ fn test_python_template_basic() {
     insta::assert_snapshot!("python_basic_template", stdout);
 }
 
-/// Test Python template generation WITH --init-flake (no PATH given).
-/// This now produces the structured nix/ layout: package under
-/// nix/pkgs/<pname>/package.nix, an overlay that uses
-/// python3Packages.callPackage, and a flake.nix exposing the package.
-///
-/// NOTE: This test is disabled because --init-flake is now only for local project
-/// initialization and cannot be used with explicit remote package parameters.
-#[test]
-#[ignore]
-fn test_python_template_with_flake_init() {
-    let mut cmd = Command::cargo_bin("nix-template").unwrap();
-    let output = cmd
-        .args(&[
-            "python_package",
-            "-p",
-            "requests",
-            "-v",
-            "2.31.0",
-            "-l",
-            "asl20",
-            "--maintainer",
-            "",
-            "-s", // --stdout flag
-            "--init-flake",
-        ])
-        .output()
-        .unwrap();
-
-    assert!(output.status.success(), "Command failed: {:?}", output);
-    let stdout = String::from_utf8(output.stdout).unwrap();
-
-    // All structured-layout artefacts should appear in stdout, separated by markers.
-    assert!(stdout.contains("# ===== flake.nix ====="));
-    assert!(stdout.contains("# ===== nix/overlay.nix ====="));
-
-    // stdout ordering from main.rs is: package → flake → overlay.
-    let after_flake_marker: Vec<&str> = stdout.split("# ===== flake.nix =====").collect();
-    assert_eq!(after_flake_marker.len(), 2, "Expected a flake.nix marker");
-    let package_nix = after_flake_marker[0].trim();
-
-    let after_overlay_marker: Vec<&str> = after_flake_marker[1]
-        .split("# ===== nix/overlay.nix =====")
-        .collect();
-    assert_eq!(after_overlay_marker.len(), 2, "Expected an overlay marker");
-    let flake_nix = after_overlay_marker[0].trim();
-    let overlay_nix = after_overlay_marker[1].trim();
-
-    // Verify package part
-    assert!(package_nix.contains("buildPythonPackage"));
-    assert!(package_nix.contains("fetchPypi"));
-
-    // Overlay must use python3Packages.callPackage for python templates.
-    assert!(
-        overlay_nix.contains("requests = final.python3Packages.callPackage ./package.nix"),
-        "Python overlay should use python3Packages.callPackage; got:\n{}",
-        overlay_nix
-    );
-
-    // Verify flake part — structured flake exposes overlays.default and the
-    // python package via the overlayed pkgs set.
-    assert!(flake_nix.contains("description ="));
-    assert!(flake_nix.contains("inputs"));
-    assert!(flake_nix.contains("nixpkgs.url"));
-    assert!(flake_nix.contains("outputs"));
-    assert!(
-        flake_nix.contains("overlays.default = import ./nix/overlay.nix"),
-        "structured flake should expose overlays.default; got:\n{}",
-        flake_nix
-    );
-    assert!(
-        flake_nix.contains("overlayed.python3Packages.requests"),
-        "Python flake should resolve via python3Packages on overlayed pkgs; got:\n{}",
-        flake_nix
-    );
-    assert!(flake_nix.contains("supportedSystems"));
-
-    // Snapshot all three parts
-    insta::assert_snapshot!("python_with_flake_package", package_nix);
-    insta::assert_snapshot!("python_with_flake_overlay", overlay_nix);
-    insta::assert_snapshot!("python_with_flake_flake", flake_nix);
-}
-
 /// Test Python template with explicit PyPI fetcher
 /// This verifies that -f pypi works correctly
 #[test]
@@ -126,6 +45,7 @@ fn test_python_template_pypi_fetcher_explicit() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "python_package",
             "-f",
             "pypi", // Explicitly specify PyPI fetcher
@@ -162,6 +82,7 @@ fn test_python_template_github_fetcher_override() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "python_package",
             "-f",
             "github", // Override with GitHub fetcher
@@ -189,366 +110,7 @@ fn test_python_template_github_fetcher_override() {
     insta::assert_snapshot!("python_github_override_package", stdout);
 }
 
-/// Test Python template file writing (not just stdout)
-/// `--init-flake` without an explicit PATH now uses the structured nix/
-/// layout, so files land at nix/pkgs/<pname>/package.nix, nix/overlay.nix,
-/// and flake.nix at the top. No top-level default.nix is emitted in this
-/// mode (it's only added by --init-npins).
-///
-/// NOTE: This test is disabled because --init-flake is now only for local project
-/// initialization and cannot be used with explicit remote package parameters.
-#[test]
-#[ignore]
-fn test_python_template_file_writing_with_flake() {
-    let temp_dir = TempDir::new().unwrap();
-    let temp_path = temp_dir.path();
-
-    let mut cmd = Command::cargo_bin("nix-template").unwrap();
-    let output = cmd
-        .current_dir(temp_path)
-        .args(&[
-            "python_package",
-            "-p",
-            "requests",
-            "-v",
-            "2.31.0",
-            "-l",
-            "asl20",
-            "--maintainer",
-            "",
-            "--init-flake",
-            // No -s flag, so it will write files
-        ])
-        .output()
-        .unwrap();
-
-    assert!(output.status.success(), "Command failed: {:?}", output);
-
-    // Verify the structured layout was created.
-    let package_nix_path = temp_path.join("nix/package.nix");
-    let overlay_nix_path = temp_path.join("nix/overlay.nix");
-    let flake_nix_path = temp_path.join("flake.nix");
-    let top_default_nix_path = temp_path.join("default.nix");
-
-    assert!(
-        package_nix_path.exists(),
-        "nix/package.nix should be created"
-    );
-    assert!(
-        overlay_nix_path.exists(),
-        "nix/overlay.nix should be created"
-    );
-    assert!(flake_nix_path.exists(), "flake.nix should be created");
-    assert!(
-        !top_default_nix_path.exists(),
-        "top-level default.nix should NOT be created for --init-flake alone"
-    );
-
-    // Read and verify contents.
-    let package_nix_content = std::fs::read_to_string(&package_nix_path).unwrap();
-    let overlay_nix_content = std::fs::read_to_string(&overlay_nix_path).unwrap();
-    let mut flake_nix_content = std::fs::read_to_string(&flake_nix_path).unwrap();
-
-    assert!(package_nix_content.contains("buildPythonPackage"));
-    assert!(
-        overlay_nix_content.contains("python3Packages.callPackage"),
-        "overlay should wire python3Packages.callPackage"
-    );
-    assert!(
-        flake_nix_content.contains("overlays.default = import ./nix/overlay.nix"),
-        "flake should expose overlays.default importing the overlay"
-    );
-    assert!(
-        flake_nix_content.contains("overlayed.python3Packages.requests"),
-        "flake should resolve the package via overlayed.python3Packages"
-    );
-
-    // Normalize the temp directory name in the description field for snapshot
-    // stability — the description tracks the directory name which is random
-    // for temp dirs.
-    let temp_dir_name = temp_path.file_name().unwrap().to_str().unwrap();
-    flake_nix_content = flake_nix_content.replace(
-        &format!("description = \"{}\";", temp_dir_name),
-        "description = \"<temp_dir>\";",
-    );
-
-    // Snapshot the file contents
-    insta::assert_snapshot!("python_file_write_package", package_nix_content);
-    insta::assert_snapshot!("python_file_write_overlay", overlay_nix_content);
-    insta::assert_snapshot!("python_file_write_flake", flake_nix_content);
-}
-
-/// Test --init-npins to stdout: emits the structured nix/ layout —
-/// package.nix under nix/pkgs/<pname>/, an overlay.nix, a top-level
-/// default.nix, plus the npins/ scaffold.
-///
-/// NOTE: This test is disabled because --init-npins is now only for local project
-/// initialization and cannot be used with explicit remote package parameters.
-#[test]
-#[ignore]
-fn test_init_npins_stdout() {
-    let mut cmd = Command::cargo_bin("nix-template").unwrap();
-    let output = cmd
-        .args(&[
-            "stdenv",
-            "-p",
-            "hello",
-            "-v",
-            "1.0",
-            "-l",
-            "mit",
-            "--maintainer",
-            "",
-            "-s",
-            "--init-npins",
-        ])
-        .output()
-        .unwrap();
-
-    assert!(output.status.success(), "Command failed: {:?}", output);
-    let stdout = String::from_utf8(output.stdout).unwrap();
-
-    // Markers for each artefact in the structured layout.
-    assert!(stdout.contains("# ===== nix/overlay.nix ====="));
-    assert!(stdout.contains("# ===== default.nix ====="));
-    assert!(stdout.contains("# ===== npins/default.nix ====="));
-    assert!(stdout.contains("# ===== npins/sources.json ====="));
-
-    // Top-level default.nix imports the overlay and pulls pkgs from npins.
-    assert!(stdout.contains("sources = import ./npins;"));
-    assert!(stdout.contains("overlays = [ (import ./nix/overlay.nix) ];"));
-    assert!(stdout.contains("pkgs.hello"));
-
-    // Overlay calls callPackage on the package under nix/pkgs/.
-    assert!(stdout.contains("hello = final.callPackage ./pkgs/hello/package.nix { }"));
-
-    // Empty pins lockfile, version 7
-    assert!(stdout.contains("\"pins\": {}"));
-    assert!(stdout.contains("\"version\": 7"));
-
-    // Vendored npins boilerplate signature
-    assert!(stdout.contains("mkFunctor"));
-    assert!(stdout.contains("Unsupported format version"));
-}
-
-/// Test --init-npins file writing: scaffolds the structured nix/ layout
-/// with the package under nix/pkgs/<pname>/package.nix, an overlay, a
-/// top-level default.nix wrapper, and the npins/ directory.
-///
-/// NOTE: This test is disabled because --init-npins is now only for local project
-/// initialization and cannot be used with explicit remote package parameters.
-#[test]
-#[ignore]
-fn test_init_npins_writes_three_files_and_renames() {
-    let temp_dir = TempDir::new().unwrap();
-    let temp_path = temp_dir.path();
-
-    let mut cmd = Command::cargo_bin("nix-template").unwrap();
-    let output = cmd
-        .current_dir(temp_path)
-        .args(&[
-            "stdenv",
-            "-p",
-            "hello",
-            "-v",
-            "1.0",
-            "-l",
-            "mit",
-            "--maintainer",
-            "",
-            "--init-npins",
-        ])
-        .output()
-        .unwrap();
-
-    assert!(output.status.success(), "Command failed: {:?}", output);
-
-    // Package lives under nix/pkgs/<pname>/package.nix
-    let package_nix = temp_path
-        .join("nix")
-        .join("pkgs")
-        .join("hello")
-        .join("package.nix");
-    assert!(
-        package_nix.exists(),
-        "nix/pkgs/hello/package.nix should be created"
-    );
-
-    // Top-level default.nix wraps the overlay, replacing the legacy npins
-    // wrapper that used to live alongside the package file.
-    let wrapper = temp_path.join("default.nix");
-    assert!(wrapper.exists(), "top-level default.nix should be created");
-    let wrapper_content = std::fs::read_to_string(&wrapper).unwrap();
-    assert!(wrapper_content.contains("sources = import ./npins;"));
-    assert!(wrapper_content.contains("overlays = [ (import ./nix/overlay.nix) ];"));
-    assert!(wrapper_content.contains("pkgs.hello"));
-
-    // Overlay calls callPackage on the new package path.
-    let overlay = temp_path.join("nix").join("overlay.nix");
-    assert!(overlay.exists(), "nix/overlay.nix should be created");
-    let overlay_content = std::fs::read_to_string(&overlay).unwrap();
-    assert!(
-        overlay_content.contains("hello = final.callPackage ./pkgs/hello/package.nix { }"),
-        "overlay should reference nix/pkgs/hello/package.nix; got:\n{}",
-        overlay_content
-    );
-
-    // npins/ scaffold exists at project root.
-    let npins_default = temp_path.join("npins").join("default.nix");
-    let npins_sources = temp_path.join("npins").join("sources.json");
-    assert!(
-        npins_default.exists(),
-        "npins/default.nix should be created"
-    );
-    assert!(
-        npins_sources.exists(),
-        "npins/sources.json should be created"
-    );
-
-    let sources_content = std::fs::read_to_string(&npins_sources).unwrap();
-    assert!(sources_content.contains("\"pins\": {}"));
-    assert!(sources_content.contains("\"version\": 7"));
-
-    let npins_default_content = std::fs::read_to_string(&npins_default).unwrap();
-    assert!(npins_default_content.contains("mkFunctor"));
-
-    let package_content = std::fs::read_to_string(&package_nix).unwrap();
-    assert!(package_content.contains("stdenv.mkDerivation"));
-
-    // Snapshot stable artifacts
-    insta::assert_snapshot!("init_npins_wrapper_stdenv", wrapper_content);
-    insta::assert_snapshot!("init_npins_overlay_stdenv", overlay_content);
-    insta::assert_snapshot!("init_npins_sources_json", sources_content);
-    insta::assert_snapshot!("init_npins_default_nix", npins_default_content);
-}
-
-/// Test that --init-npins works for python (wrapper should use python3Packages).
-///
-/// NOTE: This test is disabled because --init-npins is now only for local project
-/// initialization and cannot be used with explicit remote package parameters.
-#[test]
-#[ignore]
-fn test_init_npins_python_wrapper() {
-    let temp_dir = TempDir::new().unwrap();
-    let temp_path = temp_dir.path();
-
-    let mut cmd = Command::cargo_bin("nix-template").unwrap();
-    let output = cmd
-        .current_dir(temp_path)
-        .args(&[
-            "python_package",
-            "-p",
-            "requests",
-            "-v",
-            "2.31.0",
-            "-l",
-            "asl20",
-            "--maintainer",
-            "",
-            "--init-npins",
-        ])
-        .output()
-        .unwrap();
-
-    assert!(output.status.success(), "Command failed: {:?}", output);
-
-    let wrapper = std::fs::read_to_string(temp_path.join("default.nix")).unwrap();
-    assert!(
-        wrapper.contains("pkgs.python3Packages.requests"),
-        "Python wrapper should resolve via python3Packages; got:\n{}",
-        wrapper
-    );
-
-    // The overlay should use python3Packages.callPackage.
-    let overlay = std::fs::read_to_string(temp_path.join("nix").join("overlay.nix")).unwrap();
-    assert!(
-        overlay.contains(
-            "requests = final.python3Packages.callPackage ./pkgs/requests/package.nix { }"
-        ),
-        "Python overlay should use python3Packages.callPackage; got:\n{}",
-        overlay
-    );
-
-    insta::assert_snapshot!("init_npins_wrapper_python", wrapper);
-    insta::assert_snapshot!("init_npins_overlay_python", overlay);
-}
-
-/// Test --init-npins combined with --init-flake: both scaffolds coexist.
-///
-/// NOTE: This test is disabled because --init-npins is now only for local project
-/// initialization and cannot be used with explicit remote package parameters.
-#[test]
-#[ignore]
-fn test_init_npins_with_init_flake() {
-    let temp_dir = TempDir::new().unwrap();
-    let temp_path = temp_dir.path();
-
-    let mut cmd = Command::cargo_bin("nix-template").unwrap();
-    let output = cmd
-        .current_dir(temp_path)
-        .args(&[
-            "stdenv",
-            "-p",
-            "hello",
-            "-v",
-            "1.0",
-            "-l",
-            "mit",
-            "--maintainer",
-            "",
-            "--init-npins",
-            "--init-flake",
-        ])
-        .output()
-        .unwrap();
-
-    assert!(output.status.success(), "Command failed: {:?}", output);
-
-    // Structured layout: package + overlay under nix/, flake/default at root,
-    // npins/ at root.
-    assert!(
-        temp_path
-            .join("nix")
-            .join("pkgs")
-            .join("hello")
-            .join("package.nix")
-            .exists(),
-        "nix/pkgs/hello/package.nix should exist"
-    );
-    assert!(
-        temp_path.join("nix").join("overlay.nix").exists(),
-        "nix/overlay.nix"
-    );
-    assert!(
-        temp_path.join("default.nix").exists(),
-        "top-level default.nix"
-    );
-    assert!(temp_path.join("flake.nix").exists(), "flake.nix");
-    assert!(
-        temp_path.join("npins").join("default.nix").exists(),
-        "npins/default.nix"
-    );
-    assert!(
-        temp_path.join("npins").join("sources.json").exists(),
-        "npins/sources.json"
-    );
-
-    // Top-level default.nix imports the overlay applied to npins-pinned nixpkgs.
-    let wrapper = std::fs::read_to_string(temp_path.join("default.nix")).unwrap();
-    assert!(wrapper.contains("overlays = [ (import ./nix/overlay.nix) ];"));
-
-    // Flake exposes the overlay and references the package under nix/pkgs/.
-    let flake = std::fs::read_to_string(temp_path.join("flake.nix")).unwrap();
-    assert!(
-        flake.contains("overlays.default = import ./nix/overlay.nix"),
-        "flake should expose overlays.default; got:\n{}",
-        flake
-    );
-}
-
-/// Test that --init-npins refuses to clobber pre-existing scaffold files
-/// (specifically files inside the npins/ directory, which the existing
-/// package-path collision check does not cover).
+/// Test --init-npins refuses to clobber pre-existing scaffold files
 #[test]
 fn test_init_npins_refuses_overwrite() {
     let temp_dir = TempDir::new().unwrap();
@@ -566,6 +128,8 @@ fn test_init_npins_refuses_overwrite() {
     let output = cmd
         .current_dir(temp_path)
         .args(&[
+            "project",
+            "npins",
             "stdenv",
             "-p",
             "hello",
@@ -575,7 +139,6 @@ fn test_init_npins_refuses_overwrite() {
             "mit",
             "--maintainer",
             "",
-            "--init-npins",
         ])
         .output()
         .unwrap();
@@ -598,6 +161,7 @@ fn test_npm_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "npm",
             "-p",
             "example",
@@ -629,6 +193,7 @@ fn test_pnpm_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "pnpm",
             "-p",
             "example",
@@ -666,6 +231,7 @@ fn test_dotnet_template_basic() {
     let output = Command::cargo_bin("nix-template")
         .unwrap()
         .args(&[
+            "template",
             "dotnet",
             "--pname",
             "example",
@@ -711,6 +277,7 @@ fn test_ruby_template_basic() {
     let output = Command::cargo_bin("nix-template")
         .unwrap()
         .args(&[
+            "template",
             "ruby",
             "--pname",
             "example",
@@ -782,6 +349,7 @@ BUNDLED WITH
         .unwrap()
         .current_dir(temp_dir.path())
         .args(&[
+            "template",
             "ruby",
             "--pname",
             "example",
@@ -811,7 +379,6 @@ BUNDLED WITH
 
 /// Test that file writes successfully complete and show success messages
 /// without crashing due to canonicalize failures.
-/// This is a regression test for the post-write canonicalize crash bug.
 #[test]
 fn test_file_write_shows_success_message() {
     let temp_dir = TempDir::new().unwrap();
@@ -820,6 +387,7 @@ fn test_file_write_shows_success_message() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "stdenv",
             "-p",
             "test-package",
@@ -863,9 +431,6 @@ fn test_file_write_shows_success_message() {
 }
 
 /// Test that write_new atomically prevents overwriting files.
-/// This is a regression test for the TOCTOU race condition bug.
-/// The atomic create_new operation should prevent race conditions where
-/// a file could be created between the existence check and write.
 #[test]
 fn test_write_new_atomic_overwrite_prevention() {
     let temp_dir = TempDir::new().unwrap();
@@ -878,6 +443,7 @@ fn test_write_new_atomic_overwrite_prevention() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "stdenv",
             "-p",
             "test-overwrite",
@@ -899,7 +465,6 @@ fn test_write_new_atomic_overwrite_prevention() {
     );
 
     // Error message should indicate refusal to overwrite
-    // Either from early check in cli.rs or from atomic operation in output.rs
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
         stderr.contains("Refusing to overwrite") || stderr.contains("already exists"),
@@ -916,9 +481,8 @@ fn test_write_new_atomic_overwrite_prevention() {
 }
 
 /// Test that write_new won't follow symlinks to overwrite target files.
-/// This prevents symlink attack scenarios.
 #[test]
-#[cfg(unix)] // Symlinks work differently on Windows
+#[cfg(unix)]
 fn test_write_new_prevents_symlink_attacks() {
     use std::os::unix::fs::symlink;
 
@@ -936,6 +500,7 @@ fn test_write_new_prevents_symlink_attacks() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "stdenv",
             "-p",
             "symlink-test",
@@ -965,7 +530,6 @@ fn test_write_new_prevents_symlink_attacks() {
 }
 
 /// Test that the program handles corrupted config files gracefully
-/// This is a regression test for the XDG/Config unwrap crash bug.
 #[test]
 fn test_corrupted_config_file_doesnt_crash() {
     let temp_dir = TempDir::new().unwrap();
@@ -983,6 +547,7 @@ fn test_corrupted_config_file_doesnt_crash() {
     let output = cmd
         .env("XDG_CONFIG_HOME", temp_dir.path())
         .args(&[
+            "template",
             "stdenv",
             "-p",
             "test-config",
@@ -1038,6 +603,7 @@ fn test_malformed_toml_config_doesnt_crash() {
     let output = cmd
         .env("XDG_CONFIG_HOME", temp_dir.path())
         .args(&[
+            "template",
             "stdenv",
             "-p",
             "test-toml",
@@ -1076,13 +642,9 @@ fn test_malformed_toml_config_doesnt_crash() {
 }
 
 /// Test that the program works when config directory cannot be created
-/// (simulated by using a read-only location)
 #[test]
-#[cfg(unix)] // Unix-specific test using permissions
+#[cfg(unix)]
 fn test_no_config_directory_doesnt_crash() {
-    // This test verifies that if XDG setup fails entirely,
-    // the program uses fallback and continues
-
     let temp_dir = TempDir::new().unwrap();
     let readonly_dir = temp_dir.path().join("readonly");
     fs::create_dir(&readonly_dir).unwrap();
@@ -1090,7 +652,7 @@ fn test_no_config_directory_doesnt_crash() {
     // Make directory read-only
     use std::os::unix::fs::PermissionsExt;
     let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
-    perms.set_mode(0o444); // Read-only
+    perms.set_mode(0o444);
     fs::set_permissions(&readonly_dir, perms).unwrap();
 
     // Try to use the read-only directory as config home
@@ -1098,6 +660,7 @@ fn test_no_config_directory_doesnt_crash() {
     let output = cmd
         .env("XDG_CONFIG_HOME", &readonly_dir)
         .args(&[
+            "template",
             "stdenv",
             "-p",
             "test-readonly",
@@ -1138,6 +701,7 @@ fn test_php_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "php",
             "-p",
             "laravel",
@@ -1147,7 +711,7 @@ fn test_php_template_basic() {
             "mit",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1186,6 +750,7 @@ fn test_php_template_with_extensions() {
     let output = cmd
         .current_dir(&temp_path)
         .args(&[
+            "template",
             "php",
             "-p",
             "test-app",
@@ -1195,7 +760,7 @@ fn test_php_template_with_extensions() {
             "mit",
             "--maintainer",
             "",
-            "-s", // --stdout flag (no --init-flake to avoid temp dir in snapshot)
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1204,8 +769,6 @@ fn test_php_template_with_extensions() {
     let stdout = String::from_utf8(output.stdout).unwrap();
 
     // Verify PHP extension wrapper is generated
-    // Note: When version is detected from composer.json, it will be php83.buildEnv
-    // Otherwise it will be php.buildEnv
     assert!(stdout.contains("php83.buildEnv") || stdout.contains("php.buildEnv"));
     assert!(stdout.contains("extensions ="));
     assert!(stdout.contains("pdo"));
@@ -1224,6 +787,7 @@ fn test_maven_basic_template() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "maven",
             "-p",
             "spring-boot-app",
@@ -1233,7 +797,7 @@ fn test_maven_basic_template() {
             "apache20",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1286,6 +850,7 @@ fn test_maven_template_with_jdbc() {
     let output = cmd
         .current_dir(&temp_path)
         .args(&[
+            "template",
             "maven",
             "-p",
             "test-app",
@@ -1295,7 +860,7 @@ fn test_maven_template_with_jdbc() {
             "apache20",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1307,7 +872,7 @@ fn test_maven_template_with_jdbc() {
     assert!(stdout.contains("maven.buildMavenPackage"));
     assert!(stdout.contains("mvnHash"));
 
-    // Snapshot the entire output (dependencies would be inferred if implemented)
+    // Snapshot the entire output
     insta::assert_snapshot!("maven_with_jdbc_template", stdout);
 }
 
@@ -1317,6 +882,7 @@ fn test_elixir_basic_template() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "elixir",
             "-p",
             "phoenix_app",
@@ -1326,7 +892,7 @@ fn test_elixir_basic_template() {
             "mit",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1335,7 +901,7 @@ fn test_elixir_basic_template() {
     let stdout = String::from_utf8(output.stdout).unwrap();
 
     // Verify it's an Elixir derivation
-    assert!(stdout.contains("beamPackages.mixRelease")); // Default is Release
+    assert!(stdout.contains("beamPackages.mixRelease"));
     assert!(stdout.contains("mixFodDeps"));
     assert!(stdout.contains("beamPackages.fetchMixDeps"));
 
@@ -1343,7 +909,7 @@ fn test_elixir_basic_template() {
     insta::assert_snapshot!("elixir_basic_template", stdout);
 }
 
-/// Test basic Gradle template generation (Manual variant with gradle.fetchDeps)
+/// Test basic Gradle template generation
 #[test]
 fn test_gradle_basic_template() {
     let temp_dir = TempDir::new().unwrap();
@@ -1376,6 +942,7 @@ dependencies {
     let output = cmd
         .current_dir(&temp_path)
         .args(&[
+            "template",
             "gradle",
             "-p",
             "example-app",
@@ -1385,7 +952,7 @@ dependencies {
             "apache20",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1442,6 +1009,7 @@ dependencies {
     let output = cmd
         .current_dir(&temp_path)
         .args(&[
+            "template",
             "gradle",
             "-p",
             "spring-app",
@@ -1451,7 +1019,7 @@ dependencies {
             "apache20",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1462,8 +1030,6 @@ dependencies {
     // Verify it's a Gradle derivation
     assert!(stdout.contains("stdenv.mkDerivation"));
     assert!(stdout.contains("gradle.fetchDeps"));
-    // Note: In test environment, gradle-deps.json detection may not work due to
-    // current_dir limitations, so we just verify the general structure
 
     // Snapshot the output
     insta::assert_snapshot!("gradle_gradle2nix_template", stdout);
@@ -1498,6 +1064,7 @@ executables:
     let output = cmd
         .current_dir(&temp_path)
         .args(&[
+            "template",
             "dart",
             "-p",
             "dart-cli-app",
@@ -1507,7 +1074,7 @@ executables:
             "mit",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1525,12 +1092,12 @@ executables:
 }
 
 /// Test basic Haskell template generation
-/// This should generate a Haskell package using callCabal2nix
 #[test]
 fn test_haskell_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "haskell",
             "-p",
             "my-haskell-pkg",
@@ -1540,7 +1107,7 @@ fn test_haskell_template_basic() {
             "bsd3",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1558,12 +1125,12 @@ fn test_haskell_template_basic() {
 }
 
 /// Test basic OCaml template generation
-/// This should generate an OCaml package using buildDunePackage
 #[test]
 fn test_ocaml_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "ocaml",
             "-p",
             "my-ocaml-pkg",
@@ -1573,7 +1140,7 @@ fn test_ocaml_template_basic() {
             "mit",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1591,12 +1158,12 @@ fn test_ocaml_template_basic() {
 }
 
 /// Test basic Scala template generation
-/// This should generate a Scala/SBT package using mkDerivation with sbt-derivation pattern
 #[test]
 fn test_scala_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "scala",
             "-p",
             "my-scala-app",
@@ -1606,7 +1173,7 @@ fn test_scala_template_basic() {
             "apache2",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1628,6 +1195,7 @@ fn test_clojure_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "clojure",
             "-p",
             "my-clojure-app",
@@ -1637,7 +1205,7 @@ fn test_clojure_template_basic() {
             "epl10",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1660,6 +1228,7 @@ fn test_perl_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "perl",
             "-p",
             "My-Module",
@@ -1669,7 +1238,7 @@ fn test_perl_template_basic() {
             "artistic2",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1691,6 +1260,7 @@ fn test_lua_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "lua",
             "-p",
             "my-lua-lib",
@@ -1700,7 +1270,7 @@ fn test_lua_template_basic() {
             "mit",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
@@ -1722,6 +1292,7 @@ fn test_r_template_basic() {
     let mut cmd = Command::cargo_bin("nix-template").unwrap();
     let output = cmd
         .args(&[
+            "template",
             "r",
             "-p",
             "myRpackage",
@@ -1731,7 +1302,7 @@ fn test_r_template_basic() {
             "mit",
             "--maintainer",
             "",
-            "-s", // --stdout flag
+            "-s",
         ])
         .output()
         .unwrap();
